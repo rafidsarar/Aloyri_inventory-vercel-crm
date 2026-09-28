@@ -4,7 +4,7 @@ import { roleCanEdit } from './roles';
 
 /** The CRM sends one state document; keep its shape while removing fields outside a role's work. */
 export function visibleState(source:State,role:WorkspaceRole):State {
-  if(role==='owner'||role==='viewer')return source;
+  if(role==='owner'||role==='admin'||role==='viewer')return source;
   const state=structuredClone(source);
   state.expenses=[];
   state.cashEntries=[];
