@@ -23,6 +23,10 @@ The archive has no live customer records. In the existing private Skinventory si
 
 Open **Finances → Cashflow** for dated cash in, cash out and net movement. Settled delivered orders count the payout after courier and payment fees on their settlement date; paid stock batches count their batch cost on the payment date; operating expenses count on their recorded date. Use **Record cash movement** for capital deposits, transfers and other payments, and avoid entering automatically counted movements twice. Older settled orders or paid batches without payment dates are excluded until their known movements are entered manually. Net cashflow is not a bank balance or operating profit.
 
+## Account reconciliation
+
+Open **Finances → Reconciliation** to track Cash, Bank, bKash and Nagad separately. Set each account's actual opening balance and date; that balance is measured before any transactions dated on the opening date. Earlier movements stay in Cashflow but are excluded from that account's ledger. Assign existing Cashflow movements to the account where the money actually moved, add a statement reference if useful and mark a movement matched only after checking the statement. A movement can be assigned to one account at a time; assigning it does not create another Cashflow entry. Enter a statement date and actual statement balance to compare it with the opening balance plus matched movements through that date. Unmatched movements are excluded from the statement comparison, while all assigned movements count toward the CRM account balance. A zero difference does not prove every movement has been entered or assigned. For a transfer between accounts, record separate cash-out and cash-in movements.
+
 ## Local development
 
 Create a Neon development database and run `sql/001_init.sql` in its SQL Editor. Create `.env.local` containing `DATABASE_URL=postgresql://...` and `BOOTSTRAP_SECRET=<a different random key>`. Run `pnpm install --frozen-lockfile`, `pnpm dev`, and open `/setup`. To check the build, run `pnpm build`. Keep development and production databases separate.
