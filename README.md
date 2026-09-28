@@ -17,6 +17,10 @@ Uploading the ZIP itself is not the recommended Vercel workflow; import a GitHub
 
 The archive has no live customer records. In the existing private Skinventory site, the owner can use **Download full backup**. On the new site, use **Import records** before making any new records. The import accepts a fresh, empty workspace only. Compare product, customer, and order counts after the move. Keep the downloaded backup private.
 
+## Cashflow
+
+Open **Finances → Cashflow** for dated cash in, cash out and net movement. Settled delivered orders count the payout after courier and payment fees on their settlement date; paid stock batches count their batch cost on the payment date; operating expenses count on their recorded date. Use **Record cash movement** for capital deposits, transfers and other payments, and avoid entering automatically counted movements twice. Older settled orders or paid batches without payment dates are excluded until their known movements are entered manually. Net cashflow is not a bank balance or operating profit.
+
 ## Local development
 
 Create a Neon development database and run `sql/001_init.sql` in its SQL Editor. Create `.env.local` containing `DATABASE_URL=postgresql://...` and `BOOTSTRAP_SECRET=<a different random key>`. Run `pnpm install --frozen-lockfile`, `pnpm dev`, and open `/setup`. To check the build, run `pnpm build`. Keep development and production databases separate.
