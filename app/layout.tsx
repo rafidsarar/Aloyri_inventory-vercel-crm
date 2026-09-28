@@ -5,8 +5,8 @@ export const metadata: Metadata = {
   title: "ALOYRI | Skincare CRM",
   description: "Your private skincare business CRM. Orders, customers, inventory and finances in BDT.",
   icons: {
-    icon: "/aloyri-logo.webp",
-    shortcut: "/favicon.svg",
+    icon: [{ url: "/favicon.svg?v=aloyri", type: "image/svg+xml", sizes: "any" }],
+    shortcut: "/favicon.svg?v=aloyri",
   },
 };
 
