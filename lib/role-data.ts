@@ -8,6 +8,8 @@ export function visibleState(source:State,role:WorkspaceRole):State {
   const state=structuredClone(source);
   state.expenses=[];
   state.cashEntries=[];
+  state.accountOpenings=[];
+  state.accountMatches=[];
   state.budget=0;
   if(role==='sales'){
     state.suppliers=[];
