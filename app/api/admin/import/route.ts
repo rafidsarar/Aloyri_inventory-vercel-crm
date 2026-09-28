@@ -3,7 +3,7 @@ import { database } from '@/db/raw';
 import { stateSchema,validateRelations } from '@/lib/crm';
 export async function POST(request:Request){
   if(!checkOrigin(request))return Response.json({error:'Invalid request origin.'},{status:403});
-  const user=await getAppUser();if(!user||user.role!=='owner')return Response.json({error:'Only the owner can import records.'},{status:403});
+  const user=await getAppUser();if(!user||!['owner','admin'].includes(user.role))return Response.json({error:'Only the owner or an admin can import records.'},{status:403});
   const text=await request.text();if(text.length>1800000)return Response.json({error:'Backup is too large.'},{status:413});
   let raw:any;try{raw=JSON.parse(text)}catch{return Response.json({error:'Invalid JSON backup.'},{status:400})}
   const parsed=stateSchema.safeParse(raw.data||raw);
