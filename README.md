@@ -27,6 +27,10 @@ Open **Finances → Cashflow** for dated cash in, cash out and net movement. Set
 
 Open **Finances → Reconciliation** to track Cash, Bank, bKash and Nagad separately. Set each account's actual opening balance and date; that balance is measured before any transactions dated on the opening date. Earlier movements stay in Cashflow but are excluded from that account's ledger. Assign existing Cashflow movements to the account where the money actually moved, add a statement reference if useful and mark a movement matched only after checking the statement. A movement can be assigned to one account at a time; assigning it does not create another Cashflow entry. Enter a statement date and actual statement balance to compare it with the opening balance plus matched movements through that date. Unmatched movements are excluded from the statement comparison, while all assigned movements count toward the CRM account balance. A zero difference does not prove every movement has been entered or assigned. For a transfer between accounts, record separate cash-out and cash-in movements.
 
+## Business profile and invoices
+
+Open **Business settings** to edit the business name, phone, email, address, optional registered BIN, and starting capital. Upload a PNG, JPG or WebP logo; it is resized in the browser before saving. Add an invoice footer and return policy if desired. The invoice displays these details only when provided and remains printable or downloadable as a PDF. Business settings are editable by the owner and admins; changes affect future prints of older orders, while already downloaded PDFs are unchanged. Enter a BIN only when it belongs to the business. This is a customer invoice layout, not an automatic tax calculation.
+
 ## Local development
 
 Create a Neon development database and run `sql/001_init.sql` in its SQL Editor. Create `.env.local` containing `DATABASE_URL=postgresql://...` and `BOOTSTRAP_SECRET=<a different random key>`. Run `pnpm install --frozen-lockfile`, `pnpm dev`, and open `/setup`. To check the build, run `pnpm build`. Keep development and production databases separate.
