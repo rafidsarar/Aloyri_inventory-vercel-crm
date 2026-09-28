@@ -26,8 +26,9 @@ class Statement {
   async run() { const result = await this.query(); return { meta: { changes: result.rowCount } }; }
 }
 function client() {
-  if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is not configured.');
-  return neon(process.env.DATABASE_URL);
+  const url = process.env.SKINVENTORY_DB_DATABASE_URL || process.env.DATABASE_URL;
+  if (!url) throw new Error('A Neon database URL is not configured.');
+  return neon(url);
 }
 export function database() {
   return {
