@@ -19,7 +19,7 @@ export default function Invoice({state,order,onClose}:{state:State;order:Order|n
         <div><strong>INVOICE</strong><span>INV-{order.number}</span><small>{date}</small></div>
       </header>
       <div className="aloyri-business">
-        <div><strong>ALOYRI</strong><span>Let Your Skin Glow.</span>{profile.address&&<span className="invoice-address">{profile.address}</span>}{profile.phone&&<span>{profile.phone}</span>}{profile.email&&<span>{profile.email}</span>}{profile.bin&&<span>BIN / VAT: {profile.bin}</span>}</div>
+        <div>{profile.address&&<span className="invoice-address">{profile.address}</span>}{profile.phone&&<span>{profile.phone}</span>}{profile.email&&<span>{profile.email}</span>}{profile.bin&&<span>BIN / VAT: {profile.bin}</span>}</div>
         <div><span><b>Order</b> {order.number}</span><span><b>Payment</b> {order.payment}</span><span><b>Status</b> {paymentStatus}</span></div>
       </div>
       <section className="aloyri-bill"><h3>Bill to</h3><div><div><small>Customer</small><strong>{customer?.name||'Customer'}</strong></div><div><small>Phone</small><strong>{customer?.phone||'—'}</strong></div><div><small>Delivery address</small><strong>{[customer?.address,customer?.city].filter(Boolean).join(', ')||'—'}</strong></div></div></section>
