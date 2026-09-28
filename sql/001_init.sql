@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS crm_users (
   owner_id TEXT NOT NULL,
   email TEXT NOT NULL UNIQUE,
   name TEXT NOT NULL DEFAULT '',
-  role TEXT NOT NULL CHECK (role IN ('owner','sales','inventory','viewer')),
+  role TEXT NOT NULL CHECK (role IN ('owner','admin','sales','inventory','viewer')),
   password_salt TEXT,
   password_hash TEXT,
   active INTEGER NOT NULL DEFAULT 1,
