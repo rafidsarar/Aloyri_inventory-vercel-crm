@@ -31,7 +31,7 @@ export const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Dhaka',ye
 export const shiftDate=(days:number,base=today())=>{const d=new Date(base+'T12:00:00Z'); d.setUTCDate(d.getUTCDate()+days); return d.toISOString().slice(0,10)};
 export const taka=(n:number)=>'৳'+Math.round(n).toLocaleString('en-BD');
 export const dateLabel=(d:string)=>new Date(d+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short'});
-export function initialState():State {return {businessName:'My skincare business',businessProfile:emptyBusinessProfile(),budget:120000,productCategories:[...categories],customers:[],suppliers:[],batches:[],stockAdjustments:[],orders:[],expenses:[],cashEntries:[],accountOpenings:[],accountMatches:[],tasks:[],products:[
+export function initialState():State {return {businessName:'ALOYRI',businessProfile:emptyBusinessProfile(),budget:120000,productCategories:[...categories],customers:[],suppliers:[],batches:[],stockAdjustments:[],orders:[],expenses:[],cashEntries:[],accountOpenings:[],accountMatches:[],tasks:[],products:[
   {id:'simple-wash',brand:'Simple',name:'Refreshing Facial Wash',size:'150ml · Poland',category:'Cleanser',price:749,cost:520,targetQty:12,reorderAt:4,active:true},
   {id:'simple-light',brand:'Simple',name:'Hydrating Light Moisturiser',size:'125ml · Hungary',category:'Moisturizer',price:749,cost:520,targetQty:10,reorderAt:4,active:true},
   {id:'simple-rich',brand:'Simple',name:'Replenishing Rich Moisturizer',size:'125ml',category:'Moisturizer',price:775,cost:540,targetQty:6,reorderAt:3,active:true},
@@ -77,3 +77,6 @@ export function cashflow(s:State){
   entries.sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
   return {entries,undated:s.orders.filter(o=>o.settled&&!o.settledAt).length+s.batches.filter(b=>b.paid&&!b.paidAt).length};
 }
+
+/** Keep the ALOYRI identity fixed for existing and imported workspaces. */
+export const fixedBusinessName = (state:State):State => ({...state,businessName:'ALOYRI'});

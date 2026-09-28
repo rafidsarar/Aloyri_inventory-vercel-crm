@@ -2,7 +2,7 @@ import { getAppUser, checkOrigin } from '@/app/local-auth';
 import { AccessDenied, resolveWorkspace } from '@/app/team-access';
 import { visibleState, applyRoleChanges } from '@/lib/role-data';
 import { database } from '@/db/raw';
-import { initialState, stateSchema, validateRelations } from '@/lib/crm';
+import { initialState, stateSchema, validateRelations, fixedBusinessName } from '@/lib/crm';
 
 export const dynamic='force-dynamic';
 const response=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
@@ -16,7 +16,7 @@ export async function GET(){
     if(role==='owner')await db.prepare('INSERT OR IGNORE INTO crm_workspaces (owner_id,data,version,updated_at) VALUES (?,?,0,?)').bind(ownerId,JSON.stringify(initialState()),new Date().toISOString()).run();
     const row=await db.prepare('SELECT data,version FROM crm_workspaces WHERE owner_id = ?').bind(ownerId).first<{data:string;version:number}>();
     if(!row)return response({error:'The shared workspace is not ready. Ask the owner to sign in first.'},404);
-    return response({data:visibleState(stateSchema.parse(JSON.parse(row.data)),role),version:row.version,role,userName:user.displayName});
+    return response({data:visibleState(fixedBusinessName(stateSchema.parse(JSON.parse(row.data))),role),version:row.version,role,userName:user.displayName});
   }catch(e){
     if(e instanceof AccessDenied)return response({error:e.message},403);
     console.error('Workspace read failed',e);
@@ -40,9 +40,10 @@ export async function PUT(request:Request){
     const db=database();
     const existing=await db.prepare('SELECT data,version FROM crm_workspaces WHERE owner_id = ?').bind(ownerId).first<{data:string;version:number}>();
     if(!existing||existing.version!==body.version)return response({error:'This workspace changed in another window. Refresh records, then try again.'},409);
-    const previous=stateSchema.parse(JSON.parse(existing.data));
+    const previous=fixedBusinessName(stateSchema.parse(JSON.parse(existing.data)));
     let merged:typeof previous;
     try{merged=applyRoleChanges(previous,parsed.data,role)}catch(e){return response({error:e instanceof Error?e.message:'You cannot change that section.'},403)}
+    merged=fixedBusinessName(merged);
     try{validateRelations(merged)}catch(e){return response({error:e instanceof Error?e.message:'Invalid records.'},400)}
     const result=await db.prepare('UPDATE crm_workspaces SET data = ?, version = version + 1, updated_at = ? WHERE owner_id = ? AND version = ?').bind(JSON.stringify(merged),new Date().toISOString(),ownerId,body.version).run();
     if(!result.meta.changes)return response({error:'This workspace changed in another window. Refresh records, then try again.'},409);

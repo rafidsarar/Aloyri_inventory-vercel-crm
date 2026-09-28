@@ -1,10 +1,8 @@
 'use client';
 import React from 'react';
-import Image from 'next/image';
 import { Download, Printer } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { State, Order, taka, total } from '@/lib/crm';
-import { aloyriInvoiceLogo } from './aloyri-invoice-logo';
 
 export default function Invoice({state,order,onClose}:{state:State;order:Order|null;onClose:()=>void}){
   if(!order)return null;
@@ -16,7 +14,7 @@ export default function Invoice({state,order,onClose}:{state:State;order:Order|n
   return <Dialog open onOpenChange={open=>{if(!open)onClose()}}><DialogContent className="invoice-dialog aloyri-dialog">
     <DialogHeader className="invoice-screen-header"><DialogTitle>Invoice for {order.number}</DialogTitle><DialogDescription>ALOYRI invoice generated from the saved order. Print or save it as a PDF.</DialogDescription></DialogHeader>
     <div className="invoice-page aloyri-invoice" aria-label={'ALOYRI invoice '+order.number}>
-      <header className="aloyri-masthead"><Image src={aloyriInvoiceLogo} alt="ALOYRI - Let Your Skin Glow" width={265} height={98} unoptimized priority/><div><strong>INVOICE</strong><span># INV-{order.number}</span><small>Order ID: {order.number}</small></div></header>
+      <header className="aloyri-masthead"><img src="/aloyri-logo.webp" alt="ALOYRI — Let Your Skin Glow" width={265} height={100}/><div><strong>INVOICE</strong><span># INV-{order.number}</span><small>Order ID: {order.number}</small></div></header>
       <div className="aloyri-business"><div><strong>ALOYRI</strong><span>Premium Skincare | Let Your Skin Glow.</span>{profile.address&&<span className="invoice-address">{profile.address}</span>}{(profile.phone||profile.email)&&<span>{profile.phone&&<>Phone: {profile.phone}</>}{profile.phone&&profile.email?' | ':''}{profile.email&&<>Email: {profile.email}</>}</span>}{profile.bin&&<span>BIN/VAT: {profile.bin}</span>}</div><div><span>Invoice Date: {date}</span><span>Payment Method: {order.payment}</span><span>Payment Status: {paymentStatus}</span></div></div>
       <section className="aloyri-bill"><h3>BILL TO</h3><div><div><small>CUSTOMER NAME</small><strong>{customer?.name||'Customer'}</strong></div><div><small>PHONE</small><strong>{customer?.phone||'—'}</strong></div><div><small>DELIVERY ADDRESS</small><strong>{[customer?.address,customer?.city].filter(Boolean).join(', ')||'—'}</strong></div></div></section>
       <section className="aloyri-order"><h3>ORDER DETAILS</h3><table><thead><tr><th>#</th><th>Product</th><th>Qty</th><th>Unit Price</th><th>Amount</th></tr></thead><tbody>{Array.from({length:Math.max(5,order.items.length)},(_,index)=>{const item=order.items[index],product=item&&state.products.find(p=>p.id===item.productId);return item?<tr key={item.productId+'-'+index}><td>{index+1}</td><td><strong>{product?.name||'Product'}</strong><small>{[product?.brand,product?.size].filter(Boolean).join(' · ')}</small></td><td>{item.qty}</td><td>{taka(item.price)}</td><td>{taka(item.price*item.qty)}</td></tr>:<tr className="aloyri-empty-row" key={'blank-'+index} aria-hidden="true"><td>{index+1}</td><td/><td/><td/><td/></tr>})}</tbody></table></section>
