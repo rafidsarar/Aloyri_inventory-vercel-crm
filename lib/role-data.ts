@@ -7,6 +7,7 @@ export function visibleState(source:State,role:WorkspaceRole):State {
   if(role==='owner'||role==='viewer')return source;
   const state=structuredClone(source);
   state.expenses=[];
+  state.cashEntries=[];
   state.budget=0;
   if(role==='sales'){
     state.suppliers=[];
