@@ -6,8 +6,8 @@ Independent CRM website with its own email and password login. It runs on Vercel
 
 1. Push the contents of this folder to your own GitHub repository. Keep `DATABASE_URL`, `BOOTSTRAP_SECRET`, customer backups, and `.env.local` out of GitHub.
 2. Create a Vercel project from that repository. Framework preset: **Next.js**. Root directory: repository root (or this folder if this project is in a larger repository). Use Node.js 22 or newer. Build command: `pnpm build` (Vercel can detect the framework default). The repository includes `pnpm-lock.yaml`.
-3. In Vercel's Storage/Marketplace, connect a **Neon Postgres** database to the project. Confirm the project has a server-side `DATABASE_URL` environment variable for Production, with the Neon Postgres connection string. In the Neon SQL Editor for that database, run `sql/001_init.sql` once. This creates the required tables.
-4. Generate a setup key (`openssl rand -hex 32`) and add it to Vercel project environment variables as `BOOTSTRAP_SECRET` for Production. Do not expose it through a `NEXT_PUBLIC_` variable. Redeploy after environment variables are set.
+3. In Vercel's Storage/Marketplace, connect a **Neon Postgres** database to the project. The app uses `SKINVENTORY_DB_DATABASE_URL` when connected with the `SKINVENTORY_DB` prefix, or `DATABASE_URL` for a manually configured database. In the Neon SQL Editor for that database, run each statement in `sql/001_init.sql` individually once. This creates the required tables.
+4. Generate a setup key (`openssl rand -hex 32`) and add it to Vercel project environment variables as `BOOTSTRAP_SECRET` for Production. Replace the public `.env.example` value; the app rejects it. Do not expose it through a `NEXT_PUBLIC_` variable. Redeploy after environment variables are set.
 5. Open `https://<your-project>.vercel.app/setup`, enter the setup key, owner email and a password of 12–128 characters. Setup succeeds only once. Then log in at `/login`.
 6. In **Manage staff**, invite sales employees and inventory managers. Privately send their one-time invitation links; links expire after seven days. Add your own domain under Vercel **Settings → Domains** if desired.
 
