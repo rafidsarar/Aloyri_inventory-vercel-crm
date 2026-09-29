@@ -103,6 +103,7 @@ export function applyRoleChanges(current:State,proposed:State,role:WorkspaceRole
   if(role==='sales'){
     const currentOrders=new Map(current.orders.map(o=>[o.id,o]));
     const visibleOrders=new Map(visible.orders.map(o=>[o.id,o]));
+    for(const before of current.orders)if(!proposed.orders.some(o=>o.id===before.id))throw new Error('Sales staff cannot delete existing orders.');
     for(const order of proposed.orders){
       const before=currentOrders.get(order.id);
       if(before){
@@ -111,6 +112,7 @@ export function applyRoleChanges(current:State,proposed:State,role:WorkspaceRole
         const protectedAfter={number:order.number,customerId:order.customerId,created:order.created,channel:order.channel,payment:order.payment,items:order.items,discount:order.discount,deliveryCharge:order.deliveryCharge,collections:order.collections,settled:order.settled,settledAt:order.settledAt,courierCost:order.courierCost,packaging:order.packaging,paymentFee:order.paymentFee,returnFee:order.returnFee,restocked:order.restocked};
         if(JSON.stringify(protectedBefore)!==JSON.stringify(protectedAfter))throw new Error('Sales staff can update order status, delivery/tracking and notes, but cannot rewrite order values, stock allocations or finance fields.');
       }else{
+        if(order.status!=='New'||order.delivered||order.returnedAt)throw new Error('Sales staff must create orders in the New stage.');
         if(order.collections.length||order.settled||order.settledAt||order.courierCost||order.packaging||order.paymentFee||order.returnFee||order.restocked)
           throw new Error('Sales staff cannot create finance settlement or internal fulfillment-cost data.');
         for(const item of order.items){
