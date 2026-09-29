@@ -3,10 +3,21 @@ import { AccessDenied, resolveWorkspace } from '@/app/team-access';
 import { visibleState, applyRoleChanges } from '@/lib/role-data';
 import { canManageBusinessSettings } from '@/lib/roles';
 import { database } from '@/db/raw';
-import { initialState, stateSchema, validateRelations, fixedBusinessName } from '@/lib/crm';
+import { initialState, stateSchema, validateRelations, fixedBusinessName, nextStatuses, type State } from '@/lib/crm';
 
 export const dynamic='force-dynamic';
 const response=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
+
+function validateTransitions(previous:State,next:State){
+  const oldOrders=new Map(previous.orders.map(o=>[o.id,o]));
+  for(const order of next.orders){const before=oldOrders.get(order.id);if(before&&before.status!==order.status&&!nextStatuses(before).includes(order.status))throw new Error('Invalid order status transition for #'+before.number+'.');}
+  const allowed:Record<State['purchaseOrders'][number]['status'],readonly State['purchaseOrders'][number]['status'][]>={
+    Draft:['Draft','Sent','Cancelled'],Sent:['Sent','Part received','Received','Cancelled'],'Part received':['Part received','Received','Cancelled'],Received:['Received'],Cancelled:['Cancelled']
+  };
+  const oldPOs=new Map(previous.purchaseOrders.map(p=>[p.id,p]));
+  for(const po of next.purchaseOrders){const before=oldPOs.get(po.id);if(!before)continue;if(!allowed[before.status].includes(po.status))throw new Error('Invalid purchase order status transition for '+before.number+'.');for(const item of po.items){const oldItem=before.items.find(x=>x.productId===item.productId);if(oldItem&&item.receivedQty<oldItem.receivedQty)throw new Error('Received purchase-order quantities cannot be reduced.');}}
+  for(const before of previous.purchaseOrders)if(!next.purchaseOrders.some(p=>p.id===before.id)&&before.items.some(i=>i.receivedQty>0))throw new Error('A purchase order with received stock cannot be deleted.');
+}
 
 export async function GET(){
   try{
@@ -47,7 +58,7 @@ export async function PUT(request:Request){
     let merged:typeof previous;
     try{merged=applyRoleChanges(previous,parsed.data,role)}catch(e){return response({error:e instanceof Error?e.message:'You cannot change that section.'},403)}
     merged=fixedBusinessName(merged);
-    try{validateRelations(merged)}catch(e){return response({error:e instanceof Error?e.message:'Invalid records.'},400)}
+    try{validateTransitions(previous,merged);validateRelations(merged)}catch(e){return response({error:e instanceof Error?e.message:'Invalid records.'},400)}
     const changedSections=(Object.keys(previous) as (keyof typeof previous)[]).filter(key=>JSON.stringify(previous[key])!==JSON.stringify(merged[key])).map(String);
     const now=new Date().toISOString();
     await db.prepare('CREATE TABLE IF NOT EXISTS crm_audit_log (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, actor_id TEXT NOT NULL, actor_name TEXT NOT NULL, role TEXT NOT NULL, summary TEXT NOT NULL, sections TEXT NOT NULL, created_at TEXT NOT NULL)').run();
