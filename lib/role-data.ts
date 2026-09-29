@@ -14,7 +14,7 @@ export function visibleState(source:State,role:WorkspaceRole):State {
   if(role==='sales'){
     state.suppliers=[];
     state.products.forEach(p=>{p.cost=0});
-    state.batches.forEach(b=>{b.unitCost=0;b.supplierId='';b.paid=false});
+    state.batches.forEach(b=>{b.unitCost=0;b.supplierId='';b.paid=false;b.paidAt=undefined});
     state.orders.forEach(o=>o.items.forEach(i=>i.allocations.forEach(a=>{a.unitCost=0})));
   }else{
     state.customers=source.customers.map(c=>({...c,name:'Private customer',phone:'',address:'',city:'',preference:'',notes:'',consent:false}));
