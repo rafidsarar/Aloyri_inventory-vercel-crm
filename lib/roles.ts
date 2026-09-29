@@ -14,3 +14,5 @@ export const roleCanViewSection=(role:WorkspaceRole,section:string)=>(roleCapabi
 export const roleCanPrintInvoice=(role:WorkspaceRole)=>roleCapabilities[role].invoice;
 export const roleCanManageTeam=(role:WorkspaceRole)=>roleCapabilities[role].team;
 export const roleCanReset=(role:WorkspaceRole)=>roleCapabilities[role].reset;
+
+export const roleCanManageFinance=(role:WorkspaceRole)=>roleCapabilities[role].finance;
