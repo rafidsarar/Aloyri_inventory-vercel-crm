@@ -21,7 +21,7 @@ The archive has no live customer records. In the existing private ALOYRI site, t
 
 ## Cashflow
 
-Open **Finances → Cashflow** for dated cash in, cash out and net movement. Settled delivered orders count the payout after courier and payment fees on their settlement date; paid stock batches count their batch cost on the payment date; operating expenses count on their recorded date. Use **Record cash movement** for capital deposits, transfers and other payments, and avoid entering automatically counted movements twice. Older settled orders or paid batches without payment dates are excluded until their known movements are entered manually. Net cashflow is not a bank balance or operating profit.
+Open **Finances → Cashflow** for dated cash in, cash out and net movement. Settled delivered orders count the payout after courier and payment fees on their settlement date; paid stock batches count their batch cost on the payment date; operating expenses count on their recorded date. Use **Record cash movement** for owner contributions, transfers and other payments, and avoid entering automatically counted movements twice. Older settled orders or paid batches without payment dates are excluded until their known movements are entered manually. Net cashflow is not a bank balance or operating profit.
 
 ## Account reconciliation
 
@@ -29,7 +29,7 @@ Open **Finances → Reconciliation** to track Cash, Bank, bKash and Nagad separa
 
 ## Business profile and invoices
 
-The business name is permanently ALOYRI. Open **Business settings** to edit the phone, email, address, optional registered BIN, and starting capital. Upload a PNG, JPG or WebP logo; it is resized in the browser before saving. **View invoice** now uses the ALOYRI customer-provided layout and wordmark, filling in the CRM's saved order, customer, products, delivery, discount and total. It prints or saves as a PDF. The template omits SKU, customer email, VAT/tax and partial-payment amounts because the CRM does not record them; it does not invent these values. The previous editable invoice footer and return-policy text are preserved in existing workspace data but are not shown on the new template. Business contact settings are editable by the owner and admins; changes affect future prints of older orders, while already downloaded PDFs are unchanged. Enter a BIN only when it belongs to the business. This is a customer invoice layout, not an automatic tax calculation.
+The business name is permanently ALOYRI. Open **Business settings** to edit the phone, email, address, optional registered BIN. Upload a PNG, JPG or WebP logo; it is resized in the browser before saving. **View invoice** now uses the ALOYRI customer-provided layout and wordmark, filling in the CRM's saved order, customer, products, delivery, discount and total. It prints or saves as a PDF. The template omits SKU, customer email, VAT/tax and partial-payment amounts because the CRM does not record them; it does not invent these values. The previous editable invoice footer and return-policy text are preserved in existing workspace data but are not shown on the new template. Business contact settings are editable by the owner and admins; changes affect future prints of older orders, while already downloaded PDFs are unchanged. Enter a BIN only when it belongs to the business. This is a customer invoice layout, not an automatic tax calculation.
 
 ## Local development
 

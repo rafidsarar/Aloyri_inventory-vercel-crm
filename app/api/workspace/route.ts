@@ -53,7 +53,7 @@ export async function PUT(request:Request){
     const existing=await db.prepare('SELECT data,version FROM crm_workspaces WHERE owner_id = ?').bind(ownerId).first<{data:string;version:number}>();
     if(!existing||existing.version!==body.version)return response({error:'This workspace changed in another window. Refresh records, then try again.'},409);
     const previous=fixedBusinessName(stateSchema.parse(JSON.parse(existing.data)));
-    if(!canManageBusinessSettings(role)&&(['businessName','businessProfile','budget'] as const).some(key=>JSON.stringify(parsed.data[key])!==JSON.stringify(visibleState(previous,role)[key])))
+    if(!canManageBusinessSettings(role)&&(['businessName','businessProfile'] as const).some(key=>JSON.stringify(parsed.data[key])!==JSON.stringify(visibleState(previous,role)[key])))
       return response({error:'Only the owner or an admin can edit Business settings.'},403);
     let merged:typeof previous;
     try{merged=applyRoleChanges(previous,parsed.data,role)}catch(e){return response({error:e instanceof Error?e.message:'You cannot change that section.'},403)}

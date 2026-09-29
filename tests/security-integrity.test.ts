@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { roleCanEdit, roleCanManageFinance, roleCanManageTeam, roleCanReset } from '../lib/roles.ts';
-import { accountBalance, cashflow, initialState, metrics, receivable, shiftDate, today, uid, validateRelations, type Order, type State } from '../lib/crm.ts';
+import { accountBalance, cashflow, initialState, metrics, receivable, stateSchema, shiftDate, today, uid, validateRelations, type Order, type State } from '../lib/crm.ts';
 
 function baseOrder(overrides:Partial<Order>={}):Order{
   return {
@@ -21,6 +21,13 @@ function baseState(order:Order):State{
   state.purchaseOrders=[];state.stockAdjustments=[];state.expenses=[];state.cashEntries=[];state.accountOpenings=[];state.accountMatches=[];state.financeCloses=[];state.tasks=[];
   return state;
 }
+
+test('legacy starting capital is ignored and new workspaces do not contain it',()=>{
+  const fresh=initialState() as State & {budget?:number};
+  assert.equal('budget' in fresh,false);
+  const parsed=stateSchema.parse({...fresh,budget:120000}) as State & {budget?:number};
+  assert.equal('budget' in parsed,false);
+});
 
 test('production role permissions keep finance and destructive controls restricted',()=>{
   assert.equal(roleCanManageFinance('owner'),true);
