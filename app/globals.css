@@ -310,3 +310,30 @@ h3{font-size:15px;line-height:1.4;font-weight:650}
   #aloyri-print-root .aloyri-masthead,#aloyri-print-root .aloyri-business,#aloyri-print-root .aloyri-bill,#aloyri-print-root .aloyri-totals,#aloyri-print-root .aloyri-footer{break-inside:avoid!important}
   #aloyri-print-root .aloyri-order thead{display:table-header-group!important}#aloyri-print-root .aloyri-order tr{break-inside:avoid!important}
 }
+
+
+/* Keep standard customer invoices on one physical A4 sheet. */
+@media print{
+  @page{size:A4 portrait;margin:8mm}
+  body>#aloyri-print-root{height:281mm!important;max-height:281mm!important;overflow:hidden!important}
+  #aloyri-print-root .aloyri-invoice{height:281mm!important;max-height:281mm!important;overflow:hidden!important;font-size:10.5px!important;line-height:1.35!important;transform:none!important}
+  #aloyri-print-root .aloyri-masthead{padding-bottom:12px!important;gap:14px!important}
+  #aloyri-print-root .aloyri-masthead img{width:170px!important;max-height:58px!important}
+  #aloyri-print-root .aloyri-masthead strong{font-size:17px!important}
+  #aloyri-print-root .aloyri-business{margin:11px 0 13px!important;gap:18px!important;font-size:10px!important}
+  #aloyri-print-root .aloyri-business span{line-height:1.35!important}
+  #aloyri-print-root .aloyri-invoice h3{font-size:10px!important;margin-bottom:5px!important}
+  #aloyri-print-root .aloyri-bill{margin-bottom:12px!important}
+  #aloyri-print-root .aloyri-bill>div{gap:8px!important;padding-top:7px!important}
+  #aloyri-print-root .aloyri-bill small{font-size:9px!important}#aloyri-print-root .aloyri-bill strong{font-size:10.5px!important;line-height:1.3!important}
+  #aloyri-print-root .aloyri-order table{font-size:10px!important}
+  #aloyri-print-root .aloyri-order th{padding:6px!important}#aloyri-print-root .aloyri-order td{padding:6px!important}
+  #aloyri-print-root .aloyri-order td strong{font-size:10px!important}#aloyri-print-root .aloyri-order td small{font-size:8.5px!important}
+  #aloyri-print-root .aloyri-bottom{gap:9px!important;margin-top:9px!important;break-inside:auto!important}
+  #aloyri-print-root .aloyri-totals{font-size:10px!important;break-inside:auto!important}
+  #aloyri-print-root .aloyri-totals>div{padding:4px 2px!important}#aloyri-print-root .aloyri-totals .aloyri-grand{margin-top:2px!important;padding:7px!important;font-size:12px!important}
+  #aloyri-print-root .aloyri-notes{font-size:9.5px!important;padding-top:7px!important;break-inside:auto!important}
+  #aloyri-print-root .aloyri-notes p{line-height:1.25!important}
+  #aloyri-print-root .aloyri-footer{margin-top:10px!important;padding-top:8px!important;font-size:9.5px!important;break-inside:auto!important}
+  #aloyri-print-root .aloyri-footer strong{font-size:11px!important}
+}
