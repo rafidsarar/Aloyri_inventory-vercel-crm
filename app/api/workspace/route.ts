@@ -26,7 +26,7 @@ export async function GET(){
     const {ownerId,role}=await resolveWorkspace(user);
     const db=database();
     if(role==='owner')await db.prepare('INSERT OR IGNORE INTO crm_workspaces (owner_id,data,version,updated_at) VALUES (?,?,0,?)').bind(ownerId,JSON.stringify(initialState()),new Date().toISOString()).run();
-    let row=await db.prepare('SELECT data,version,updated_at FROM crm_workspaces WHERE owner_id = ?').bind(ownerId).first<{data:string;version:number;updated_at:string}>();
+    const row=await db.prepare('SELECT data,version,updated_at FROM crm_workspaces WHERE owner_id = ?').bind(ownerId).first<{data:string;version:number;updated_at:string}>();
     if(!row)return response({error:'The shared workspace is not ready. Ask the owner to sign in first.'},404);
     return response({data:visibleState(fixedBusinessName(stateSchema.parse(JSON.parse(row.data))),role),version:row.version,role,userName:user.displayName});
   }catch(e){
