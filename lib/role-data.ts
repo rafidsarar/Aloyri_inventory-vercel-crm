@@ -10,7 +10,6 @@ export function visibleState(source:State,role:WorkspaceRole):State {
   state.cashEntries=[];
   state.accountOpenings=[];
   state.accountMatches=[];
-  state.budget=0;
   if(role==='sales'){
     state.suppliers=[];state.purchaseOrders=[];
     state.products.forEach(p=>{p.cost=0});
