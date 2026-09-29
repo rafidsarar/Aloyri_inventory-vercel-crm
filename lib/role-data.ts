@@ -43,9 +43,9 @@ export function applyRoleChanges(current:State,proposed:State,role:WorkspaceRole
     for(const order of proposed.orders){
       const before=currentOrders.get(order.id);
       if(before){
-        const protectedBefore={collections:before.collections,settled:before.settled,settledAt:before.settledAt,courierCost:before.courierCost,packaging:before.packaging,paymentFee:before.paymentFee,returnFee:before.returnFee};
-        const protectedAfter={collections:order.collections,settled:order.settled,settledAt:order.settledAt,courierCost:order.courierCost,packaging:order.packaging,paymentFee:order.paymentFee,returnFee:order.returnFee};
-        if(JSON.stringify(protectedBefore)!==JSON.stringify(protectedAfter))throw new Error('Sales staff cannot change collections, settlement or finance cost fields.');
+        const protectedBefore={number:before.number,customerId:before.customerId,created:before.created,channel:before.channel,payment:before.payment,items:before.items,discount:before.discount,deliveryCharge:before.deliveryCharge,collections:before.collections,settled:before.settled,settledAt:before.settledAt,courierCost:before.courierCost,packaging:before.packaging,paymentFee:before.paymentFee,returnFee:before.returnFee,restocked:before.restocked};
+        const protectedAfter={number:order.number,customerId:order.customerId,created:order.created,channel:order.channel,payment:order.payment,items:order.items,discount:order.discount,deliveryCharge:order.deliveryCharge,collections:order.collections,settled:order.settled,settledAt:order.settledAt,courierCost:order.courierCost,packaging:order.packaging,paymentFee:order.paymentFee,returnFee:order.returnFee,restocked:order.restocked};
+        if(JSON.stringify(protectedBefore)!==JSON.stringify(protectedAfter))throw new Error('Sales staff can update order status, delivery/tracking and notes, but cannot rewrite order values, stock allocations or finance fields.');
       }else if(order.collections.length||order.settled||order.settledAt||order.courierCost||order.packaging||order.paymentFee||order.returnFee)throw new Error('Sales staff cannot create finance settlement data.');
     }
   }
