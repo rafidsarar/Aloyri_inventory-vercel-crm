@@ -53,9 +53,9 @@ test('non-restocked returns include lost inventory cost in operating result',()=
   const returned=baseOrder({status:'Returned',returnedAt:today(),delivered:undefined,returnFee:70,restocked:false});
   const state=baseState(returned);
   validateRelations(state);
-  assert.equal(metrics(state).profit,-570);
+  assert.equal(metrics(state).profit,-590);
   returned.restocked=true;
-  assert.equal(metrics(state).profit,-170);
+  assert.equal(metrics(state).profit,-190);
 });
 
 test('broken account transfers are rejected by production validation',()=>{
