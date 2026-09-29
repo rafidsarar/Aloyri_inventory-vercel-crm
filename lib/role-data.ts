@@ -15,7 +15,7 @@ export function visibleState(source:State,role:WorkspaceRole):State {
     state.suppliers=[];state.purchaseOrders=[];
     state.products.forEach(p=>{p.cost=0});
     state.batches.forEach(b=>{b.unitCost=0;b.supplierId='';b.paid=false;b.paidAt=undefined});
-    state.orders.forEach(o=>o.items.forEach(i=>i.allocations.forEach(a=>{a.unitCost=0})));
+    state.orders.forEach(o=>{o.items.forEach(i=>i.allocations.forEach(a=>{a.unitCost=0}));o.courierCost=0;o.packaging=0;o.paymentFee=0;o.returnFee=0;o.collections=[];o.settled=false;o.settledAt=undefined;});
   }else{
     state.customers=source.customers.map(c=>({...c,name:'Private customer',phone:'',address:'',city:'',preference:'',notes:'',consent:false}));
     state.orders=source.orders.map(o=>({...o,number:'Private order',tracking:'',notes:'',discount:0,deliveryCharge:0,courierCost:0,packaging:0,paymentFee:0,returnFee:0,items:o.items.map(i=>({...i,price:0}))}));
@@ -40,10 +40,12 @@ export function applyRoleChanges(current:State,proposed:State,role:WorkspaceRole
   }
   if(role==='sales'){
     const currentOrders=new Map(current.orders.map(o=>[o.id,o]));
+    const visibleOrders=new Map(visible.orders.map(o=>[o.id,o]));
     for(const order of proposed.orders){
       const before=currentOrders.get(order.id);
       if(before){
-        const protectedBefore={number:before.number,customerId:before.customerId,created:before.created,channel:before.channel,payment:before.payment,items:before.items,discount:before.discount,deliveryCharge:before.deliveryCharge,collections:before.collections,settled:before.settled,settledAt:before.settledAt,courierCost:before.courierCost,packaging:before.packaging,paymentFee:before.paymentFee,returnFee:before.returnFee,restocked:before.restocked};
+        const beforeVisible=visibleOrders.get(order.id)!;
+        const protectedBefore={number:beforeVisible.number,customerId:beforeVisible.customerId,created:beforeVisible.created,channel:beforeVisible.channel,payment:beforeVisible.payment,items:beforeVisible.items,discount:beforeVisible.discount,deliveryCharge:beforeVisible.deliveryCharge,collections:beforeVisible.collections,settled:beforeVisible.settled,settledAt:beforeVisible.settledAt,courierCost:beforeVisible.courierCost,packaging:beforeVisible.packaging,paymentFee:beforeVisible.paymentFee,returnFee:beforeVisible.returnFee,restocked:beforeVisible.restocked};
         const protectedAfter={number:order.number,customerId:order.customerId,created:order.created,channel:order.channel,payment:order.payment,items:order.items,discount:order.discount,deliveryCharge:order.deliveryCharge,collections:order.collections,settled:order.settled,settledAt:order.settledAt,courierCost:order.courierCost,packaging:order.packaging,paymentFee:order.paymentFee,returnFee:order.returnFee,restocked:order.restocked};
         if(JSON.stringify(protectedBefore)!==JSON.stringify(protectedAfter))throw new Error('Sales staff can update order status, delivery/tracking and notes, but cannot rewrite order values, stock allocations or finance fields.');
       }else if(order.collections.length||order.settled||order.settledAt||order.courierCost||order.packaging||order.paymentFee||order.returnFee)throw new Error('Sales staff cannot create finance settlement data.');
