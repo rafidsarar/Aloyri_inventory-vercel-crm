@@ -301,7 +301,8 @@ test('inventory employee can restock a returned order without gaining general or
 
 test('legacy batches migrate with empty batch number and optional manufacturing date',()=>{
   const state=baseState(baseOrder());
-  const legacy=structuredClone(state) as any;
+  type LegacyBatch=Omit<State['batches'][number],'batchNumber'|'manufactured'>&{batchNumber?:string;manufactured?:string};
+  const legacy=structuredClone(state) as Omit<State,'batches'>&{batches:LegacyBatch[]};
   delete legacy.batches[0].batchNumber;
   delete legacy.batches[0].manufactured;
   const parsed=stateSchema.parse(legacy);
