@@ -12,7 +12,7 @@ export function visibleState(source:State,role:WorkspaceRole):State {
   state.accountMatches=[];
   state.budget=0;
   if(role==='sales'){
-    state.suppliers=[];
+    state.suppliers=[];state.purchaseOrders=[];
     state.products.forEach(p=>{p.cost=0});
     state.batches.forEach(b=>{b.unitCost=0;b.supplierId='';b.paid=false;b.paidAt=undefined});
     state.orders.forEach(o=>o.items.forEach(i=>i.allocations.forEach(a=>{a.unitCost=0})));
