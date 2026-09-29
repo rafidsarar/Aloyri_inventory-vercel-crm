@@ -96,7 +96,7 @@ function restoreInventoryPaymentFields(next:State,current:State){
 export function applyRoleChanges(current:State,proposed:State,role:WorkspaceRole):State {
   const visible=visibleState(current,role);
   for(const key of Object.keys(current) as (keyof State)[]){
-    if(!roleCanEdit(role,key)&&JSON.stringify(proposed[key])!==JSON.stringify(visible[key]))
+    if(!roleCanEdit(role,key)&&!(role==='inventory'&&key==='orders')&&JSON.stringify(proposed[key])!==JSON.stringify(visible[key]))
       throw new Error('Your role cannot change '+key+'. Ask the owner to update your access.');
   }
 
@@ -134,6 +134,17 @@ export function applyRoleChanges(current:State,proposed:State,role:WorkspaceRole
         throw new Error('Inventory staff cannot create supplier payment data.');
       }
     }
+    if(proposed.orders.length!==visible.orders.length)throw new Error('Inventory staff cannot add or delete orders.');
+    const visibleOrders=new Map(visible.orders.map(o=>[o.id,o]));
+    for(const order of proposed.orders){
+      const before=visibleOrders.get(order.id);
+      if(!before)throw new Error('Inventory staff cannot add orders.');
+      const beforeProtected={...before,restocked:false};
+      const afterProtected={...order,restocked:false};
+      if(JSON.stringify(beforeProtected)!==JSON.stringify(afterProtected))throw new Error('Inventory staff can only complete return inspection by restocking a returned order.');
+      if(order.restocked!==before.restocked&&!(before.status==='Returned'&&!before.restocked&&order.restocked))
+        throw new Error('Only a returned order awaiting inspection can be restocked.');
+    }
   }
 
   const merged=structuredClone(current);
@@ -144,6 +155,13 @@ export function applyRoleChanges(current:State,proposed:State,role:WorkspaceRole
     restoreSalesOrderProtectedFields(merged,current);
     restoreOrderCosts(merged,current);
   }
-  if(role==='inventory')restoreInventoryPaymentFields(merged,current);
+  if(role==='inventory'){
+    restoreInventoryPaymentFields(merged,current);
+    const proposedOrders=new Map(proposed.orders.map(o=>[o.id,o]));
+    merged.orders=merged.orders.map(order=>{
+      const proposedOrder=proposedOrders.get(order.id);
+      return proposedOrder?.restocked!==order.restocked?{...order,restocked:proposedOrder!.restocked}:order;
+    });
+  }
   return merged;
 }

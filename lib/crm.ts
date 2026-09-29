@@ -15,6 +15,7 @@ const purchaseOrderSchema=z.object({id,number:str.min(1),supplierId:id,created:d
 const purchasePaymentSchema=z.object({id,date,amount:money.refine(n=>n>0),note:str.default('')});
 const batchSchema = z.object({id,productId:id,qty,unitCost:money,expiry:date,received:date,supplierId:str,invoice:str,dueDate:date.optional(),payments:z.array(purchasePaymentSchema).max(100).default([]),paid:z.boolean(),paidAt:date.optional()});
 const stockAdjustmentSchema = z.object({id,batchId:id,delta:z.number().int().min(-100000).max(100000).refine(v=>v!==0),date,reason:str.min(1)});
+const inventoryHoldSchema = z.object({id,batchId:id,qty:z.number().int().min(1).max(100000),date,type:z.enum(['Quarantine','Damaged']),reason:str.min(1),releasedAt:date.optional()});
 const allocationSchema = z.object({batchId:id,qty,unitCost:money});
 const collectionSchema=z.object({id,date,amount:money.refine(n=>n>0),reference:str.default('')});
 const orderStatusSchema=z.preprocess(value=>value==='Processing'?'Ready to pack':value==='Ready to Ship'?'Packed':value,z.enum(statuses));
@@ -27,7 +28,7 @@ const businessProfileSchema=z.object({phone:z.string().trim().max(40),email:z.un
 export const emptyBusinessProfile=()=>({phone:'',email:'',address:'',bin:'',logoDataUrl:'',invoiceFooter:'',returnPolicy:''});
 const taskSchema = z.object({id,customerId:str,title:str.min(1),due:date,done:z.boolean(),kind:z.enum(['Follow-up','Replenishment','Other'])});
 const financeCloseSchema=z.object({month:z.string().regex(/^\d{4}-\d{2}$/),closedAt:date,closedBy:str,notes:str.default('')});
-export const stateSchema = z.object({products:z.array(productSchema).max(2000),productCategories:z.array(z.string().trim().min(1).max(50)).min(1).max(100).default(()=>[...categories]),customers:z.array(customerSchema).max(10000),suppliers:z.array(supplierSchema).max(1000),purchaseOrders:z.array(purchaseOrderSchema).max(5000).default([]),batches:z.array(batchSchema).max(10000),stockAdjustments:z.array(stockAdjustmentSchema).max(10000).default([]),orders:z.array(orderSchema).max(10000),expenses:z.array(expenseSchema).max(10000),cashEntries:z.array(cashEntrySchema).max(10000).default([]),accountOpenings:z.array(accountOpeningSchema).max(4).default([]),accountMatches:z.array(accountMatchSchema).max(30000).default([]),financeCloses:z.array(financeCloseSchema).max(120).default([]),tasks:z.array(taskSchema).max(10000),businessName:str.min(1),businessProfile:businessProfileSchema.default(emptyBusinessProfile)});
+export const stateSchema = z.object({products:z.array(productSchema).max(2000),productCategories:z.array(z.string().trim().min(1).max(50)).min(1).max(100).default(()=>[...categories]),customers:z.array(customerSchema).max(10000),suppliers:z.array(supplierSchema).max(1000),purchaseOrders:z.array(purchaseOrderSchema).max(5000).default([]),batches:z.array(batchSchema).max(10000),stockAdjustments:z.array(stockAdjustmentSchema).max(10000).default([]),inventoryHolds:z.array(inventoryHoldSchema).max(10000).default([]),orders:z.array(orderSchema).max(10000),expenses:z.array(expenseSchema).max(10000),cashEntries:z.array(cashEntrySchema).max(10000).default([]),accountOpenings:z.array(accountOpeningSchema).max(4).default([]),accountMatches:z.array(accountMatchSchema).max(30000).default([]),financeCloses:z.array(financeCloseSchema).max(120).default([]),tasks:z.array(taskSchema).max(10000),businessName:str.min(1),businessProfile:businessProfileSchema.default(emptyBusinessProfile)});
 export type State=z.infer<typeof stateSchema>;
 export type Product=State['products'][number]; export type Customer=State['customers'][number]; export type Order=State['orders'][number]; export type Batch=State['batches'][number];
 export type Supplier=State['suppliers'][number]; export type PurchaseOrder=State['purchaseOrders'][number]; export type Task=State['tasks'][number];
@@ -36,7 +37,7 @@ export const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Dhaka',ye
 export const shiftDate=(days:number,base=today())=>{const d=new Date(base+'T12:00:00Z'); d.setUTCDate(d.getUTCDate()+days); return d.toISOString().slice(0,10)};
 export const taka=(n:number)=>'৳'+Math.round(n).toLocaleString('en-BD');
 export const dateLabel=(d:string)=>new Date(d+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short'});
-export function initialState():State {return {businessName:'ALOYRI',businessProfile:emptyBusinessProfile(),productCategories:[...categories],customers:[],suppliers:[],purchaseOrders:[],batches:[],stockAdjustments:[],orders:[],expenses:[],cashEntries:[],accountOpenings:[],accountMatches:[],financeCloses:[],tasks:[],products:[
+export function initialState():State {return {businessName:'ALOYRI',businessProfile:emptyBusinessProfile(),productCategories:[...categories],customers:[],suppliers:[],purchaseOrders:[],batches:[],stockAdjustments:[],inventoryHolds:[],orders:[],expenses:[],cashEntries:[],accountOpenings:[],accountMatches:[],financeCloses:[],tasks:[],products:[
   {id:'simple-wash',brand:'Simple',name:'Refreshing Facial Wash',size:'150ml · Poland',category:'Cleanser',price:749,cost:520,targetQty:12,reorderAt:4,active:true},
   {id:'simple-light',brand:'Simple',name:'Hydrating Light Moisturiser',size:'125ml · Hungary',category:'Moisturizer',price:749,cost:520,targetQty:10,reorderAt:4,active:true},
   {id:'simple-rich',brand:'Simple',name:'Replenishing Rich Moisturizer',size:'125ml',category:'Moisturizer',price:775,cost:540,targetQty:6,reorderAt:3,active:true},
@@ -44,9 +45,27 @@ export function initialState():State {return {businessName:'ALOYRI',businessProf
   {id:'skin-aqua',brand:'Rohto',name:'Skin Aqua Super Moisture UV Gel',size:'110g · SPF50+ PA++++',category:'Sunscreen',price:1350,cost:940,targetQty:6,reorderAt:3,active:true},
   {id:'cosrx',brand:'COSRX',name:'Low pH Good Morning Gel Cleanser',size:'50ml',category:'Cleanser',price:580,cost:400,targetQty:6,reorderAt:3,active:true}
 ]};}
+export const rawBatchUnits=(s:State,b:Batch)=>b.qty+(s.stockAdjustments||[]).filter(a=>a.batchId===b.id).reduce((n,a)=>n+a.delta,0);
 export function usedByBatch(s:State,batchId:string) {return s.orders.filter(o=>o.status!=='Cancelled' && !(o.status==='Returned'&&o.restocked)).flatMap(o=>o.items.flatMap(i=>i.allocations)).filter(a=>a.batchId===batchId).reduce((n,a)=>n+a.qty,0)}
-export const batchRemaining=(s:State,b:Batch)=>b.qty+(s.stockAdjustments||[]).filter(a=>a.batchId===b.id).reduce((n,a)=>n+a.delta,0)-usedByBatch(s,b.id);
-export const stock=(s:State,id:string)=>s.batches.filter(b=>b.productId===id&&b.expiry>today()).reduce((n,b)=>n+batchRemaining(s,b),0);
+export const activeHoldQty=(s:State,batchId:string)=>s.inventoryHolds.filter(h=>h.batchId===batchId&&!h.releasedAt).reduce((n,h)=>n+h.qty,0);
+export const batchRemaining=(s:State,b:Batch)=>rawBatchUnits(s,b)-usedByBatch(s,b.id)-activeHoldQty(s,b.id);
+export const stock=(s:State,id:string)=>s.batches.filter(b=>b.productId===id&&b.expiry>today()).reduce((n,b)=>n+Math.max(0,batchRemaining(s,b)),0);
+const reservedStatuses=new Set<Order['status']>(['New','Confirmed','Ready to pack','Packed']);
+export const reservedByBatch=(s:State,batchId:string)=>s.orders.filter(o=>reservedStatuses.has(o.status)).flatMap(o=>o.items.flatMap(i=>i.allocations)).filter(a=>a.batchId===batchId).reduce((n,a)=>n+a.qty,0);
+export const returnedPendingByBatch=(s:State,batchId:string)=>s.orders.filter(o=>o.status==='Returned'&&!o.restocked).flatMap(o=>o.items.flatMap(i=>i.allocations)).filter(a=>a.batchId===batchId).reduce((n,a)=>n+a.qty,0);
+export const awayByBatch=(s:State,batchId:string)=>s.orders.filter(o=>['Shipped','Out for delivery','Delivered'].includes(o.status)).flatMap(o=>o.items.flatMap(i=>i.allocations)).filter(a=>a.batchId===batchId).reduce((n,a)=>n+a.qty,0);
+export const physicalByBatch=(s:State,b:Batch)=>Math.max(0,rawBatchUnits(s,b)-awayByBatch(s,b.id));
+export function stockPosition(s:State,productId:string){
+  const batches=s.batches.filter(b=>b.productId===productId);
+  const physical=batches.reduce((n,b)=>n+physicalByBatch(s,b),0);
+  const available=batches.filter(b=>b.expiry>today()).reduce((n,b)=>n+Math.max(0,batchRemaining(s,b)),0);
+  const reserved=batches.filter(b=>b.expiry>today()).reduce((n,b)=>n+reservedByBatch(s,b.id),0);
+  const returnedPending=batches.filter(b=>b.expiry>today()).reduce((n,b)=>n+returnedPendingByBatch(s,b.id),0);
+  const held=batches.filter(b=>b.expiry>today()).reduce((n,b)=>n+activeHoldQty(s,b.id),0);
+  const expired=batches.filter(b=>b.expiry<=today()).reduce((n,b)=>n+physicalByBatch(s,b),0);
+  const blocked=held+expired;
+  return {physical,available,reserved,returnedPending,held,expired,blocked};
+}
 export const subtotal=(o:Order)=>o.items.reduce((n,i)=>n+i.price*i.qty,0)-o.discount;
 export const total=(o:Order)=>subtotal(o)+o.deliveryCharge;
 /** Amount expected from the customer/courier. COD is a net courier remittance; direct payments are gross customer receipts. */
@@ -61,7 +80,7 @@ export function nextStatuses(o:Order):Order['status'][] {return ({New:['Confirme
 export function validateRelations(s:State) {
   if(new Set(s.productCategories.map(c=>c.toLowerCase())).size!==s.productCategories.length)throw new Error('Product categories must have unique names.');
   for(const p of s.products)if(!s.productCategories.includes(p.category))throw new Error('A product uses a category that is missing from Inventory.');
-  for(const list of [s.products,s.customers,s.suppliers,s.purchaseOrders,s.batches,s.stockAdjustments,s.orders,s.expenses,s.cashEntries,s.tasks])if(new Set(list.map(x=>x.id)).size!==list.length)throw new Error('Duplicate record identifiers.');
+  for(const list of [s.products,s.customers,s.suppliers,s.purchaseOrders,s.batches,s.stockAdjustments,s.inventoryHolds,s.orders,s.expenses,s.cashEntries,s.tasks])if(new Set(list.map(x=>x.id)).size!==list.length)throw new Error('Duplicate record identifiers.');
   if(new Set(s.purchaseOrders.map(p=>p.number.toLowerCase())).size!==s.purchaseOrders.length)throw new Error('Purchase order numbers must be unique.');
   if(new Set(s.orders.map(o=>o.number.toLowerCase())).size!==s.orders.length)throw new Error('Order numbers must be unique.');
   if(new Set(s.financeCloses.map(x=>x.month)).size!==s.financeCloses.length)throw new Error('Each month can only be closed once.');
@@ -75,6 +94,7 @@ export function validateRelations(s:State) {
   for(const b of s.batches){if(new Set(b.payments.map(p=>p.id)).size!==b.payments.length)throw new Error('Supplier payment identifiers must be unique within a purchase.');const amount=b.qty*b.unitCost,paidAmount=b.payments.reduce((n,p)=>n+p.amount,0);if(paidAmount>amount+.001)throw new Error('Supplier payments cannot exceed the purchase amount.');if(b.dueDate&&b.dueDate<b.received)throw new Error('Supplier due date cannot be before the stock receipt date.');for(const p of b.payments)if(p.date>today())throw new Error('Supplier payment date cannot be in the future.');if(b.paidAt&&!b.paid)throw new Error('Unpaid stock cannot have a payment date.');}
   for(const o of s.orders){if(new Set(o.collections.map(p=>p.id)).size!==o.collections.length)throw new Error('Collection identifiers must be unique within an order.');const due=receivable(o),collected=o.collections.reduce((n,p)=>n+p.amount,0);if(collected>due+.001)throw new Error('Order collections cannot exceed the receivable.');for(const p of o.collections)if(p.date>today())throw new Error('Collection date cannot be in the future.');if(o.settledAt&&!o.settled)throw new Error('Unsettled orders cannot have a payment date.');if(o.returnedAt&&o.returnedAt>today())throw new Error('Return date cannot be in the future.');}
   for(const a of s.stockAdjustments)if(!s.batches.some(b=>b.id===a.batchId))throw new Error('Stock adjustment refers to an unknown batch.');
+  for(const h of s.inventoryHolds){const b=s.batches.find(b=>b.id===h.batchId);if(!b)throw new Error('Inventory hold refers to an unknown batch.');if(h.date>today()||h.releasedAt&&h.releasedAt>today())throw new Error('Inventory hold dates cannot be in the future.');if(h.releasedAt&&h.releasedAt<h.date)throw new Error('Inventory hold release cannot be before the hold date.');if(h.date>=b.expiry)throw new Error('Expired stock is already blocked and cannot be placed on hold.');}
   for(const b of s.batches){if(!s.products.some(p=>p.id===b.productId))throw new Error('Unknown product.');if(b.expiry<=b.received)throw new Error('Expiry must be after receipt.');if(b.supplierId&&!s.suppliers.some(p=>p.id===b.supplierId))throw new Error('Unknown supplier.');if(batchRemaining(s,b)<0)throw new Error('Stock is over-allocated.');}
   for(const o of s.orders){if(!s.customers.some(c=>c.id===o.customerId))throw new Error('Select a customer.');if(subtotal(o)<0)throw new Error('Discount exceeds the product total.');if(o.status==='Delivered'&&!o.delivered)throw new Error('Delivery date is required.');if(o.restocked&&o.status!=='Returned')throw new Error('Only returned orders can be restocked.');if(o.returnedAt&&o.status!=='Returned')throw new Error('Only returned orders can have a return date.');if(o.settled&&o.payment==='COD'&&o.status!=='Delivered'&&!(o.status==='Returned'&&!!o.delivered))throw new Error('COD orders can only be settled after delivery.');for(const i of o.items){if(!s.products.some(p=>p.id===i.productId))throw new Error('Unknown product.');if(i.allocations.reduce((n,a)=>n+a.qty,0)!==i.qty)throw new Error('Invalid stock allocation.');for(const a of i.allocations){const b=s.batches.find(b=>b.id===a.batchId);if(!b||b.productId!==i.productId||b.unitCost!==a.unitCost)throw new Error('Invalid batch allocation.');}}}
   const transfers=new Map<string,State['cashEntries']>();for(const e of s.cashEntries)if(e.transferId)transfers.set(e.transferId,[...(transfers.get(e.transferId)||[]),e]);for(const [transferId,list] of transfers){if(list.length!==2||list[0].amount!==list[1].amount||list[0].kind===list[1].kind)throw new Error('Transfer '+transferId+' must have one equal cash-out and cash-in entry.');}
