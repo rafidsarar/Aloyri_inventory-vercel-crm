@@ -269,3 +269,44 @@ h3{font-size:15px;line-height:1.4;font-weight:650}
 .team-person{grid-template-columns:minmax(0,1fr) 145px auto 36px}
 @media(max-width:700px){.team-person{grid-template-columns:minmax(0,1fr) 120px auto 36px}}
 @media(max-width:560px){.team-person{grid-template-columns:minmax(0,1fr) 36px;gap:8px 10px}.team-person>div:first-child{grid-column:1/-1}.team-person>.choice{grid-column:1/2;width:100%}.team-person>.text-button{grid-column:1/2;justify-self:start}.team-person>.icon-button{grid-column:2;grid-row:2/4;align-self:center}}
+
+
+/* Single-source invoice printing: clone the exact on-screen ALOYRI invoice into a dedicated print root. */
+#aloyri-print-root{display:none}
+@media print{
+  @page{size:A4;margin:12mm}
+  html,body{width:auto!important;min-width:0!important;height:auto!important;overflow:visible!important;background:#fff!important}
+  body>*{display:none!important}
+  body>#aloyri-print-root{display:block!important;position:static!important;width:100%!important;margin:0!important;padding:0!important;background:#fff!important}
+  #aloyri-print-root .aloyri-invoice{display:block!important;position:static!important;width:100%!important;min-height:0!important;max-height:none!important;overflow:visible!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;box-shadow:none!important;background:#fff!important;color:#352d29!important;font-family:var(--font-sans)!important;font-size:12px!important;line-height:1.5!important;print-color-adjust:exact!important;-webkit-print-color-adjust:exact!important}
+  #aloyri-print-root .aloyri-masthead{display:flex!important;justify-content:space-between!important;align-items:flex-start!important;gap:20px!important;padding:0 0 20px!important;border-bottom:1px solid #c8a393!important}
+  #aloyri-print-root .aloyri-masthead img{width:190px!important;max-width:52%!important;max-height:70px!important;height:auto!important;object-fit:contain!important;object-position:left top!important}
+  #aloyri-print-root .aloyri-masthead>div{text-align:right!important;white-space:normal!important}
+  #aloyri-print-root .aloyri-masthead strong{font-family:var(--font-sans)!important;font-size:19px!important;letter-spacing:.06em!important;line-height:1.1!important;color:#3c302b!important}
+  #aloyri-print-root .aloyri-masthead span{font-size:12px!important;color:#7b4a3f!important;margin-top:5px!important}
+  #aloyri-print-root .aloyri-masthead small{font-size:11px!important;color:#756e68!important;margin-top:3px!important}
+  #aloyri-print-root .aloyri-business{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(175px,.75fr)!important;gap:28px!important;margin:19px 0 22px!important;font-size:11px!important}
+  #aloyri-print-root .aloyri-business>div:last-child{text-align:right!important;min-width:0!important;font-weight:400!important}
+  #aloyri-print-root .aloyri-business span{line-height:1.5!important;color:#5f5550!important}
+  #aloyri-print-root .aloyri-business b{color:#746761!important;font-weight:600!important;margin-right:5px!important}
+  #aloyri-print-root .aloyri-invoice h3{font:700 11px var(--font-sans)!important;letter-spacing:.08em!important;text-transform:uppercase!important;color:#765246!important;margin:0 0 9px!important}
+  #aloyri-print-root .aloyri-bill{margin:0 0 24px!important}
+  #aloyri-print-root .aloyri-bill>div{display:grid!important;grid-template-columns:1fr 1fr!important;gap:12px!important;background:none!important;border:0!important;border-top:1px solid #e7dfda!important;padding-top:11px!important}
+  #aloyri-print-root .aloyri-bill>div>div{border:0!important;padding:0!important;min-width:0!important}
+  #aloyri-print-root .aloyri-bill>div>div:last-child{grid-column:1/-1!important}
+  #aloyri-print-root .aloyri-bill small{font-size:10px!important;color:#7d746d!important;font-weight:500!important}
+  #aloyri-print-root .aloyri-bill strong{font-size:12px!important;color:#392d28!important;font-weight:600!important;line-height:1.45!important}
+  #aloyri-print-root .aloyri-order table{table-layout:fixed!important;width:100%!important;border-collapse:collapse!important;font-size:11px!important}
+  #aloyri-print-root .aloyri-order th{padding:9px 7px!important;background:#f8f4f1!important;color:#6f5950!important;font-weight:650!important;border-top:1px solid #e7ddd7!important;border-bottom:1px solid #e7ddd7!important;text-align:left!important}
+  #aloyri-print-root .aloyri-order th:first-child{width:49%!important}#aloyri-print-root .aloyri-order th:nth-child(2){width:10%!important;text-align:center!important}#aloyri-print-root .aloyri-order th:nth-child(3),#aloyri-print-root .aloyri-order th:nth-child(4){width:20.5%!important;text-align:right!important}
+  #aloyri-print-root .aloyri-order td{padding:10px 7px!important;text-align:left!important;vertical-align:top!important;border-bottom:1px solid #ece5e0!important;white-space:normal!important;background:#fff!important}
+  #aloyri-print-root .aloyri-order td:nth-child(2){text-align:center!important}#aloyri-print-root .aloyri-order td:nth-child(3),#aloyri-print-root .aloyri-order td:nth-child(4){text-align:right!important;white-space:nowrap!important}
+  #aloyri-print-root .aloyri-order td strong{color:#3d302b!important;font-size:11px!important;font-weight:650!important}#aloyri-print-root .aloyri-order td small{color:#80736c!important;font-size:10px!important;line-height:1.4!important}
+  #aloyri-print-root .aloyri-bottom{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:20px!important;margin-top:16px!important}
+  #aloyri-print-root .aloyri-totals{width:min(275px,100%)!important;align-self:flex-end!important;font-size:11px!important}
+  #aloyri-print-root .aloyri-totals>div{padding:6px 2px!important;border-bottom:0!important}#aloyri-print-root .aloyri-totals .aloyri-grand{margin-top:5px!important;padding:10px 9px!important;border-top:1px solid #b98a78!important;background:#f8f2ee!important;color:#49332d!important;font-size:14px!important}
+  #aloyri-print-root .aloyri-notes{font-size:11px!important;color:#695f59!important;border-top:1px solid #e8dfd9!important;padding-top:12px!important}
+  #aloyri-print-root .aloyri-footer{margin-top:24px!important;padding:16px 0 0!important;border-top:1px solid #d8c0b4!important;border-bottom:0!important;text-align:left!important;color:#5c4941!important;font-size:11px!important}
+  #aloyri-print-root .aloyri-masthead,#aloyri-print-root .aloyri-business,#aloyri-print-root .aloyri-bill,#aloyri-print-root .aloyri-totals,#aloyri-print-root .aloyri-footer{break-inside:avoid!important}
+  #aloyri-print-root .aloyri-order thead{display:table-header-group!important}#aloyri-print-root .aloyri-order tr{break-inside:avoid!important}
+}
