@@ -15,4 +15,4 @@ export const roleCanPrintInvoice=(role:WorkspaceRole)=>roleCapabilities[role].in
 export const roleCanManageTeam=(role:WorkspaceRole)=>roleCapabilities[role].team;
 export const roleCanReset=(role:WorkspaceRole)=>roleCapabilities[role].reset;
 
-export const roleCanManageFinance=(role:WorkspaceRole)=>roleCapabilities[role].finance;
+export const roleCanManageFinance=(role:WorkspaceRole)=>role==='owner'||role==='admin';
