@@ -263,3 +263,9 @@ h3{font-size:15px;line-height:1.4;font-weight:650}
   .aloyri-order tr{break-inside:avoid}
   .aloyri-bottom{break-inside:auto}
 }
+
+
+/* Team access: four controls per staff row, responsive without overlap. */
+.team-person{grid-template-columns:minmax(0,1fr) 145px auto 36px}
+@media(max-width:700px){.team-person{grid-template-columns:minmax(0,1fr) 120px auto 36px}}
+@media(max-width:560px){.team-person{grid-template-columns:minmax(0,1fr) 36px;gap:8px 10px}.team-person>div:first-child{grid-column:1/-1}.team-person>.choice{grid-column:1/2;width:100%}.team-person>.text-button{grid-column:1/2;justify-self:start}.team-person>.icon-button{grid-column:2;grid-row:2/4;align-self:center}}
