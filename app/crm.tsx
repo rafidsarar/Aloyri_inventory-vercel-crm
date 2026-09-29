@@ -1,6 +1,6 @@
 'use client';
 import React,{useEffect,useRef,useState} from 'react';
-import { LayoutDashboard,ShoppingBag,Package,Users,Truck,Wallet,CalendarCheck,Settings,Plus,ArrowUpRight,ArrowRight,ChevronRight,ChevronDown,Download,Search,Bell,Check,CheckCircle2,Clock,AlertTriangle,Sun,Droplets,Leaf,RefreshCw,ShieldCheck,Receipt,ArrowDownLeft,Box,LogOut,Loader2,X,Mail,Phone,MapPin,ExternalLink } from 'lucide-react';
+import { LayoutDashboard,ShoppingBag,Package,Users,Truck,Wallet,CalendarCheck,Settings,Plus,ArrowUpRight,ArrowRight,ChevronRight,ChevronDown,Download,Search,Bell,Check,CheckCircle2,Clock,AlertTriangle,Sun,Droplets,Leaf,RefreshCw,ShieldCheck,Receipt,ArrowDownLeft,Box,LogOut,Loader2,X,Mail,Phone,MapPin,ExternalLink,TrendingUp } from 'lucide-react';
 import { SidebarProvider,Sidebar,SidebarHeader,SidebarContent,SidebarFooter,SidebarGroup,SidebarGroupLabel,SidebarMenu,SidebarMenuItem,SidebarMenuButton,SidebarTrigger,useSidebar } from '@/components/ui/sidebar';
 import { Table,TableHeader,TableHead,TableBody,TableRow,TableCell } from '@/components/ui/table';
 import { Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription } from '@/components/ui/dialog';
@@ -14,7 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
 import { AreaChart,Area,CartesianGrid,XAxis,YAxis,Tooltip,ResponsiveContainer } from 'recharts';
-import { State,Product,Order,Customer,initialState,uid,today,shiftDate,taka,dateLabel,stock,batchRemaining,metrics,cashflow,subtotal,total,contribution,statuses,nextStatuses,stateSchema,validateRelations } from '@/lib/crm';
+import { State,Product,Order,Customer,initialState,uid,today,shiftDate,taka,dateLabel,stock,batchRemaining,metrics,cashflow,subtotal,total,contribution,statuses,nextStatuses,stateSchema,validateRelations,accountIds,accountNames,accountBalance } from '@/lib/crm';
 import Form,{Choice,Modal} from './forms';
 import Invoice from './invoice';
 import Team from './team';
