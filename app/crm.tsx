@@ -14,7 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
 import { AreaChart,Area,CartesianGrid,XAxis,YAxis,Tooltip,ResponsiveContainer } from 'recharts';
-import { State,Product,Order,Customer,initialState,uid,today,shiftDate,taka,dateLabel,stock,batchRemaining,metrics,cashflow,subtotal,total,receivable,collectedAmount,orderBalance,orderPaymentStatus,contribution,statuses,nextStatuses,stateSchema,validateRelations,accountIds,accountNames,accountBalance } from '@/lib/crm';
+import { State,Product,Order,Customer,initialState,uid,today,shiftDate,taka,dateLabel,stock,batchRemaining,stockPosition,metrics,cashflow,subtotal,total,receivable,collectedAmount,orderBalance,orderPaymentStatus,contribution,statuses,nextStatuses,stateSchema,validateRelations,accountIds,accountNames,accountBalance } from '@/lib/crm';
 import Form,{Choice,Modal} from './forms';
 import Invoice from './invoice';
 import Team from './team';
@@ -24,7 +24,7 @@ import { canManageBusinessSettings, roleCanEdit, roleCanViewSection, roleCanPrin
 const sections=['Overview','Alerts','Orders','Inventory','Customers','Suppliers','Finances','Follow-ups','Activity'] as const;type View=typeof sections[number];
 const navIcons=[LayoutDashboard,Bell,ShoppingBag,Package,Users,Truck,Wallet,CalendarCheck,ShieldCheck];
 const visibleSections=(role:WorkspaceRole):View[]=>sections.filter(section=>roleCanViewSection(role,section));
-const modalCollection:Record<Modal['type'],string>={order:'orders',orderEdit:'orders',customer:'customers',task:'tasks',product:'products',category:'productCategories',batch:'batches',stockAdjust:'stockAdjustments',supplier:'suppliers',expense:'expenses',cashEntry:'cashEntries',settings:'businessName'};
+const modalCollection:Record<Modal['type'],string>={order:'orders',orderEdit:'orders',customer:'customers',task:'tasks',product:'products',category:'productCategories',batch:'batches',stockAdjust:'stockAdjustments',stockHold:'inventoryHolds',supplier:'suppliers',expense:'expenses',cashEntry:'cashEntries',settings:'businessName'};
 const titles:Record<View,string>={Overview:'Business overview',Alerts:'Alert center',Orders:'Orders',Inventory:'Inventory',Customers:'Customers',Suppliers:'Suppliers',Finances:'Finances', 'Follow-ups':'Follow-ups',Activity:'Activity log'};
 const descriptions:Record<View,string>={Overview:'Monitor sales, stock and actions that need attention.',Alerts:'Automatic business alerts, prioritized for your role.',Orders:'Track fulfillment, delivery and payment from one workspace.',Inventory:'Monitor stock health, batches, expiry and purchasing from one workspace.',Customers:'View contact details, preferences and order history.',Suppliers:'Manage supplier contacts and sourcing records.',Finances:'Review sales, expenses, cashflow and collections in BDT.', 'Follow-ups':'Track customer follow-ups and replenishment tasks.',Activity:'Review protected employee and administrator change history.'};
 const signedTaka=(amount:number)=>amount<0?'− '+taka(-amount):taka(amount);
@@ -54,6 +54,13 @@ const recentDeliveredInventory=s.orders.filter(o=>o.status==='Delivered'&&(o.del
 const inventoryVelocity=activeProducts.map(product=>({product,units:recentDeliveredInventory.reduce((n,o)=>n+o.items.filter(i=>i.productId===product.id).reduce((x,i)=>x+i.qty,0),0)})).sort((a,b)=>b.units-a.units);
 const fastestMoving=inventoryVelocity.find(x=>x.units>0);
 const slowMovingCount=inventoryVelocity.filter(x=>stock(s,x.product.id)>0&&x.units===0).length;
+const inventoryPositions=activeProducts.map(product=>({product,...stockPosition(s,product.id)}));
+const inventoryPhysicalUnits=inventoryPositions.reduce((n,x)=>n+x.physical,0);
+const inventoryReservedUnits=inventoryPositions.reduce((n,x)=>n+x.reserved,0);
+const inventoryReturnPendingUnits=inventoryPositions.reduce((n,x)=>n+x.returnedPending,0);
+const inventoryBlockedUnits=inventoryPositions.reduce((n,x)=>n+x.blocked,0);
+const activeInventoryHolds=s.inventoryHolds.filter(h=>!h.releasedAt);
+const pendingReturnOrders=s.orders.filter(o=>o.status==='Returned'&&!o.restocked);
 const externalFlow=flow.entries.filter(e=>e.source!=='Transfer'),allCashIn=externalFlow.filter(e=>e.kind==='in').reduce((n,e)=>n+e.amount,0),allCashOut=externalFlow.filter(e=>e.kind==='out').reduce((n,e)=>n+e.amount,0),netCashMovement=allCashIn-allCashOut;
 const overduePayables=s.batches.reduce((n,b)=>{const amount=b.qty*b.unitCost,legacy=b.paid&&b.payments.length===0?amount:0,balance=Math.max(0,amount-b.payments.reduce((x,p)=>x+p.amount,0)-legacy);return n+(balance>.001&&b.dueDate&&b.dueDate<today()?balance:0)},0);
 const reconciledAccounts=s.accountOpenings.length,unassignedMovements=flow.entries.filter(e=>!s.accountMatches.some(m=>m.entryId===e.id)).length;
@@ -179,13 +186,15 @@ function requestDelete(kind:'products'|'customers'|'suppliers',id:string,name:st
   }});
 }
 async function updateOrder(o:Order,patch:Partial<Order>){const next=structuredClone(s);next.orders=next.orders.map(x=>x.id===o.id?{...x,...patch}:x);await save(next)}
+async function releaseInventoryHold(id:string){const next=structuredClone(s);const hold=next.inventoryHolds.find(h=>h.id===id);if(!hold||hold.releasedAt)return;hold.releasedAt=today();await save(next)}
 function changeStatus(o:Order,status:Order['status']){if(!nextStatuses(o).includes(status))return;if(status==='Cancelled'){setConfirm({title:'Cancel '+o.number+'?',text:'Reserved products will become available again. The order stays in your history.',action:()=>{void updateOrder(o,{status})}});return;}if(status==='Returned'){setConfirm({title:'Record return for '+o.number+'?',text:o.status==='Delivered'?'This marks the delivered order as returned. Review refund handling separately in Finance and inspect stock before restocking.':'This marks the delivery as returned. The products stay out of sale until you inspect and restock them.',action:()=>{void updateOrder(o,{status,returnedAt:today(),restocked:false})}});return;}void updateOrder(o,{status,...(status==='Delivered'?{delivered:today()}: {})})}
 function exportData(){const safe=(v:unknown)=>{let t=String(v??'');if(/^[=+@-]/.test(t))t="'"+t;return '"'+t.replaceAll('"','""')+'"'};const rows=[['Order','Date','Customer','Channel','Status','Payment','Product revenue','Customer total','Product cost','Courier','Payment fee','Packaging','Settled']];for(const o of s.orders)rows.push([o.number,o.created,s.customers.find(c=>c.id===o.customerId)?.name||'',o.channel,o.status,o.payment,String(subtotal(o)),String(total(o)),String(o.items.flatMap(i=>i.allocations).reduce((n,a)=>n+a.qty*a.unitCost,0)),String(o.courierCost),String(o.paymentFee),String(o.packaging),o.settled?'Yes':'No']);const blob=new Blob(['\ufeff'+rows.map(r=>r.map(safe).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='aloyri-orders-'+today()+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast.success('Order report downloaded')}
 const chart=Array.from({length:Number(range)},(_,i)=>{const date=shiftDate(i-Number(range)+1);return {date:dateLabel(date),sales:s.orders.filter(o=>o.status==='Delivered'&&o.delivered===date).reduce((n,o)=>n+subtotal(o),0)}});const periodSales=chart.reduce((n,d)=>n+d.sales,0);
 const match=(...values:unknown[])=>values.join(' ').toLowerCase().includes(query.toLowerCase());
 const inventoryHealthRank:Record<string,number>={Out:0,Critical:1,Low:2,Healthy:3,Inactive:4};
 const inventoryProductRows=s.products.map(product=>{
-  const available=stock(s,product.id);
+  const position=stockPosition(s,product.id);
+  const available=position.available;
   const criticalAt=product.reorderAt>0?Math.max(1,Math.ceil(product.reorderAt/2)):0;
   const health=!product.active?'Inactive':available===0?'Out':criticalAt&&available<=criticalAt?'Critical':available<=product.reorderAt?'Low':'Healthy';
   const incomingOrders=openPurchaseOrders.map(po=>({po,remaining:po.items.filter(i=>i.productId===product.id).reduce((n,i)=>n+Math.max(0,i.qty-i.receivedQty),0)})).filter(x=>x.remaining>0).sort((a,b)=>a.po.expected.localeCompare(b.po.expected));
@@ -195,7 +204,7 @@ const inventoryProductRows=s.products.map(product=>{
   const earliestExpiry=liveBatches[0]?.expiry;
   const stockValue=liveBatches.reduce((n,b)=>n+Math.max(0,batchRemaining(s,b))*b.unitCost,0);
   const movement30=inventoryVelocity.find(x=>x.product.id===product.id)?.units||0;
-  return {product,available,health,incoming,incomingExpected,earliestExpiry,stockValue,movement30};
+  return {product,available,physical:position.physical,reserved:position.reserved,returnedPending:position.returnedPending,blocked:position.blocked,health,incoming,incomingExpected,earliestExpiry,stockValue,movement30};
 });
 const visibleInventoryProducts=inventoryProductRows.filter(row=>match(row.product.name,row.product.brand,row.product.size,row.product.category,row.product.id,row.health)).filter(row=>
   filter==='All'||
@@ -204,6 +213,9 @@ const visibleInventoryProducts=inventoryProductRows.filter(row=>match(row.produc
   filter==='Out of stock'&&row.health==='Out'||
   filter==='Healthy'&&row.health==='Healthy'||
   filter==='Inactive'&&row.health==='Inactive'||
+  filter==='Reserved'&&row.reserved>0||
+  filter==='Return inspection'&&row.returnedPending>0||
+  filter==='Blocked'&&row.blocked>0||
   filter==='No movement · 30d'&&row.available>0&&row.movement30===0||
   row.product.category===filter
 ).sort((a,b)=>{
