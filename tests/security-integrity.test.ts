@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { roleCanEdit, roleCanManageFinance, roleCanManageTeam, roleCanReset } from '../lib/roles.ts';
 import { applyRoleChanges, visibleState } from '../lib/role-data.ts';
-import { accountBalance, cashflow, collectedAmount, initialState, metrics, nextStatuses, orderBalance, orderPaymentStatus, receivable, stateSchema, statuses, shiftDate, today, uid, validateRelations, type Order, type State } from '../lib/crm.ts';
+import { accountBalance, allocate, batchRemaining, cashflow, collectedAmount, initialState, metrics, nextStatuses, orderBalance, orderPaymentStatus, receivable, stateSchema, statuses, shiftDate, stock, stockPosition, today, uid, validateRelations, type Order, type State } from '../lib/crm.ts';
 
 function baseOrder(overrides:Partial<Order>={}):Order{
   return {
@@ -19,7 +19,7 @@ function baseState(order:Order):State{
   state.suppliers=[{id:'supplier-1',name:'Supplier',contact:'',phone:'',notes:'',verified:true}];
   state.batches=[{id:'batch-1',productId:'product-1',qty:10,unitCost:400,expiry:shiftDate(365),received:today(),supplierId:'supplier-1',invoice:'INV-1',payments:[],paid:false}];
   state.orders=[order];
-  state.purchaseOrders=[];state.stockAdjustments=[];state.expenses=[];state.cashEntries=[];state.accountOpenings=[];state.accountMatches=[];state.financeCloses=[];state.tasks=[];
+  state.purchaseOrders=[];state.stockAdjustments=[];state.inventoryHolds=[];state.expenses=[];state.cashEntries=[];state.accountOpenings=[];state.accountMatches=[];state.financeCloses=[];state.tasks=[];
   return state;
 }
 
@@ -201,7 +201,97 @@ test('inventory-visible state hides finance and inventory saves preserve supplie
 test('role capabilities keep operational boundaries aligned',()=>{
   for(const key of ['orders','customers','tasks'])assert.equal(roleCanEdit('sales',key),true);
   for(const key of ['batches','suppliers','purchaseOrders','cashEntries','expenses','accountMatches'])assert.equal(roleCanEdit('sales',key),false);
-  for(const key of ['products','productCategories','batches','suppliers','purchaseOrders','stockAdjustments'])assert.equal(roleCanEdit('inventory',key),true);
+  for(const key of ['products','productCategories','batches','suppliers','purchaseOrders','stockAdjustments','inventoryHolds'])assert.equal(roleCanEdit('inventory',key),true);
   for(const key of ['orders','customers','tasks','cashEntries','expenses','accountMatches'])assert.equal(roleCanEdit('inventory',key),false);
   for(const key of ['orders','customers','products','batches','cashEntries','expenses','tasks'])assert.equal(roleCanEdit('viewer',key),false);
+});
+
+
+test('stock positions separate physical, reserved and available units',()=>{
+  const order=baseOrder({status:'Confirmed',delivered:undefined});
+  const state=baseState(order);
+  const position=stockPosition(state,'product-1');
+  assert.deepEqual(position,{physical:10,available:9,reserved:1,returnedPending:0,held:0,expired:0,blocked:0});
+  assert.equal(stock(state,'product-1'),9);
+  assert.equal(batchRemaining(state,state.batches[0]),9);
+});
+
+test('inventory holds block sale allocation without reducing physical stock',()=>{
+  const state=baseState(baseOrder({status:'Confirmed',delivered:undefined}));
+  state.inventoryHolds=[{id:'hold-1',batchId:'batch-1',qty:2,date:today(),type:'Quarantine',reason:'Seal check'}];
+  validateRelations(state);
+  const position=stockPosition(state,'product-1');
+  assert.equal(position.physical,10);
+  assert.equal(position.reserved,1);
+  assert.equal(position.held,2);
+  assert.equal(position.blocked,2);
+  assert.equal(position.available,7);
+  assert.equal(stock(state,'product-1'),7);
+  assert.throws(()=>allocate(state,'product-1',8),/Not enough unexpired stock/);
+  assert.equal(allocate(state,'product-1',7).reduce((n,a)=>n+a.qty,0),7);
+});
+
+test('released inventory holds return units to available stock',()=>{
+  const state=baseState(baseOrder({status:'Confirmed',delivered:undefined}));
+  state.inventoryHolds=[{id:'hold-1',batchId:'batch-1',qty:2,date:today(),type:'Damaged',reason:'Outer box crushed',releasedAt:today()}];
+  validateRelations(state);
+  const position=stockPosition(state,'product-1');
+  assert.equal(position.held,0);
+  assert.equal(position.available,9);
+  assert.equal(position.blocked,0);
+});
+
+test('returned stock stays in inspection pending until explicitly restocked',()=>{
+  const returned=baseOrder({status:'Returned',returnedAt:today(),delivered:today(),restocked:false});
+  const state=baseState(returned);
+  validateRelations(state);
+  let position=stockPosition(state,'product-1');
+  assert.equal(position.physical,10);
+  assert.equal(position.returnedPending,1);
+  assert.equal(position.available,9);
+  returned.restocked=true;
+  position=stockPosition(state,'product-1');
+  assert.equal(position.returnedPending,0);
+  assert.equal(position.available,10);
+});
+
+test('shipped stock leaves physical on-hand while still remaining consumed',()=>{
+  const state=baseState(baseOrder({status:'Shipped',delivered:undefined}));
+  validateRelations(state);
+  const position=stockPosition(state,'product-1');
+  assert.equal(position.physical,9);
+  assert.equal(position.available,9);
+  assert.equal(position.reserved,0);
+});
+
+test('expired physical units are blocked rather than sellable',()=>{
+  const state=baseState(baseOrder({status:'Cancelled',delivered:undefined}));
+  state.batches[0].received=shiftDate(-365);
+  state.batches[0].expiry=shiftDate(-1);
+  validateRelations(state);
+  const position=stockPosition(state,'product-1');
+  assert.equal(position.physical,10);
+  assert.equal(position.available,0);
+  assert.equal(position.expired,10);
+  assert.equal(position.blocked,10);
+});
+
+test('inventory holds cannot exceed uncommitted available stock',()=>{
+  const state=baseState(baseOrder({status:'Confirmed',delivered:undefined}));
+  state.inventoryHolds=[{id:'hold-1',batchId:'batch-1',qty:10,date:today(),type:'Quarantine',reason:'Check'}];
+  assert.throws(()=>validateRelations(state),/over-allocated/i);
+});
+
+test('inventory employee can restock a returned order without gaining general order edits',()=>{
+  const current=baseState(baseOrder({status:'Returned',returnedAt:today(),delivered:today(),restocked:false,payment:'bKash',collections:[{id:'pay-1',date:today(),amount:500,reference:'BKASH'}]}));
+  const proposed=visibleState(current,'inventory');
+  proposed.orders[0].restocked=true;
+  const merged=applyRoleChanges(current,proposed,'inventory');
+  assert.equal(merged.orders[0].restocked,true);
+  assert.deepEqual(merged.orders[0].collections,current.orders[0].collections);
+  assert.equal(stockPosition(merged,'product-1').available,10);
+
+  const bad=visibleState(current,'inventory');
+  bad.orders[0].status='Cancelled';
+  assert.throws(()=>applyRoleChanges(current,bad,'inventory'),/only complete return inspection/i);
 });
