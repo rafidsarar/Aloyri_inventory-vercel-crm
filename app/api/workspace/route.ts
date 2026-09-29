@@ -47,6 +47,10 @@ export async function PUT(request:Request){
     let merged:typeof previous;
     try{merged=applyRoleChanges(previous,parsed.data,role)}catch(e){return response({error:e instanceof Error?e.message:'You cannot change that section.'},403)}
     merged=fixedBusinessName(merged);
+    const changedSections=(Object.keys(previous) as (keyof typeof previous)[]).filter(key=>key!=='auditLog'&&JSON.stringify(previous[key])!==JSON.stringify(merged[key])).map(String);
+    if(changedSections.length){
+      merged.auditLog=[{id:crypto.randomUUID(),at:new Date().toISOString(),actor:user.displayName||'Team member',role,summary:'Updated '+changedSections.join(', '),sections:changedSections},...merged.auditLog].slice(0,2000);
+    }
     try{validateRelations(merged)}catch(e){return response({error:e instanceof Error?e.message:'Invalid records.'},400)}
     const result=await db.prepare('UPDATE crm_workspaces SET data = ?, version = version + 1, updated_at = ? WHERE owner_id = ? AND version = ?').bind(JSON.stringify(merged),new Date().toISOString(),ownerId,body.version).run();
     if(!result.meta.changes)return response({error:'This workspace changed in another window. Refresh records, then try again.'},409);
