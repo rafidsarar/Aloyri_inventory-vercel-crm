@@ -358,3 +358,6 @@ html,body{max-width:100%;overflow-x:hidden}
 
 .payment-dialog{max-width:560px}.payment-form{display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-top:6px}.payment-form label{display:grid;gap:7px}.payment-form label>span{font-size:12px;font-weight:700;color:var(--muted-foreground);text-transform:uppercase;letter-spacing:.04em}.payment-form select{height:40px;width:100%;border:1px solid var(--input);border-radius:8px;background:var(--background);padding:0 11px;font-size:14px}.payment-dialog-actions{grid-column:1/-1;display:flex;justify-content:flex-end;gap:9px;padding-top:6px}
 @media(max-width:560px){.payment-form{grid-template-columns:1fr}.payment-dialog-actions{grid-column:1}}
+
+.aging-panel{margin-bottom:16px}.aging-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.aging-card{display:grid;gap:7px;border:1px solid var(--border);border-radius:12px;padding:14px;background:var(--background)}.aging-card span{font-size:12px;color:var(--muted-foreground);font-weight:650}.aging-card strong{font-size:19px}
+@media(max-width:950px){.aging-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:560px){.aging-grid{grid-template-columns:1fr 1fr}.aging-card{padding:12px}.aging-card strong{font-size:16px}}
