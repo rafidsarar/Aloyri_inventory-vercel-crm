@@ -1,4 +1,4 @@
-# Skinventory CRM — Vercel edition
+# ALOYRI CRM — Vercel edition
 
 Independent CRM website with its own email and password login. It runs on Vercel with a Neon Postgres database. Roles: owner, admin, sales employee, inventory manager, and viewer. Admins can manage all business records, finances, settings, imports and exports. Only the owner can invite people, change roles, remove accounts or manage team access. The app does not use ChatGPT authentication.
 
@@ -17,7 +17,7 @@ Uploading the ZIP itself is not the recommended Vercel workflow; import a GitHub
 
 ## Transfer existing CRM records
 
-The archive has no live customer records. In the existing private Skinventory site, the owner can use **Download full backup**. On the new site, the owner or an admin can use **Import records** before making any new records. The import accepts a fresh, empty workspace only. Compare product, customer, and order counts after the move. Keep the downloaded backup private.
+The archive has no live customer records. In the existing private ALOYRI site, the owner can use **Download full backup**. On the new site, the owner or an admin can use **Import records** before making any new records. The import accepts a fresh, empty workspace only. Compare product, customer, and order counts after the move. Keep the downloaded backup private.
 
 ## Cashflow
 
