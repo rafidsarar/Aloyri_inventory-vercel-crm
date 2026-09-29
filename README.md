@@ -37,7 +37,7 @@ Create a Neon development database and run `sql/001_init.sql` in its SQL Editor.
 
 ## Security and recovery
 
-Passwords are salted PBKDF2-SHA256 hashes; sessions are backed by revocable database records and HttpOnly cookies. Staff access is checked on the server. Back up the Neon database and retain access to your Neon and Vercel accounts. If an owner loses their password, account recovery requires an administrative database procedure; `/setup` cannot create a second owner.
+Passwords are salted PBKDF2-SHA256 hashes; sessions are backed by revocable database records and HttpOnly cookies. Staff access is checked on the server. Back up the Neon database and retain access to your Neon and Vercel accounts. Active users, including the owner, can recover access through the login-page password reset flow when transactional email is configured; `/setup` cannot create a second owner.
 
 ## Password recovery
 
