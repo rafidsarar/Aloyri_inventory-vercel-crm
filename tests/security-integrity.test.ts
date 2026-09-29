@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { roleCanEdit, roleCanManageFinance, roleCanManageTeam, roleCanReset } from '../lib/roles.ts';
-import { accountBalance, cashflow, initialState, metrics, receivable, stateSchema, shiftDate, today, uid, validateRelations, type Order, type State } from '../lib/crm.ts';
+import { accountBalance, cashflow, collectedAmount, initialState, metrics, orderBalance, orderPaymentStatus, receivable, stateSchema, shiftDate, today, uid, validateRelations, type Order, type State } from '../lib/crm.ts';
 
 function baseOrder(overrides:Partial<Order>={}):Order{
   return {
@@ -45,6 +45,22 @@ test('COD receivable is courier net while direct payments remain gross customer 
   assert.equal(receivable(cod),1000);
   const bkash=baseOrder({payment:'bKash'});
   assert.equal(receivable(bkash),1100);
+});
+
+test('order payment helpers distinguish COD, partial and settled payments',()=>{
+  const cod=baseOrder({status:'Confirmed',delivered:undefined});
+  assert.equal(orderPaymentStatus(cod),'Due on delivery');
+  assert.equal(orderBalance(cod),1000);
+  const direct=baseOrder({payment:'bKash',status:'Confirmed',delivered:undefined,collections:[{id:'pay-1',date:today(),amount:400,reference:'BKASH'}]});
+  assert.equal(collectedAmount(direct),400);
+  assert.equal(orderBalance(direct),700);
+  assert.equal(orderPaymentStatus(direct),'Part paid');
+  direct.collections=[{id:'pay-2',date:today(),amount:1100,reference:'BKASH'}];direct.settled=true;direct.settledAt=today();
+  assert.equal(orderBalance(direct),0);
+  assert.equal(orderPaymentStatus(direct),'Paid');
+  const cancelled=baseOrder({status:'Cancelled',delivered:undefined});
+  assert.equal(orderBalance(cancelled),0);
+  assert.equal(orderPaymentStatus(cancelled),'Closed');
 });
 
 test('advance direct payment is valid and appears in cashflow before delivery',()=>{
