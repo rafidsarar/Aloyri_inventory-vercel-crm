@@ -1,5 +1,5 @@
-import type { State } from './crm';
-import type { WorkspaceRole } from './roles';
+import type { State } from './crm.ts';
+import type { WorkspaceRole } from './roles.ts';
 import { roleCanEdit } from './roles';
 
 /** The CRM sends one state document; keep its shape while removing fields outside a role's work. */
