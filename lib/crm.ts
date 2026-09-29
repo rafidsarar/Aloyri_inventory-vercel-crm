@@ -17,7 +17,7 @@ const stockAdjustmentSchema = z.object({id,batchId:id,delta:z.number().int().min
 const allocationSchema = z.object({batchId:id,qty,unitCost:money});
 const collectionSchema=z.object({id,date,amount:money.refine(n=>n>0),reference:str.default('')});
 const orderSchema = z.object({id,number:str,customerId:id,created:date,delivered:date.optional(),settledAt:date.optional(),collections:z.array(collectionSchema).max(100).default([]),channel:z.enum(channels),payment:z.enum(['COD','bKash','Nagad','Bank']),status:z.enum(statuses),items:z.array(z.object({productId:id,qty,price:money,allocations:z.array(allocationSchema).min(1)})).min(1).max(50),discount:money,deliveryCharge:money,courierCost:money,packaging:money,paymentFee:money,returnFee:money,settled:z.boolean(),restocked:z.boolean(),tracking:str,notes:str});
-const expenseSchema = z.object({id,category:z.enum(expenseCategories),amount:money,date,notes:str});
+const expenseSchema = z.object({id,category:z.enum(expenseCategories),amount:money,date,notes:str,vendor:str.default(''),reference:str.default(''),recurring:z.enum(['none','monthly']).default('none'),account:z.enum(accountIds).optional()});
 const cashEntrySchema = z.object({id,date,kind:z.enum(['in','out']),category:z.string().trim().min(1).max(100),description:str,amount:money.refine(n=>n>0),transferId:id.optional()});
 const accountOpeningSchema=z.object({account:z.enum(accountIds),date,balance:money,statementDate:date.optional(),statementBalance:money.optional()});
 const accountMatchSchema=z.object({entryId:id,account:z.enum(accountIds),matched:z.boolean(),reference:z.string().trim().max(200)});
@@ -73,7 +73,7 @@ export function cashflow(s:State){
   const entries:{id:string;date:string;kind:'in'|'out';source:string;description:string;amount:number}[]=[];
   for(const o of s.orders.filter(o=>o.status==='Delivered')){const payout=Math.max(0,total(o)-o.courierCost-o.paymentFee);if(o.collections.length)for(const p of o.collections)entries.push({id:'order-collection-'+o.id+'-'+p.id,date:p.date,kind:'in',source:'Order collection',description:'#'+o.number+(p.reference?' · '+p.reference:''),amount:p.amount});else if(o.settled&&o.settledAt&&payout)entries.push({id:'order-'+o.id,date:o.settledAt,kind:'in',source:'Order settlement',description:'#'+o.number,amount:payout});}
   for(const b of s.batches){const description=b.invoice||s.products.find(p=>p.id===b.productId)?.name||'Stock';if(b.payments.length)for(const p of b.payments)entries.push({id:'batch-payment-'+b.id+'-'+p.id,date:p.date,kind:'out',source:'Stock purchase',description,amount:p.amount});else if(b.paid&&b.paidAt)entries.push({id:'batch-'+b.id,date:b.paidAt,kind:'out',source:'Stock purchase',description,amount:b.qty*b.unitCost});}
-  for(const e of s.expenses)entries.push({id:'expense-'+e.id,date:e.date,kind:'out',source:e.category,description:e.notes||'Operating expense',amount:e.amount});
+  for(const e of s.expenses)entries.push({id:'expense-'+e.id,date:e.date,kind:'out',source:e.category,description:(e.vendor?e.vendor+' · ':'')+(e.notes||'Operating expense')+(e.reference?' · '+e.reference:''),amount:e.amount});
   for(const e of s.cashEntries)entries.push({id:'manual-'+e.id,date:e.date,kind:e.kind,source:e.category,description:e.description||'Other cash movement',amount:e.amount});
   entries.sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
   return {entries,undated:s.orders.filter(o=>o.settled&&!o.settledAt&&!o.collections.length).length+s.batches.filter(b=>b.paid&&!b.paidAt&&!b.payments.length).length};
