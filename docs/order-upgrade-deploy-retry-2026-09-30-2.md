@@ -25,3 +25,6 @@ Manual retry requested again for fulfillment queue scrolling and Orders copy rol
 
 
 Another manual retry for Orders scroll fix deployment.
+
+
+Retry for staff role permissions and sales order workflow fix (`d17e959e74b31d527d8484aa74daa0388e839031`).
