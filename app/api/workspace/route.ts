@@ -3,7 +3,7 @@ import { AccessDenied, resolveWorkspace } from '@/app/team-access';
 import { visibleState, applyRoleChanges } from '@/lib/role-data';
 import { canManageBusinessSettings } from '@/lib/roles';
 import { database } from '@/db/raw';
-import { initialState, stateSchema, validateRelations, fixedBusinessName, cashflow } from '@/lib/crm';
+import { initialState, stateSchema, validateRelations, fixedBusinessName } from '@/lib/crm';
 
 export const dynamic='force-dynamic';
 const response=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
@@ -38,20 +38,6 @@ export async function GET(){
   }
 }
 
-function closedPeriodViolation(previous:ReturnType<typeof fixedBusinessName>,next:ReturnType<typeof fixedBusinessName>){
- const closed=new Set(previous.financeCloses.map(x=>x.month));if(!closed.size)return '';
- const locked=(date:string)=>closed.has(date.slice(0,7));
- const byId=(xs:Array<{id:string}&Record<string,unknown>>)=>new Map(xs.map(x=>[x.id,x]));
- const prevOrders=new Map(previous.orders.map(x=>[x.id,x])),nextOrders=new Map(next.orders.map(x=>[x.id,x]));
- for(const [id,p] of prevOrders){const n=nextOrders.get(id);if(!n&&locked(p.delivered||p.created))return 'Orders in a closed month are locked.';if(n){const pc=p.collections.filter(x=>locked(x.date)),nc=n.collections.filter(x=>locked(x.date));if(JSON.stringify(pc)!==JSON.stringify(nc))return 'Customer collections in a closed month are locked.';if(locked(p.delivered||p.created)&&JSON.stringify(p)!==JSON.stringify(n))return 'Delivered orders in a closed month are locked.'}}
- for(const n of next.orders)if(!prevOrders.has(n.id)&&locked(n.delivered||n.created))return 'New orders cannot be posted into a closed month.';
- const prevBatches=new Map(previous.batches.map(x=>[x.id,x])),nextBatches=new Map(next.batches.map(x=>[x.id,x]));
- for(const [id,p] of prevBatches){const n=nextBatches.get(id);if(!n&&locked(p.received))return 'Purchases received in a closed month are locked.';if(n){const pp=p.payments.filter(x=>locked(x.date)),np=n.payments.filter(x=>locked(x.date));if(JSON.stringify(pp)!==JSON.stringify(np))return 'Supplier payments in a closed month are locked.';if(locked(p.received)&&JSON.stringify({...p,payments:[]})!==JSON.stringify({...n,payments:[]}))return 'Purchases received in a closed month are locked.'}}
- for(const n of next.batches)if(!prevBatches.has(n.id)&&locked(n.received))return 'New stock receipts cannot be posted into a closed month.';
- for(const key of ['expenses','cashEntries'] as const){const p=new Map(previous[key].map(x=>[x.id,x])),n=new Map(next[key].map(x=>[x.id,x]));for(const [id,row] of p){const nr=n.get(id);if((!nr||JSON.stringify(row)!==JSON.stringify(nr))&&locked(row.date))return (key==='expenses'?'Expenses':'Cash movements')+' in a closed month are locked.'}for(const [id,row] of n)if(!p.has(id)&&locked(row.date))return 'New '+(key==='expenses'?'expenses':'cash movements')+' cannot be posted into a closed month.'}
- const lockedEntryIds=new Set(cashflow(previous).entries.filter(e=>locked(e.date)).map(e=>e.id));const pm=new Map(previous.accountMatches.map(x=>[x.entryId,x])),nm=new Map(next.accountMatches.map(x=>[x.entryId,x]));for(const id of lockedEntryIds)if(JSON.stringify(pm.get(id))!==JSON.stringify(nm.get(id)))return 'Reconciliation assignments in a closed month are locked.';
- return '';
-}
 export async function PUT(request:Request){
   try{
     const user=await getAppUser();
@@ -74,7 +60,6 @@ export async function PUT(request:Request){
     let merged:typeof previous;
     try{merged=applyRoleChanges(previous,parsed.data,role)}catch(e){return response({error:e instanceof Error?e.message:'You cannot change that section.'},403)}
     merged=fixedBusinessName(merged);
-    const closedError=closedPeriodViolation(previous,merged);if(closedError)return response({error:closedError+' Reopen the month from Finance → Month-end close before changing it.'},409);
     try{validateRelations(merged)}catch(e){return response({error:e instanceof Error?e.message:'Invalid records.'},400)}
     const result=await db.prepare('UPDATE crm_workspaces SET data = ?, version = version + 1, updated_at = ? WHERE owner_id = ? AND version = ?').bind(JSON.stringify(merged),new Date().toISOString(),ownerId,body.version).run();
     if(!result.meta.changes)return response({error:'This workspace changed in another window. Refresh records, then try again.'},409);
