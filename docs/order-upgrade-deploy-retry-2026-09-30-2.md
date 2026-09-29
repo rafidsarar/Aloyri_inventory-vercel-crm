@@ -39,3 +39,6 @@ Manual retry requested again for Inventory command dashboard production rollout.
 
 
 Manual retry requested again for Inventory command dashboard production deployment.
+
+
+Deploy full Inventory Steps 1–3 together from main (`51f4e0292683947907f47eedf1cc83ff6f2a6e93`).
