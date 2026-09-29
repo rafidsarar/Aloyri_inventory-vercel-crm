@@ -4,3 +4,6 @@ Second docs-only trigger to retry production deployment for the merged Orders up
 
 
 Deployment trigger for order lifecycle sequence commit `993b8db08015bcae06e053425bd903f217638976`.
+
+
+Manual retry requested for production deployment of the new order sequence.
