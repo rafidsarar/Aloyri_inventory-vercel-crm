@@ -1,0 +1,35 @@
+import { getAppUser, checkOrigin } from '@/app/local-auth';
+import { AccessDenied, resolveWorkspace } from '@/app/team-access';
+import { database } from '@/db/raw';
+import { fixedBusinessName, stateSchema, validateRelations } from '@/lib/crm';
+
+export const dynamic='force-dynamic';
+const response=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
+
+export async function POST(request:Request){
+  try{
+    const user=await getAppUser();
+    if(!user)return response({error:'Please sign in before resetting the workspace.'},401);
+    if(!checkOrigin(request))return response({error:'Invalid request origin.'},403);
+    const {ownerId,role}=await resolveWorkspace(user);
+    if(role!=='owner')return response({error:'Only the business owner can reset CRM data.'},403);
+    const body=await request.json().catch(()=>null);
+    if(body?.confirmation!=='RESET ALOYRI')return response({error:'Type RESET ALOYRI to confirm.'},400);
+    const db=database();
+    const row=await db.prepare('SELECT data,version FROM crm_workspaces WHERE owner_id = ?').bind(ownerId).first<{data:string;version:number}>();
+    if(!row)return response({error:'Workspace not found.'},404);
+    const current=fixedBusinessName(stateSchema.parse(JSON.parse(row.data)));
+    const products=current.products.slice(0,2);
+    const usedCategories=new Set(products.map(p=>p.category));
+    const productCategories=current.productCategories.filter(c=>usedCategories.has(c));
+    const cleaned={...current,products,productCategories:productCategories.length?productCategories:current.productCategories.slice(0,1),customers:[],suppliers:[],batches:[],stockAdjustments:[],orders:[],expenses:[],cashEntries:[],accountOpenings:[],accountMatches:[],tasks:[]};
+    validateRelations(cleaned);
+    const result=await db.prepare('UPDATE crm_workspaces SET data = ?, version = version + 1, updated_at = ? WHERE owner_id = ? AND version = ?').bind(JSON.stringify(cleaned),new Date().toISOString(),ownerId,row.version).run();
+    if(!result.meta.changes)return response({error:'Workspace changed while resetting. Please try again.'},409);
+    return response({ok:true,version:row.version+1,keptProducts:products.map(p=>p.name)});
+  }catch(e){
+    if(e instanceof AccessDenied)return response({error:e.message},403);
+    console.error('Workspace reset failed',e);
+    return response({error:'Could not reset CRM data. Nothing was intentionally partially cleared.'},503);
+  }
+}
