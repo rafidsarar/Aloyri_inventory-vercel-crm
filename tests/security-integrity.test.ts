@@ -131,7 +131,7 @@ test('account balances use assigned movements without double counting transfers'
 test('sales-visible state hides supplier finance and remains safe for client validation',()=>{
   const state=baseState(baseOrder());
   state.batches[0].payments=[{id:'supplier-pay-1',date:today(),amount:800,note:'Bank'}];
-  state.financeCloses=[{month:today().slice(0,7),closedAt:today()}];
+  state.financeCloses=[{month:today().slice(0,7),closedAt:today(),closedBy:'Owner',notes:''}];
   validateRelations(state);
   const sales=visibleState(state,'sales');
   assert.equal(sales.batches[0].unitCost,0);
@@ -183,7 +183,7 @@ test('sales can create a catalog-priced order without internal fulfillment finan
 test('inventory-visible state hides finance and inventory saves preserve supplier payments',()=>{
   const current=baseState(baseOrder({payment:'bKash',collections:[{id:'collection-1',date:today(),amount:500,reference:'BKASH'}]}));
   current.batches[0].payments=[{id:'supplier-pay-1',date:today(),amount:800,note:'Bank'}];
-  current.financeCloses=[{month:today().slice(0,7),closedAt:today()}];
+  current.financeCloses=[{month:today().slice(0,7),closedAt:today(),closedBy:'Owner',notes:''}];
   validateRelations(current);
   const proposed=visibleState(current,'inventory');
   assert.deepEqual(proposed.batches[0].payments,[]);
