@@ -37,9 +37,9 @@ test('order lifecycle follows the requested queue sequence and migrates legacy s
   assert.deepEqual(nextStatuses(baseOrder({status:'Shipped',delivered:undefined})),['Out for delivery']);
   assert.deepEqual(nextStatuses(baseOrder({status:'Out for delivery',delivered:undefined})),['Delivered','Returned']);
   assert.deepEqual(nextStatuses(baseOrder({status:'Delivered'})),['Returned']);
-  const processing=baseState(baseOrder({status:'Confirmed',delivered:undefined})) as any;processing.orders[0].status='Processing';
+  const processing=structuredClone(baseState(baseOrder({status:'Confirmed',delivered:undefined}))) as unknown as {orders:Array<{status:string}>};processing.orders[0].status='Processing';
   assert.equal(stateSchema.parse(processing).orders[0].status,'Ready to pack');
-  const readyToShip=baseState(baseOrder({status:'Confirmed',delivered:undefined})) as any;readyToShip.orders[0].status='Ready to Ship';
+  const readyToShip=structuredClone(baseState(baseOrder({status:'Confirmed',delivered:undefined}))) as unknown as {orders:Array<{status:string}>};readyToShip.orders[0].status='Ready to Ship';
   assert.equal(stateSchema.parse(readyToShip).orders[0].status,'Packed');
 });
 
