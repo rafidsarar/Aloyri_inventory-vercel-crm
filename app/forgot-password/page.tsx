@@ -1,3 +1,3 @@
-import PasswordRecoveryForm from '../password-recovery-form';
+import PasswordRecovery from '../password-recovery';
 export const dynamic='force-dynamic';
-export default function ForgotPassword(){return <PasswordRecoveryForm mode="forgot"/>}
+export default function ForgotPassword(){return <PasswordRecovery mode="request"/>}

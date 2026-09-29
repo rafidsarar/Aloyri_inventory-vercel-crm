@@ -1,4 +1,3 @@
--- Adds one-time self-service password reset tokens for all active ALOYRI CRM roles.
 CREATE TABLE IF NOT EXISTS crm_password_resets (
   token_hash TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,

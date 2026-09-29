@@ -1,7 +1,3 @@
-import PasswordRecoveryForm from '../password-recovery-form';
+import PasswordRecovery from '../password-recovery';
 export const dynamic='force-dynamic';
-export default async function ResetPassword({searchParams}:{searchParams:Promise<{token?:string|string[]}>}){
-  const params=await searchParams;
-  const token=Array.isArray(params.token)?params.token[0]||'':params.token||'';
-  return <PasswordRecoveryForm mode="reset" token={token}/>
-}
+export default async function ResetPassword({searchParams}:{searchParams:Promise<{token?:string}>}){const {token}=await searchParams;return <PasswordRecovery mode="reset" token={token||''}/>}
