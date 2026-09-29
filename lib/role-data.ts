@@ -38,6 +38,26 @@ export function applyRoleChanges(current:State,proposed:State,role:WorkspaceRole
     if(!roleCanEdit(role,key)&&JSON.stringify(proposed[key])!==JSON.stringify(visible[key]))
       throw new Error('Your role cannot change '+key+'. Ask the owner to update your access.');
   }
+  if(role==='sales'){
+    const currentOrders=new Map(current.orders.map(o=>[o.id,o]));
+    for(const order of proposed.orders){
+      const before=currentOrders.get(order.id);
+      if(before){
+        const protectedBefore={collections:before.collections,settled:before.settled,settledAt:before.settledAt,courierCost:before.courierCost,packaging:before.packaging,paymentFee:before.paymentFee,returnFee:before.returnFee};
+        const protectedAfter={collections:order.collections,settled:order.settled,settledAt:order.settledAt,courierCost:order.courierCost,packaging:order.packaging,paymentFee:order.paymentFee,returnFee:order.returnFee};
+        if(JSON.stringify(protectedBefore)!==JSON.stringify(protectedAfter))throw new Error('Sales staff cannot change collections, settlement or finance cost fields.');
+      }else if(order.collections.length||order.settled||order.settledAt||order.courierCost||order.packaging||order.paymentFee||order.returnFee)throw new Error('Sales staff cannot create finance settlement data.');
+    }
+  }
+  if(role==='inventory'){
+    const currentBatches=new Map(current.batches.map(b=>[b.id,b]));
+    for(const batch of proposed.batches){
+      const before=currentBatches.get(batch.id);
+      if(before){
+        if(JSON.stringify({payments:before.payments,paid:before.paid,paidAt:before.paidAt})!==JSON.stringify({payments:batch.payments,paid:batch.paid,paidAt:batch.paidAt}))throw new Error('Inventory staff cannot change supplier payment fields.');
+      }else if(batch.payments.length||batch.paid||batch.paidAt)throw new Error('Inventory staff cannot create supplier payment data.');
+    }
+  }
   const merged=structuredClone(current);
   for(const key of Object.keys(current) as (keyof State)[])
     if(roleCanEdit(role,key))(merged as any)[key]=proposed[key];
