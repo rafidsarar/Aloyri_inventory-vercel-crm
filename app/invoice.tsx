@@ -11,24 +11,8 @@ export default function Invoice({state,order,onClose}:{state:State;order:Order|n
   const productTotal=order.items.reduce((sum,item)=>sum+item.qty*item.price,0);
   const date=new Date(order.created+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric',timeZone:'Asia/Dhaka'});
   const paymentStatus=order.status==='Cancelled'?'Cancelled':order.status==='Returned'?'Returned':order.settled?'Collection recorded':order.payment==='COD'?'Payment on delivery':'Payment not confirmed';
-  const printInvoice=()=>{
-    const source=document.querySelector('.aloyri-invoice');
-    if(!source)return;
-    const existing=document.getElementById('aloyri-print-root');
-    existing?.remove();
-    const root=document.createElement('div');
-    root.id='aloyri-print-root';
-    root.setAttribute('aria-hidden','true');
-    root.appendChild(source.cloneNode(true));
-    document.body.appendChild(root);
-    const cleanup=()=>{root.remove();window.removeEventListener('afterprint',cleanup)};
-    window.addEventListener('afterprint',cleanup,{once:true});
-    window.print();
-    window.setTimeout(()=>{if(document.body.contains(root))cleanup()},30000);
-  };
-  return <Dialog open onOpenChange={open=>{if(!open)onClose()}}><DialogContent className="invoice-dialog aloyri-dialog">
-    <DialogHeader className="invoice-screen-header"><DialogTitle>Invoice for {order.number}</DialogTitle><DialogDescription>ALOYRI invoice generated from the saved order. Print or save it as a PDF.</DialogDescription></DialogHeader>
-    <article className="invoice-page aloyri-invoice" aria-label={'ALOYRI invoice '+order.number}>
+  const printInvoice=()=>window.print();
+  const invoiceBody=<article className="invoice-page aloyri-invoice" aria-label={'ALOYRI invoice '+order.number}>
       <header className="aloyri-masthead">
         <img src={profile.logoDataUrl||'/aloyri-logo.webp'} alt="ALOYRI logo" width={220} height={82}/>
         <div><strong>INVOICE</strong><span>INV-{order.number}</span><small>{date}</small></div>
@@ -44,7 +28,10 @@ export default function Invoice({state,order,onClose}:{state:State;order:Order|n
         {profile.returnPolicy&&<section className="aloyri-notes"><h3>Returns and exchanges</h3><p>{profile.returnPolicy}</p></section>}
       </div>
       <footer className="aloyri-footer"><strong>{profile.invoiceFooter||'Thank you for choosing ALOYRI.'}</strong><span>{[profile.phone,profile.email].filter(Boolean).join(' · ')||'Let Your Skin Glow.'}</span></footer>
-    </article>
-    <div className="invoice-actions"><button type="button" className="btn secondary" onClick={onClose}>Close</button><button type="button" className="btn primary" onClick={printInvoice}><Printer size={16}/><span>Print / Save PDF</span><Download size={15}/></button></div>
+    </article>;
+  return <Dialog open onOpenChange={open=>{if(!open)onClose()}}><DialogContent className="invoice-dialog aloyri-dialog">
+    <DialogHeader className="invoice-screen-header"><DialogTitle>Invoice for {order.number}</DialogTitle><DialogDescription>ALOYRI invoice generated from the saved order. Print or save it as a PDF.</DialogDescription></DialogHeader>
+    <div className="invoice-viewer">{invoiceBody}</div>\n    <div className="invoice-actions"><button type="button" className="btn secondary" onClick={onClose}>Close</button><button type="button" className="btn primary" onClick={printInvoice}><Printer size={16}/><span>Print / Save PDF</span><Download size={15}/></button></div>
+    <div id="aloyri-print-sheet">{invoiceBody}</div>
   </DialogContent></Dialog>;
 }
