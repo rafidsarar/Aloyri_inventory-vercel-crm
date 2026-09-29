@@ -30,13 +30,6 @@ CREATE TABLE IF NOT EXISTS crm_invites (
   expires_at TEXT NOT NULL,
   created_at TEXT NOT NULL
 );
-CREATE TABLE IF NOT EXISTS crm_password_resets (
-  token_hash TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  expires_at TEXT NOT NULL,
-  created_at TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS crm_password_resets_user ON crm_password_resets(user_id);
 CREATE TABLE IF NOT EXISTS crm_login_attempts (
   key TEXT PRIMARY KEY,
   attempts INTEGER NOT NULL DEFAULT 0,
