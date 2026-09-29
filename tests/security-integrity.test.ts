@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { roleCanEdit, roleCanManageFinance, roleCanManageTeam, roleCanReset } from '../lib/roles.ts';
-import { accountBalance, cashflow, collectedAmount, initialState, metrics, orderBalance, orderPaymentStatus, receivable, stateSchema, shiftDate, today, uid, validateRelations, type Order, type State } from '../lib/crm.ts';
+import { accountBalance, cashflow, collectedAmount, initialState, metrics, nextStatuses, orderBalance, orderPaymentStatus, receivable, stateSchema, statuses, shiftDate, today, uid, validateRelations, type Order, type State } from '../lib/crm.ts';
 
 function baseOrder(overrides:Partial<Order>={}):Order{
   return {
@@ -27,6 +27,20 @@ test('legacy starting capital is ignored and new workspaces do not contain it',(
   assert.equal('budget' in fresh,false);
   const parsed=stateSchema.parse({...fresh,budget:120000}) as State & {budget?:number};
   assert.equal('budget' in parsed,false);
+});
+
+test('order lifecycle follows the requested queue sequence and migrates legacy stages',()=>{
+  assert.deepEqual(statuses,['New','Confirmed','Ready to pack','Packed','Shipped','Out for delivery','Delivered','Returned','Cancelled']);
+  assert.deepEqual(nextStatuses(baseOrder({status:'Confirmed',delivered:undefined})),['Ready to pack','Cancelled']);
+  assert.deepEqual(nextStatuses(baseOrder({status:'Ready to pack',delivered:undefined})),['Packed','Cancelled']);
+  assert.deepEqual(nextStatuses(baseOrder({status:'Packed',delivered:undefined})),['Shipped','Cancelled']);
+  assert.deepEqual(nextStatuses(baseOrder({status:'Shipped',delivered:undefined})),['Out for delivery']);
+  assert.deepEqual(nextStatuses(baseOrder({status:'Out for delivery',delivered:undefined})),['Delivered','Returned']);
+  assert.deepEqual(nextStatuses(baseOrder({status:'Delivered'})),['Returned']);
+  const processing=structuredClone(baseState(baseOrder({status:'Confirmed',delivered:undefined}))) as unknown as {orders:Array<{status:string}>};processing.orders[0].status='Processing';
+  assert.equal(stateSchema.parse(processing).orders[0].status,'Ready to pack');
+  const readyToShip=structuredClone(baseState(baseOrder({status:'Confirmed',delivered:undefined}))) as unknown as {orders:Array<{status:string}>};readyToShip.orders[0].status='Ready to Ship';
+  assert.equal(stateSchema.parse(readyToShip).orders[0].status,'Packed');
 });
 
 test('production role permissions keep finance and destructive controls restricted',()=>{
