@@ -1,1 +1,2 @@
-export { dynamic, POST } from '../reset/route';
+export const dynamic='force-dynamic';
+export { POST } from '../reset/route';
