@@ -1,11 +1,11 @@
 export type WorkspaceRole='owner'|'admin'|'sales'|'inventory'|'viewer';
 
 export const roleCapabilities={
-  owner:{sections:['Overview','Orders','Inventory','Customers','Suppliers','Finances','Follow-ups'],edit:['products','productCategories','customers','suppliers','batches','stockAdjustments','orders','expenses','cashEntries','accountOpenings','accountMatches','financeCloses','tasks','businessName','businessProfile','budget'],settings:true,team:true,reset:true,invoice:true,finance:true},
-  admin:{sections:['Overview','Orders','Inventory','Customers','Suppliers','Finances','Follow-ups'],edit:['products','productCategories','customers','suppliers','batches','stockAdjustments','orders','expenses','cashEntries','accountOpenings','accountMatches','tasks','businessName','businessProfile','budget'],settings:true,team:false,reset:false,invoice:true,finance:true},
-  sales:{sections:['Orders','Customers','Follow-ups'],edit:['orders','customers','tasks'],settings:false,team:false,reset:false,invoice:true,finance:false},
-  inventory:{sections:['Inventory','Suppliers'],edit:['products','productCategories','batches','suppliers','stockAdjustments'],settings:false,team:false,reset:false,invoice:false,finance:false},
-  viewer:{sections:['Overview','Orders','Inventory','Customers','Suppliers','Finances','Follow-ups'],edit:[],settings:false,team:false,reset:false,invoice:true,finance:true}
+  owner:{sections:['Overview','Alerts','Orders','Inventory','Customers','Suppliers','Finances','Follow-ups'],edit:['products','productCategories','customers','suppliers','batches','stockAdjustments','orders','expenses','cashEntries','accountOpenings','accountMatches','financeCloses','tasks','businessName','businessProfile','budget'],settings:true,team:true,reset:true,invoice:true,finance:true},
+  admin:{sections:['Overview','Alerts','Orders','Inventory','Customers','Suppliers','Finances','Follow-ups'],edit:['products','productCategories','customers','suppliers','batches','stockAdjustments','orders','expenses','cashEntries','accountOpenings','accountMatches','tasks','businessName','businessProfile','budget'],settings:true,team:false,reset:false,invoice:true,finance:true},
+  sales:{sections:['Alerts','Orders','Customers','Follow-ups'],edit:['orders','customers','tasks'],settings:false,team:false,reset:false,invoice:true,finance:false},
+  inventory:{sections:['Alerts','Inventory','Suppliers'],edit:['products','productCategories','batches','suppliers','stockAdjustments'],settings:false,team:false,reset:false,invoice:false,finance:false},
+  viewer:{sections:['Overview','Alerts','Orders','Inventory','Customers','Suppliers','Finances','Follow-ups'],edit:[],settings:false,team:false,reset:false,invoice:true,finance:true}
 } as const satisfies Record<WorkspaceRole,{sections:readonly string[];edit:readonly string[];settings:boolean;team:boolean;reset:boolean;invoice:boolean;finance:boolean}>;
 
 export const canManageBusinessSettings=(role:WorkspaceRole)=>roleCapabilities[role].settings;
