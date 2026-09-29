@@ -23,6 +23,9 @@ export async function POST(request:Request){
     validateRelations(cleaned);
     const result=await db.prepare('UPDATE crm_workspaces SET data = ?, version = version + 1, updated_at = ? WHERE owner_id = ? AND version = ?').bind(JSON.stringify(cleaned),new Date().toISOString(),ownerId,row.version).run();
     if(!result.meta.changes)return response({error:'Workspace changed while resetting. Please try again.'},409);
+    const now=new Date().toISOString();
+    await db.prepare('CREATE TABLE IF NOT EXISTS crm_audit_log (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, actor_id TEXT NOT NULL, actor_name TEXT NOT NULL, role TEXT NOT NULL, summary TEXT NOT NULL, sections TEXT NOT NULL, created_at TEXT NOT NULL)').run();
+    await db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)').bind(crypto.randomUUID(),ownerId,user.userId,user.displayName||user.email,role,'Reset operational CRM data',JSON.stringify(['workspace reset']),now).run();
     return response({ok:true,version:row.version+1});
   }catch(e){
     if(e instanceof AccessDenied)return response({error:e.message},403);
