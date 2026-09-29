@@ -2,7 +2,8 @@ import { database } from '@/db/raw';
 import { checkOrigin, createSession, newSalt, passwordHash, passwordValid, tokenHash } from '@/app/local-auth';
 export async function POST(request:Request){
   if(!checkOrigin(request))return Response.json({error:'Invalid request origin.'},{status:403});
-  let body:any;try{body=await request.json()}catch{return Response.json({error:'Invalid request.'},{status:400})}
+  const text=await request.text();if(text.length>8192)return Response.json({error:'Invalid request.'},{status:413});
+  let body:any;try{body=JSON.parse(text)}catch{return Response.json({error:'Invalid request.'},{status:400})}
   if(typeof body.token!=='string'||!/^[a-f0-9]{64}$/.test(body.token)||!passwordValid(body.password))return Response.json({error:'Use a valid invitation and a password of 12–128 characters.'},{status:400});
   const db=database(),hash=await tokenHash(body.token);
   const row=await db.prepare('DELETE FROM crm_invites WHERE token_hash=? AND expires_at>? RETURNING user_id').bind(hash,new Date().toISOString()).first<{user_id:string}>();
