@@ -38,3 +38,9 @@ Create a Neon development database and run `sql/001_init.sql` in its SQL Editor.
 ## Security and recovery
 
 Passwords are salted PBKDF2-SHA256 hashes; sessions are backed by revocable database records and HttpOnly cookies. Staff access is checked on the server. Back up the Neon database and retain access to your Neon and Vercel accounts. If an owner loses their password, account recovery requires an administrative database procedure; `/setup` cannot create a second owner.
+
+## Password recovery
+
+Every active role (owner, admin, sales, inventory and viewer) can use **Forgot password?** on the login page. Reset links are random one-time tokens stored only as SHA-256 hashes, expire after 30 minutes, and revoke all existing sessions after a successful reset. The public request endpoint does not reveal whether an email belongs to an account and rate-limits repeated requests.
+
+Email delivery uses the Resend HTTP API from the Vercel server function. Configure `RESEND_API_KEY` and `PASSWORD_RESET_FROM_EMAIL` in Vercel Production/Preview environments. The sender address must use a domain authorized for sending in Resend. `PASSWORD_RESET_BASE_URL` is optional and can pin reset links to the preferred public CRM hostname. Existing databases do not require manual migration because the reset route creates the token table if needed; `sql/003_password_resets.sql` is included for explicit database setup.
