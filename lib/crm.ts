@@ -51,7 +51,7 @@ export const total=(o:Order)=>subtotal(o)+o.deliveryCharge;
 /** Amount expected from the customer/courier. COD is a net courier remittance; direct payments are gross customer receipts. */
 export const receivable=(o:Order)=>o.payment==='COD'?Math.max(0,total(o)-o.courierCost-o.paymentFee):Math.max(0,total(o));
 export const collectedAmount=(o:Order)=>o.collections.reduce((n,p)=>n+p.amount,0);
-export const orderBalance=(o:Order)=>{const due=receivable(o);const legacy=o.settled&&o.collections.length===0?due:0;return Math.max(0,due-collectedAmount(o)-legacy)};
+export const orderBalance=(o:Order)=>{if(o.status==='Cancelled'||o.status==='Returned')return 0;const due=receivable(o);const legacy=o.settled&&o.collections.length===0?due:0;return Math.max(0,due-collectedAmount(o)-legacy)};
 export const orderPaymentStatus=(o:Order)=>{if(o.status==='Cancelled'||o.status==='Returned')return 'Closed';const collected=collectedAmount(o),balance=orderBalance(o);if(balance<=.001&&receivable(o)>0)return 'Paid';if(collected>0)return 'Part paid';if(o.payment==='COD'&&o.status!=='Delivered')return 'Due on delivery';return 'Pending'};
 export const costOfOrder=(o:Order)=>o.items.flatMap(i=>i.allocations).reduce((n,a)=>n+a.unitCost*a.qty,0);
 export const contribution=(o:Order)=>subtotal(o)-costOfOrder(o)+o.deliveryCharge-o.courierCost-o.packaging-o.paymentFee;
