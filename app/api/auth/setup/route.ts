@@ -2,7 +2,8 @@ import { database } from '@/db/raw';
 import { checkOrigin, createSession, newSalt, normalizeEmail, passwordHash, passwordValid } from '@/app/local-auth';
 export async function POST(request:Request){
   if(!checkOrigin(request))return Response.json({error:'Invalid request origin.'},{status:403});
-  let body:any;try{body=await request.json()}catch{return Response.json({error:'Invalid request.'},{status:400})}
+  const text=await request.text();if(text.length>8192)return Response.json({error:'Invalid request.'},{status:413});
+  let body:any;try{body=JSON.parse(text)}catch{return Response.json({error:'Invalid request.'},{status:400})}
   const email=typeof body.email==='string'?normalizeEmail(body.email):'';
   if(!process.env.BOOTSTRAP_SECRET||process.env.BOOTSTRAP_SECRET==='replace-with-a-random-private-setup-key'||typeof body.secret!=='string'||body.secret.length>256||body.secret!==process.env.BOOTSTRAP_SECRET)return Response.json({error:'Setup key is incorrect.'},{status:403});
   if(email.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||!passwordValid(body.password))return Response.json({error:'Use a valid email and a password of 12–128 characters.'},{status:400});
