@@ -30,3 +30,6 @@ Another manual retry for Orders scroll fix deployment.
 Retry for staff role permissions and sales order workflow fix (`d17e959e74b31d527d8484aa74daa0388e839031`).
 
 Retry requested manually for the merged staff-role permission fix on 2026-09-30.
+
+
+Retry for Inventory command dashboard rollout (`26447a42ee2c49f821555bd9debb89320e3160a5`).
