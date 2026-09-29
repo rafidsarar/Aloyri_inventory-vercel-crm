@@ -79,4 +79,4 @@ export function cashflow(s:State){
 }
 
 /** Keep the ALOYRI identity fixed for existing and imported workspaces. */
-export const fixedBusinessName = (state:State):State => ({...state,businessName:'ALOYRI'});
+export const fixedBusinessName = (state:State):State => ({...state,businessName:'ALOYRI',batches:state.batches.map(b=>b.paid?b:{...b,paidAt:undefined})});
