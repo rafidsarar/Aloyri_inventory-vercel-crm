@@ -135,6 +135,8 @@ test('sales-visible state hides supplier finance and remains safe for client val
   validateRelations(state);
   const sales=visibleState(state,'sales');
   assert.equal(sales.batches[0].unitCost,0);
+  assert.equal(sales.batches[0].batchNumber,'');
+  assert.equal(sales.batches[0].manufactured,undefined);
   assert.deepEqual(sales.batches[0].payments,[]);
   assert.equal(sales.batches[0].paid,false);
   assert.equal(sales.batches[0].paidAt,undefined);
