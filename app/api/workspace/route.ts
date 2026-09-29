@@ -48,8 +48,12 @@ export async function PUT(request:Request){
     try{merged=applyRoleChanges(previous,parsed.data,role)}catch(e){return response({error:e instanceof Error?e.message:'You cannot change that section.'},403)}
     merged=fixedBusinessName(merged);
     try{validateRelations(merged)}catch(e){return response({error:e instanceof Error?e.message:'Invalid records.'},400)}
-    const result=await db.prepare('UPDATE crm_workspaces SET data = ?, version = version + 1, updated_at = ? WHERE owner_id = ? AND version = ?').bind(JSON.stringify(merged),new Date().toISOString(),ownerId,body.version).run();
+    const changedSections=(Object.keys(previous) as (keyof typeof previous)[]).filter(key=>JSON.stringify(previous[key])!==JSON.stringify(merged[key])).map(String);
+    const now=new Date().toISOString();
+    await db.prepare('CREATE TABLE IF NOT EXISTS crm_audit_log (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, actor_id TEXT NOT NULL, actor_name TEXT NOT NULL, role TEXT NOT NULL, summary TEXT NOT NULL, sections TEXT NOT NULL, created_at TEXT NOT NULL)').run();
+    const result=await db.prepare('UPDATE crm_workspaces SET data = ?, version = version + 1, updated_at = ? WHERE owner_id = ? AND version = ?').bind(JSON.stringify(merged),now,ownerId,body.version).run();
     if(!result.meta.changes)return response({error:'This workspace changed in another window. Refresh records, then try again.'},409);
+    if(changedSections.length)await db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)').bind(crypto.randomUUID(),ownerId,user.userId,user.displayName||user.email,role,'Updated '+changedSections.join(', '),JSON.stringify(changedSections),now).run();
     return response({version:body.version+1});
   }catch(e){
     if(e instanceof AccessDenied)return response({error:e.message},403);
