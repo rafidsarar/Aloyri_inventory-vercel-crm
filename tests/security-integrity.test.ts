@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { roleCanEdit, roleCanManageFinance, roleCanManageTeam, roleCanReset } from '../lib/roles.ts';
+import { applyRoleChanges, visibleState } from '../lib/role-data.ts';
 import { accountBalance, cashflow, collectedAmount, initialState, metrics, nextStatuses, orderBalance, orderPaymentStatus, receivable, stateSchema, statuses, shiftDate, today, uid, validateRelations, type Order, type State } from '../lib/crm.ts';
 
 function baseOrder(overrides:Partial<Order>={}):Order{
@@ -124,4 +125,83 @@ test('account balances use assigned movements without double counting transfers'
   validateRelations(state);
   assert.equal(accountBalance(state,'cash'),700);
   assert.equal(accountBalance(state,'bank'),2300);
+});
+
+
+test('sales-visible state hides supplier finance and remains safe for client validation',()=>{
+  const state=baseState(baseOrder());
+  state.batches[0].payments=[{id:'supplier-pay-1',date:today(),amount:800,note:'Bank'}];
+  state.financeCloses=[{month:today().slice(0,7),closedAt:today(),closedBy:'Owner',notes:''}];
+  validateRelations(state);
+  const sales=visibleState(state,'sales');
+  assert.equal(sales.batches[0].unitCost,0);
+  assert.deepEqual(sales.batches[0].payments,[]);
+  assert.equal(sales.batches[0].paid,false);
+  assert.equal(sales.batches[0].paidAt,undefined);
+  assert.equal(sales.batches[0].invoice,'');
+  assert.equal(sales.batches[0].dueDate,undefined);
+  assert.deepEqual(sales.suppliers,[]);
+  assert.deepEqual(sales.purchaseOrders,[]);
+  assert.deepEqual(sales.financeCloses,[]);
+  validateRelations(stateSchema.parse(sales));
+});
+
+test('sales order changes preserve protected finance and stock-cost data on the server',()=>{
+  const current=baseState(baseOrder({collections:[{id:'collection-1',date:today(),amount:500,reference:'COD'}],courierCost:80,packaging:25,paymentFee:15,settled:false}));
+  const proposed=visibleState(current,'sales');
+  proposed.orders[0].status='Returned';
+  proposed.orders[0].returnedAt=today();
+  proposed.orders[0].tracking='RETURN-1';
+  const merged=applyRoleChanges(current,proposed,'sales');
+  assert.equal(merged.orders[0].status,'Returned');
+  assert.equal(merged.orders[0].tracking,'RETURN-1');
+  assert.deepEqual(merged.orders[0].collections,current.orders[0].collections);
+  assert.equal(merged.orders[0].courierCost,80);
+  assert.equal(merged.orders[0].packaging,25);
+  assert.equal(merged.orders[0].paymentFee,15);
+  assert.equal(merged.orders[0].items[0].allocations[0].unitCost,400);
+  validateRelations(merged);
+});
+
+test('sales can create a catalog-priced order without internal fulfillment finance fields',()=>{
+  const current=baseState(baseOrder());
+  const proposed=visibleState(current,'sales');
+  proposed.orders.push({
+    id:'sales-order-2',number:'SK-TEST-2',customerId:'customer-1',created:today(),channel:'Facebook',payment:'COD',status:'New',
+    delivered:undefined,returnedAt:undefined,settledAt:undefined,collections:[],
+    items:[{productId:'product-1',qty:1,price:1000,allocations:[{batchId:'batch-1',qty:1,unitCost:0}]}],
+    discount:0,deliveryCharge:60,courierCost:0,packaging:0,paymentFee:0,returnFee:0,settled:false,restocked:false,tracking:'',notes:''
+  });
+  const merged=applyRoleChanges(current,proposed,'sales');
+  const created=merged.orders.find(o=>o.id==='sales-order-2')!;
+  assert.equal(created.items[0].allocations[0].unitCost,400);
+  assert.equal(created.courierCost,0);
+  assert.equal(created.packaging,0);
+  validateRelations(merged);
+});
+
+test('inventory-visible state hides finance and inventory saves preserve supplier payments',()=>{
+  const current=baseState(baseOrder({payment:'bKash',collections:[{id:'collection-1',date:today(),amount:500,reference:'BKASH'}]}));
+  current.batches[0].payments=[{id:'supplier-pay-1',date:today(),amount:800,note:'Bank'}];
+  current.financeCloses=[{month:today().slice(0,7),closedAt:today(),closedBy:'Owner',notes:''}];
+  validateRelations(current);
+  const proposed=visibleState(current,'inventory');
+  assert.deepEqual(proposed.batches[0].payments,[]);
+  assert.equal(proposed.batches[0].paid,false);
+  assert.deepEqual(proposed.orders[0].collections,[]);
+  assert.equal(proposed.orders[0].settled,false);
+  assert.deepEqual(proposed.financeCloses,[]);
+  proposed.batches[0].invoice='INV-UPDATED';
+  const merged=applyRoleChanges(current,proposed,'inventory');
+  assert.equal(merged.batches[0].invoice,'INV-UPDATED');
+  assert.deepEqual(merged.batches[0].payments,current.batches[0].payments);
+  validateRelations(merged);
+});
+
+test('role capabilities keep operational boundaries aligned',()=>{
+  for(const key of ['orders','customers','tasks'])assert.equal(roleCanEdit('sales',key),true);
+  for(const key of ['batches','suppliers','purchaseOrders','cashEntries','expenses','accountMatches'])assert.equal(roleCanEdit('sales',key),false);
+  for(const key of ['products','productCategories','batches','suppliers','purchaseOrders','stockAdjustments'])assert.equal(roleCanEdit('inventory',key),true);
+  for(const key of ['orders','customers','tasks','cashEntries','expenses','accountMatches'])assert.equal(roleCanEdit('inventory',key),false);
+  for(const key of ['orders','customers','products','batches','cashEntries','expenses','tasks'])assert.equal(roleCanEdit('viewer',key),false);
 });
