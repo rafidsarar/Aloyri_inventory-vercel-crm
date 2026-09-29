@@ -35,6 +35,6 @@ The business name is permanently ALOYRI. Open **Business settings** to edit the 
 
 Create a Neon development database and run `sql/001_init.sql` in its SQL Editor. Create `.env.local` containing `DATABASE_URL=postgresql://...` and `BOOTSTRAP_SECRET=<a different random key>`. Run `pnpm install --frozen-lockfile`, `pnpm dev`, and open `/setup`. To check the build, run `pnpm build`. Keep development and production databases separate.
 
-## Security and recovery
+## Security
 
-Passwords are salted PBKDF2-SHA256 hashes; sessions are backed by revocable database records and HttpOnly cookies. Staff access is checked on the server. Back up the Neon database and retain access to your Neon and Vercel accounts. If an owner loses their password, account recovery requires an administrative database procedure; `/setup` cannot create a second owner.
+Passwords are salted PBKDF2-SHA256 hashes; sessions are backed by revocable database records and HttpOnly cookies. Staff access is checked on the server. Back up the Neon database and retain access to your Neon and Vercel accounts. `/setup` cannot create a second owner.
