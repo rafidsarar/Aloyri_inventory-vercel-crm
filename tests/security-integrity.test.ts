@@ -268,6 +268,7 @@ test('shipped stock leaves physical on-hand while still remaining consumed',()=>
 
 test('expired physical units are blocked rather than sellable',()=>{
   const state=baseState(baseOrder({status:'Cancelled',delivered:undefined}));
+  state.batches[0].manufactured=shiftDate(-400);
   state.batches[0].received=shiftDate(-365);
   state.batches[0].expiry=shiftDate(-1);
   validateRelations(state);
