@@ -10,3 +10,6 @@ Manual retry requested for production deployment of the new order sequence.
 
 
 Manual retry for Orders UI redesign commit `9fd0e97fd2e1229c7171c5375a57b9de0029a4ee`.
+
+
+Manual retry requested for the redesigned Orders UI production rollout.
