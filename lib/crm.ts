@@ -1,5 +1,5 @@
 import { z } from 'zod';
-export const statuses = ['New','Confirmed','Packed','Shipped','Delivered','Returned','Cancelled'] as const;
+export const statuses = ['New','Confirmed','Processing','Ready to Ship','Packed','Shipped','Delivered','Returned','Cancelled'] as const;
 export const categories = ['Cleanser','Moisturizer','Sunscreen','Lip care','Other'] as const;
 export const channels = ['Facebook','Instagram','WhatsApp','Website','Other'] as const;
 export const expenseCategories = ['Advertising','Content','Tools','Packaging','Registration','Courier & returns','Other'] as const;
@@ -51,7 +51,7 @@ export const total=(o:Order)=>subtotal(o)+o.deliveryCharge;
 export const costOfOrder=(o:Order)=>o.items.flatMap(i=>i.allocations).reduce((n,a)=>n+a.unitCost*a.qty,0);
 export const contribution=(o:Order)=>subtotal(o)-costOfOrder(o)+o.deliveryCharge-o.courierCost-o.packaging-o.paymentFee;
 export function allocate(s:State,productId:string,quantity:number) {let remaining=quantity;const result:{batchId:string;qty:number;unitCost:number}[]=[];for(const b of s.batches.filter(b=>b.productId===productId&&b.expiry>today()).sort((a,b)=>a.expiry.localeCompare(b.expiry))){const amount=Math.min(remaining,batchRemaining(s,b));if(amount>0){result.push({batchId:b.id,qty:amount,unitCost:b.unitCost});remaining-=amount;}if(!remaining)break;}if(remaining)throw new Error('Not enough unexpired stock. Receive stock first.');return result;}
-export function nextStatuses(o:Order):Order['status'][] {return ({New:['Confirmed','Cancelled'],Confirmed:['Packed','Cancelled'],Packed:['Shipped','Cancelled'],Shipped:['Delivered','Returned'],Delivered:[],Returned:[],Cancelled:[]} as Record<string,Order['status'][]>)[o.status];}
+export function nextStatuses(o:Order):Order['status'][] {return ({New:['Confirmed','Cancelled'],Confirmed:['Processing','Packed','Cancelled'],Processing:['Ready to Ship','Packed','Cancelled'],'Ready to Ship':['Packed','Shipped','Cancelled'],Packed:['Shipped','Cancelled'],Shipped:['Delivered','Returned'],Delivered:[],Returned:[],Cancelled:[]} as Record<string,Order['status'][]>)[o.status];}
 export function validateRelations(s:State) {
   if(new Set(s.productCategories.map(c=>c.toLowerCase())).size!==s.productCategories.length)throw new Error('Product categories must have unique names.');
   for(const p of s.products)if(!s.productCategories.includes(p.category))throw new Error('A product uses a category that is missing from Inventory.');
