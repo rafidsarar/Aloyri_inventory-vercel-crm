@@ -47,7 +47,7 @@ useEffect(()=>{let active=true;fetch('/api/workspace',{cache:'no-store'}).then(a
 async function save(next:State):Promise<boolean>{if(saving.current)return false;try{next=stateSchema.parse(next);validateRelations(next);}catch(e){toast.error(e instanceof Error?e.message:'Please check the values.');return false;}if(!loaded){toast.error('Load your workspace before saving.');return false;}if(Object.keys(s).some(key=>!roleCanEdit(role,key)&&JSON.stringify(next[key as keyof State])!==JSON.stringify(s[key as keyof State]))){toast.error('Your role cannot change that section.');return false;}saving.current=true;setBusy(true);try{const res=await fetch('/api/workspace',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:next,version})});const d:any=await res.json();if(!res.ok)throw Error(d.error||'Could not save.');setLive(next);setVersion(d.version);setError('');toast.success('Changes saved');return true;}catch(e){const message=e instanceof Error?e.message:'Could not save.';setError(message);toast.error(message);return false;}finally{saving.current=false;setBusy(false)}}
 async function resetWorkspace(){
   if(role!=='owner'){toast.error('Only the business owner can reset CRM data.');return;}
-  const confirmation=window.prompt('This permanently clears customers, orders, suppliers, inventory stock, finance records and follow-ups. Two products and ALOYRI settings will remain. Type RESET ALOYRI to continue.');
+  const confirmation=window.prompt('This permanently clears customers, orders, suppliers, inventory stock, finance records and follow-ups. ALOYRI settings and employee access will remain, but the product catalog will be cleared. Type RESET ALOYRI to continue.');
   if(confirmation===null)return;
   if(confirmation!=='RESET ALOYRI'){toast.error('Reset cancelled. Type RESET ALOYRI exactly to confirm.');return;}
   setBusy(true);
@@ -57,7 +57,7 @@ async function resetWorkspace(){
     if(!res.ok)throw Error(d.error||'Could not reset CRM data.');
     setModal(null);setDetail(null);setInvoiceId(null);setView('Overview');setQuery('');setFilter('All');
     await loadLive(false);
-    toast.success('CRM data cleared. Two products were kept with zero inventory stock.');
+    toast.success('CRM data cleared. Inventory and the product catalog are now empty.');
   }catch(e){toast.error(e instanceof Error?e.message:'Could not reset CRM data.');}
   finally{setBusy(false);}
 }
