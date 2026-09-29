@@ -361,3 +361,11 @@ html,body{max-width:100%;overflow-x:hidden}
 
 .aging-panel{margin-bottom:16px}.aging-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.aging-card{display:grid;gap:7px;border:1px solid var(--border);border-radius:12px;padding:14px;background:var(--background)}.aging-card span{font-size:12px;color:var(--muted-foreground);font-weight:650}.aging-card strong{font-size:19px}
 @media(max-width:950px){.aging-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:560px){.aging-grid{grid-template-columns:1fr 1fr}.aging-card{padding:12px}.aging-card strong{font-size:16px}}
+
+.report-export-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+.report-export-card{display:flex;align-items:center;gap:12px;text-align:left;border:1px solid var(--border);background:var(--card);border-radius:14px;padding:15px;cursor:pointer;color:inherit;transition:.18s ease}
+.report-export-card:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(0,0,0,.06)}
+.report-export-card span{display:flex;flex-direction:column;gap:3px}.report-export-card small{color:var(--muted-foreground)}
+@media(max-width:1190px){.report-export-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:767px){.report-export-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:480px){.report-export-grid{grid-template-columns:1fr}}
