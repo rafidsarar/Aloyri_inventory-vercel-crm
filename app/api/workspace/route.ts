@@ -15,8 +15,21 @@ export async function GET(){
     const {ownerId,role}=await resolveWorkspace(user);
     const db=database();
     if(role==='owner')await db.prepare('INSERT OR IGNORE INTO crm_workspaces (owner_id,data,version,updated_at) VALUES (?,?,0,?)').bind(ownerId,JSON.stringify(initialState()),new Date().toISOString()).run();
-    const row=await db.prepare('SELECT data,version FROM crm_workspaces WHERE owner_id = ?').bind(ownerId).first<{data:string;version:number}>();
+    let row=await db.prepare('SELECT data,version,updated_at FROM crm_workspaces WHERE owner_id = ?').bind(ownerId).first<{data:string;version:number;updated_at:string}>();
     if(!row)return response({error:'The shared workspace is not ready. Ask the owner to sign in first.'},404);
+    // One-time production cleanup requested by the owner on 2026-09-29.
+    // The timestamp gate makes this migration self-disabling after the first successful reset.
+    const cleanupCutoff='2026-09-29T11:00:00.000Z';
+    if(row.updated_at<cleanupCutoff){
+      const current=fixedBusinessName(stateSchema.parse(JSON.parse(row.data)));
+      const keepProducts=current.products.slice(0,2);
+      const cleaned={...current,products:keepProducts,customers:[],suppliers:[],batches:[],stockAdjustments:[],orders:[],expenses:[],cashEntries:[],accountOpenings:[],accountMatches:[],tasks:[]};
+      validateRelations(cleaned);
+      const now=new Date().toISOString();
+      const reset=await db.prepare('UPDATE crm_workspaces SET data = ?, version = version + 1, updated_at = ? WHERE owner_id = ? AND version = ?').bind(JSON.stringify(cleaned),now,ownerId,row.version).run();
+      if(reset.meta.changes)row={data:JSON.stringify(cleaned),version:row.version+1,updated_at:now};
+      else row=await db.prepare('SELECT data,version,updated_at FROM crm_workspaces WHERE owner_id = ?').bind(ownerId).first<{data:string;version:number;updated_at:string}>()||row;
+    }
     return response({data:visibleState(fixedBusinessName(stateSchema.parse(JSON.parse(row.data))),role),version:row.version,role,userName:user.displayName});
   }catch(e){
     if(e instanceof AccessDenied)return response({error:e.message},403);
