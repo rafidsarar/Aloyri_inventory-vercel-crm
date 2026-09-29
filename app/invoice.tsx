@@ -59,6 +59,5 @@ export default function Invoice({state,order,onClose}:{state:State;order:Order|n
     <DialogHeader className="invoice-screen-header"><DialogTitle>Invoice for {order.number}</DialogTitle><DialogDescription>ALOYRI invoice generated from the saved order. Print or save it as a PDF.</DialogDescription></DialogHeader>
     <div className="invoice-viewer">{invoiceBody}</div>
     <div className="invoice-actions"><button type="button" className="btn secondary" onClick={onClose}>Close</button><button type="button" className="btn primary" onClick={printInvoice}><Printer size={16}/><span>Print / Save PDF</span><Download size={15}/></button></div>
-    <div id="aloyri-print-sheet">{invoiceBody}</div>
   </DialogContent></Dialog>;
 }
