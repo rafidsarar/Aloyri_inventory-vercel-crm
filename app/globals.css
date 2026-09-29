@@ -326,3 +326,7 @@ html,body{max-width:100%;overflow-x:hidden}
   .aloyri-masthead{flex-direction:column}.aloyri-masthead img{max-width:70%}.aloyri-masthead>div{text-align:left}
 }
 /* Printing is handled by the isolated iframe in app/invoice.tsx so screen breakpoints cannot change the PDF layout. */
+
+.finance-control-stats{grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:18px}
+@media(max-width:1190px){.finance-control-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.finance-control-stats{grid-template-columns:1fr}}
