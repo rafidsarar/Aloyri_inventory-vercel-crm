@@ -51,3 +51,6 @@ Another manual retry for full Inventory Steps 1-3 production deployment.
 
 
 Full Inventory Steps 1-4 + centralized Holds & returns production deployment request from main (`3a66aadb4f7e76f328f09586e252c6da1baa1151`).
+
+
+Retry full Inventory Steps 1-4 + centralized Hold stock workflow production deployment.
