@@ -58,6 +58,9 @@ test('order payment helpers distinguish COD, partial and settled payments',()=>{
   direct.collections=[{id:'pay-2',date:today(),amount:1100,reference:'BKASH'}];direct.settled=true;direct.settledAt=today();
   assert.equal(orderBalance(direct),0);
   assert.equal(orderPaymentStatus(direct),'Paid');
+  const cancelled=baseOrder({status:'Cancelled',delivered:undefined});
+  assert.equal(orderBalance(cancelled),0);
+  assert.equal(orderPaymentStatus(cancelled),'Closed');
 });
 
 test('advance direct payment is valid and appears in cashflow before delivery',()=>{
