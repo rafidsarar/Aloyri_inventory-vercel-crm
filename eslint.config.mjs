@@ -14,6 +14,15 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
   ]),
   {
+    files: ["app/**/*.{ts,tsx}", "lib/**/*.ts", "db/**/*.ts"],
+    rules: {
+      // The current CRM predates this lint rule and uses explicit any at API/UI
+      // boundaries. TypeScript strict mode and runtime Zod validation remain
+      // enforced; new correctness checks should not be hidden by legacy style debt.
+      "@typescript-eslint/no-explicit-any": "off",
+    },
+  },
+  {
     files: ["components/ui/**/*.{ts,tsx}", "hooks/use-mobile.ts"],
     rules: {
       // These files are vendored verbatim from shadcn@4.17.0. Keep the
