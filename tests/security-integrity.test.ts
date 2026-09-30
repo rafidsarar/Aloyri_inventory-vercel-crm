@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { roleCanEdit, roleCanManageFinance, roleCanManageTeam, roleCanReset } from '../lib/roles.ts';
-import { applyRoleChanges, visibleState, validateRoleRelations } from '../lib/role-data.ts';
+import { applyRoleChanges, visibleState, validateRoleRelations, validateWorkspaceChange } from '../lib/role-data.ts';
 import { accountBalance, allocate, applyCancellationQuarantine, batchRemaining, cashflow, collectedAmount, initialState, metrics, nextStatuses, orderBalance, orderPaymentStatus, receivable, stateSchema, statuses, shiftDate, stock, stockPosition, today, uid, validateRelations, type Order, type State } from '../lib/crm.ts';
 
 function baseOrder(overrides:Partial<Order>={}):Order{
@@ -224,6 +224,29 @@ test('inventory stock receipt can save when legacy real order numbers are duplic
   assert.deepEqual(merged.orders.map(o=>o.number),['SK-LEGACY','SK-LEGACY']);
   assert.equal(merged.batches.length,2);
   validateRelations(merged,{skipOrderNumberUniqueness:true});
+});
+
+test('workspace changes ignore untouched legacy duplicate order numbers for unrelated actions',()=>{
+  const current=baseState(baseOrder({number:'SK-LEGACY'}));
+  current.orders.push(baseOrder({id:'order-2',number:'SK-LEGACY'}));
+  const next=structuredClone(current);
+  next.batches.push({...structuredClone(current.batches[0]),id:'batch-2',qty:4,invoice:'INV-2',payments:[],paid:false,paidAt:undefined});
+  assert.doesNotThrow(()=>validateWorkspaceChange(current,next));
+});
+
+test('workspace changes allow a new unique order even when old duplicate numbers exist',()=>{
+  const current=baseState(baseOrder({number:'SK-LEGACY'}));
+  current.orders.push(baseOrder({id:'order-2',number:'SK-LEGACY'}));
+  const next=structuredClone(current);
+  next.orders.push(baseOrder({id:'order-3',number:'SK-NEW'}));
+  assert.doesNotThrow(()=>validateWorkspaceChange(current,next));
+});
+
+test('workspace changes still reject new or edited order-number collisions',()=>{
+  const current=baseState(baseOrder({number:'SK-1001'}));
+  const next=structuredClone(current);
+  next.orders.push(baseOrder({id:'order-2',number:'SK-1001'}));
+  assert.throws(()=>validateWorkspaceChange(current,next),/Order numbers must be unique/);
 });
 
 test('role-aware client validation does not block inventory actions on legacy duplicate order numbers',()=>{

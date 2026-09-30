@@ -53,6 +53,18 @@ export function validateRoleRelations(state:State,role:WorkspaceRole){
   validateRelations(state,{skipOrderNumberUniqueness:role==='inventory'});
 }
 
+/** Allow untouched legacy duplicate order numbers, but reject any new/changed number collision. */
+export function validateWorkspaceChange(current:State,next:State){
+  validateRelations(next,{skipOrderNumberUniqueness:true});
+  const beforeNumbers=new Map(current.orders.map(order=>[order.id,order.number.trim().toLowerCase()]));
+  for(const order of next.orders){
+    const number=order.number.trim().toLowerCase();
+    if(beforeNumbers.get(order.id)===number)continue;
+    if(next.orders.some(other=>other.id!==order.id&&other.number.trim().toLowerCase()===number))
+      throw new Error('Order numbers must be unique.');
+  }
+}
+
 /** Restore batch costs hidden from sales staff before validating newly created orders. */
 export function restoreOrderCosts(next:State,current:State){
   for(const order of next.orders)for(const item of order.items)for(const allocation of item.allocations){
