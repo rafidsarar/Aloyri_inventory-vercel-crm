@@ -84,7 +84,6 @@ const openPurchaseOrders=s.purchaseOrders.filter(po=>!['Received','Cancelled'].i
 const currentInventoryMonth=today().slice(0,7);
 const receivedThisMonth=s.batches.filter(b=>b.received.slice(0,7)===currentInventoryMonth);
 const receivedUnitsThisMonth=receivedThisMonth.reduce((n,b)=>n+b.qty,0);
-const recentDeliveredInventory=s.orders.filter(o=>o.status==='Delivered'&&(o.delivered||o.created)>=shiftDate(-29));
 const inventoryVelocity=useMemo(()=>{const delivered=s.orders.filter(o=>o.status==='Delivered'&&(o.delivered||o.created)>=shiftDate(-29));return s.products.filter(p=>p.active).map(product=>({product,units:delivered.reduce((n,o)=>n+o.items.filter(i=>i.productId===product.id).reduce((x,i)=>x+i.qty,0),0)})).sort((a,b)=>b.units-a.units)},[s]);
 const fastestMoving=inventoryVelocity.find(x=>x.units>0);
 const slowMovingCount=inventoryVelocity.filter(x=>stock(s,x.product.id)>0&&x.units===0).length;
