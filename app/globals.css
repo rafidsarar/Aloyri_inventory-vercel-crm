@@ -646,3 +646,6 @@ html,body{max-width:100%;overflow-x:hidden}
   .customer-mobile-kpis{grid-template-columns:1fr 1fr}
   .customer-mobile-kpis>span:last-child{grid-column:1/-1}
 }
+
+.activity-load-more{display:flex;justify-content:center;padding:12px 16px 18px;border-top:1px solid #edf1ee}
+.activity-load-more .btn{min-width:170px}
