@@ -3,7 +3,7 @@ import { AccessDenied, resolveWorkspace } from '@/app/team-access';
 import { visibleState, applyRoleChanges } from '@/lib/role-data';
 import { canManageBusinessSettings } from '@/lib/roles';
 import { database } from '@/db/raw';
-import { initialState, stateSchema, validateRelations, fixedBusinessName, nextStatuses, type State } from '@/lib/crm';
+import { initialState, stateSchema, validateRelations, fixedBusinessName, nextStatuses, applyCancellationQuarantine, type State } from '@/lib/crm';
 
 export const dynamic='force-dynamic';
 const response=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
@@ -57,7 +57,7 @@ export async function PUT(request:Request){
       return response({error:'Only the owner or an admin can edit Business settings.'},403);
     let merged:typeof previous;
     try{merged=applyRoleChanges(previous,parsed.data,role)}catch(e){return response({error:e instanceof Error?e.message:'You cannot change that section.'},403)}
-    merged=fixedBusinessName(merged);
+    merged=applyCancellationQuarantine(previous,fixedBusinessName(merged));
     try{validateTransitions(previous,merged);validateRelations(merged)}catch(e){return response({error:e instanceof Error?e.message:'Invalid records.'},400)}
     const changedSections=(Object.keys(previous) as (keyof typeof previous)[]).filter(key=>JSON.stringify(previous[key])!==JSON.stringify(merged[key])).map(String);
     const now=new Date().toISOString();
@@ -65,7 +65,7 @@ export async function PUT(request:Request){
     const result=await db.prepare('UPDATE crm_workspaces SET data = ?, version = version + 1, updated_at = ? WHERE owner_id = ? AND version = ?').bind(JSON.stringify(merged),now,ownerId,body.version).run();
     if(!result.meta.changes)return response({error:'This workspace changed in another window. Refresh records, then try again.'},409);
     if(changedSections.length)await db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)').bind(crypto.randomUUID(),ownerId,user.userId,user.displayName||user.email,role,'Updated '+changedSections.join(', '),JSON.stringify(changedSections),now).run();
-    return response({version:body.version+1});
+    return response({version:body.version+1,data:visibleState(merged,role)});
   }catch(e){
     if(e instanceof AccessDenied)return response({error:e.message},403);
     console.error('Workspace save failed',e);
