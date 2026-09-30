@@ -51,10 +51,30 @@ const taskSchema = z.object({
   completedAt:z.union([date,z.literal('')]).default('')
 });
 const financeCloseSchema=z.object({month:z.string().regex(/^\d{4}-\d{2}$/),closedAt:date,closedBy:str,notes:str.default('')});
-export const stateSchema = z.object({products:z.array(productSchema).max(2000),productCategories:z.array(z.string().trim().min(1).max(50)).min(1).max(100).default(()=>[...categories]),customers:z.array(customerSchema).max(10000),suppliers:z.array(supplierSchema).max(1000),purchaseOrders:z.array(purchaseOrderSchema).max(5000).default([]),batches:z.array(batchSchema).max(10000),stockAdjustments:z.array(stockAdjustmentSchema).max(10000).default([]),inventoryHolds:z.array(inventoryHoldSchema).max(10000).default([]),orders:z.array(orderSchema).max(10000),expenses:z.array(expenseSchema).max(10000),cashEntries:z.array(cashEntrySchema).max(10000).default([]),accountOpenings:z.array(accountOpeningSchema).max(4).default([]),accountMatches:z.array(accountMatchSchema).max(30000).default([]),financeCloses:z.array(financeCloseSchema).max(120).default([]),tasks:z.array(taskSchema).max(10000),businessName:str.min(1),businessProfile:businessProfileSchema.default(emptyBusinessProfile)});
+export const defaultAutomationSettings=()=>({
+  deliveryFollowUp:{enabled:true,delayDays:7},
+  lowStock:{enabled:true},
+  expiringStock:{enabled:true,daysBefore:90},
+  overduePurchaseOrders:{enabled:true},
+  supplierPayments:{enabled:true,daysBefore:7},
+  customerCollections:{enabled:true,graceDays:2},
+  customerRetention:{enabled:true,inactivityDays:90},
+  staleOrders:{enabled:true,daysOpen:3}
+});
+const automationSettingsSchema=z.object({
+  deliveryFollowUp:z.object({enabled:z.boolean(),delayDays:z.number().int().min(1).max(30)}).default(()=>defaultAutomationSettings().deliveryFollowUp),
+  lowStock:z.object({enabled:z.boolean()}).default(()=>defaultAutomationSettings().lowStock),
+  expiringStock:z.object({enabled:z.boolean(),daysBefore:z.number().int().min(7).max(365)}).default(()=>defaultAutomationSettings().expiringStock),
+  overduePurchaseOrders:z.object({enabled:z.boolean()}).default(()=>defaultAutomationSettings().overduePurchaseOrders),
+  supplierPayments:z.object({enabled:z.boolean(),daysBefore:z.number().int().min(0).max(60)}).default(()=>defaultAutomationSettings().supplierPayments),
+  customerCollections:z.object({enabled:z.boolean(),graceDays:z.number().int().min(0).max(30)}).default(()=>defaultAutomationSettings().customerCollections),
+  customerRetention:z.object({enabled:z.boolean(),inactivityDays:z.number().int().min(30).max(365)}).default(()=>defaultAutomationSettings().customerRetention),
+  staleOrders:z.object({enabled:z.boolean(),daysOpen:z.number().int().min(1).max(30)}).default(()=>defaultAutomationSettings().staleOrders)
+}).default(defaultAutomationSettings);
+export const stateSchema = z.object({products:z.array(productSchema).max(2000),productCategories:z.array(z.string().trim().min(1).max(50)).min(1).max(100).default(()=>[...categories]),customers:z.array(customerSchema).max(10000),suppliers:z.array(supplierSchema).max(1000),purchaseOrders:z.array(purchaseOrderSchema).max(5000).default([]),batches:z.array(batchSchema).max(10000),stockAdjustments:z.array(stockAdjustmentSchema).max(10000).default([]),inventoryHolds:z.array(inventoryHoldSchema).max(10000).default([]),orders:z.array(orderSchema).max(10000),expenses:z.array(expenseSchema).max(10000),cashEntries:z.array(cashEntrySchema).max(10000).default([]),accountOpenings:z.array(accountOpeningSchema).max(4).default([]),accountMatches:z.array(accountMatchSchema).max(30000).default([]),financeCloses:z.array(financeCloseSchema).max(120).default([]),tasks:z.array(taskSchema).max(10000),businessName:str.min(1),businessProfile:businessProfileSchema.default(emptyBusinessProfile),automationSettings:automationSettingsSchema});
 export type State=z.infer<typeof stateSchema>;
 export type Product=State['products'][number]; export type Customer=State['customers'][number]; export type Order=State['orders'][number]; export type Batch=State['batches'][number];
-export type Supplier=State['suppliers'][number]; export type PurchaseOrder=State['purchaseOrders'][number]; export type Task=State['tasks'][number];
+export type Supplier=State['suppliers'][number]; export type PurchaseOrder=State['purchaseOrders'][number]; export type Task=State['tasks'][number]; export type AutomationSettings=State['automationSettings'];
 export const uid=()=>{if(typeof crypto.randomUUID==='function')return crypto.randomUUID();const b=crypto.getRandomValues(new Uint8Array(16));b[6]=(b[6]&15)|64;b[8]=(b[8]&63)|128;const h=Array.from(b,x=>x.toString(16).padStart(2,'0')).join('');return h.slice(0,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)+'-'+h.slice(16,20)+'-'+h.slice(20);};
 export const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Dhaka',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 export const shiftDate=(days:number,base=today())=>{const d=new Date(base+'T12:00:00Z'); d.setUTCDate(d.getUTCDate()+days); return d.toISOString().slice(0,10)};
@@ -126,7 +146,7 @@ export function applyPurchaseOrderReceipt(state:State,input:{purchaseOrderId:str
   return next;
 }
 
-export function initialState():State {return {businessName:'ALOYRI',businessProfile:emptyBusinessProfile(),productCategories:[...categories],customers:[],suppliers:[],purchaseOrders:[],batches:[],stockAdjustments:[],inventoryHolds:[],orders:[],expenses:[],cashEntries:[],accountOpenings:[],accountMatches:[],financeCloses:[],tasks:[],products:[
+export function initialState():State {return {businessName:'ALOYRI',businessProfile:emptyBusinessProfile(),automationSettings:defaultAutomationSettings(),productCategories:[...categories],customers:[],suppliers:[],purchaseOrders:[],batches:[],stockAdjustments:[],inventoryHolds:[],orders:[],expenses:[],cashEntries:[],accountOpenings:[],accountMatches:[],financeCloses:[],tasks:[],products:[
   {id:'simple-wash',brand:'Simple',name:'Refreshing Facial Wash',size:'150ml · Poland',category:'Cleanser',price:749,cost:520,targetQty:12,reorderAt:4,active:true},
   {id:'simple-light',brand:'Simple',name:'Hydrating Light Moisturiser',size:'125ml · Hungary',category:'Moisturizer',price:749,cost:520,targetQty:10,reorderAt:4,active:true},
   {id:'simple-rich',brand:'Simple',name:'Replenishing Rich Moisturizer',size:'125ml',category:'Moisturizer',price:775,cost:540,targetQty:6,reorderAt:3,active:true},
@@ -184,9 +204,115 @@ export function applyCancellationQuarantine(previous:State,next:State):State {
   return result;
 }
 
+export type AutomationSignal={
+  key:string;
+  rule:keyof AutomationSettings;
+  level:'Critical'|'Action needed'|'Upcoming';
+  title:string;
+  detail:string;
+  view:'Inventory'|'Suppliers'|'Finances'|'Orders'|'Customers'|'Follow-ups';
+  role:'inventory'|'sales'|'finance';
+};
+export function automationSignals(s:State):AutomationSignal[]{
+  const signals:AutomationSignal[]=[],settings=s.automationSettings;
+  if(settings.lowStock.enabled){
+    for(const product of s.products.filter(p=>p.active&&s.batches.some(b=>b.productId===p.id))){
+      const available=stock(s,product.id);
+      if(available<=product.reorderAt)signals.push({
+        key:'low-stock:'+product.id,rule:'lowStock',level:available<=0?'Critical':'Action needed',
+        title:(available<=0?'Out of stock: ':'Reorder: ')+product.name,
+        detail:available+' available · target '+product.targetQty+' · suggested '+Math.max(0,product.targetQty-available)+' units',
+        view:'Inventory',role:'inventory'
+      });
+    }
+  }
+  if(settings.expiringStock.enabled){
+    for(const batch of s.batches){
+      const remaining=batchRemaining(s,batch);
+      if(remaining<=0||batch.expiry>shiftDate(settings.expiringStock.daysBefore))continue;
+      const product=s.products.find(p=>p.id===batch.productId);
+      signals.push({
+        key:'expiry:'+batch.id,rule:'expiringStock',level:batch.expiry<=today()||batch.expiry<=shiftDate(30)?'Critical':'Upcoming',
+        title:(batch.expiry<=today()?'Expired: ':'Expiry watch: ')+(product?.name||'Inventory batch'),
+        detail:remaining+' units · '+(batch.expiry<=today()?'expired ':'expires ')+dateLabel(batch.expiry),
+        view:'Inventory',role:'inventory'
+      });
+    }
+  }
+  if(settings.overduePurchaseOrders.enabled){
+    for(const po of s.purchaseOrders.filter(po=>['Sent','Part received'].includes(po.status)&&po.expected<today())){
+      const supplier=s.suppliers.find(x=>x.id===po.supplierId);
+      signals.push({
+        key:'po-overdue:'+po.id,rule:'overduePurchaseOrders',level:'Critical',
+        title:'Purchase order overdue · '+po.number,
+        detail:(supplier?.name||'Supplier')+' · '+purchaseOrderOutstandingUnits(po)+' units outstanding · expected '+dateLabel(po.expected),
+        view:'Suppliers',role:'inventory'
+      });
+    }
+  }
+  if(settings.supplierPayments.enabled){
+    for(const batch of s.batches){
+      const amount=batch.qty*batch.unitCost,legacy=batch.paid&&batch.payments.length===0?amount:0;
+      const balance=Math.max(0,amount-batch.payments.reduce((n,p)=>n+p.amount,0)-legacy);
+      if(balance<=.001||!batch.dueDate||batch.dueDate>shiftDate(settings.supplierPayments.daysBefore))continue;
+      const supplier=s.suppliers.find(x=>x.id===batch.supplierId);
+      signals.push({
+        key:'supplier-payment:'+batch.id,rule:'supplierPayments',level:batch.dueDate<today()?'Critical':'Upcoming',
+        title:(batch.dueDate<today()?'Overdue supplier payment ':'Supplier payment due ')+taka(balance),
+        detail:(supplier?.name||'Supplier')+' · due '+dateLabel(batch.dueDate)+(batch.invoice?' · '+batch.invoice:''),
+        view:'Finances',role:'finance'
+      });
+    }
+  }
+  if(settings.customerCollections.enabled){
+    for(const order of s.orders.filter(o=>o.status==='Delivered')){
+      const balance=orderBalance(order),delivered=order.delivered||order.created;
+      if(balance<=.001||delivered>shiftDate(-settings.customerCollections.graceDays))continue;
+      signals.push({
+        key:'customer-collection:'+order.id,rule:'customerCollections',
+        level:delivered<shiftDate(-(settings.customerCollections.graceDays+7))?'Critical':'Action needed',
+        title:'Collect '+taka(balance)+' · #'+order.number,
+        detail:'Delivered '+dateLabel(delivered)+' · customer balance outstanding',
+        view:'Finances',role:'finance'
+      });
+    }
+  }
+  if(settings.customerRetention.enabled){
+    for(const customer of s.customers){
+      const delivered=s.orders.filter(o=>o.customerId===customer.id&&o.status==='Delivered').sort((a,b)=>(b.delivered||b.created).localeCompare(a.delivered||a.created));
+      const last=delivered[0];
+      if(!last)continue;
+      const lastDate=last.delivered||last.created;
+      const activeOrder=s.orders.some(o=>o.customerId===customer.id&&!['Delivered','Returned','Cancelled'].includes(o.status));
+      const openCare=s.tasks.some(t=>t.customerId===customer.id&&!t.done&&t.kind==='Follow-up');
+      if(activeOrder||openCare||lastDate>shiftDate(-settings.customerRetention.inactivityDays))continue;
+      signals.push({
+        key:'customer-retention:'+customer.id,rule:'customerRetention',
+        level:lastDate<shiftDate(-(settings.customerRetention.inactivityDays+60))?'Action needed':'Upcoming',
+        title:'Customer check-in · '+customer.name,
+        detail:'Last delivered purchase '+dateLabel(lastDate)+(customer.consent?' · promotional consent recorded':' · promotional consent not recorded'),
+        view:'Customers',role:'sales'
+      });
+    }
+  }
+  if(settings.staleOrders.enabled){
+    for(const order of s.orders.filter(o=>!['Delivered','Cancelled','Returned'].includes(o.status)&&o.created<shiftDate(-settings.staleOrders.daysOpen))){
+      signals.push({
+        key:'stale-order:'+order.id,rule:'staleOrders',
+        level:order.created<shiftDate(-(settings.staleOrders.daysOpen+4))?'Critical':'Action needed',
+        title:'Order #'+order.number+' needs progress',
+        detail:order.status+' since '+dateLabel(order.created),
+        view:'Orders',role:'sales'
+      });
+    }
+  }
+  return signals;
+}
+
 /** Create one customer-care reminder when an order is delivered. No message is sent automatically. */
 export function applyDeliveryFollowUps(previous:State,next:State):State {
-  const result=structuredClone(next),beforeById=new Map(previous.orders.map(o=>[o.id,o]));
+  const result=structuredClone(next),beforeById=new Map(previous.orders.map(o=>[o.id,o])),rule=result.automationSettings.deliveryFollowUp;
+  if(!rule.enabled)return result;
   for(const order of result.orders){
     const before=beforeById.get(order.id);
     if(!before||before.status==='Delivered'||order.status!=='Delivered')continue;
@@ -196,7 +322,7 @@ export function applyDeliveryFollowUps(previous:State,next:State):State {
       customerId:order.customerId,
       orderId:order.id,
       title:'Post-delivery check-in · #'+order.number,
-      due:shiftDate(7,order.delivered||today()),
+      due:shiftDate(rule.delayDays,order.delivered||today()),
       done:false,
       kind:'Follow-up',
       priority:'Normal',

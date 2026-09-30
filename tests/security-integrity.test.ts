@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { roleCanBackup, roleCanCloseFinance, roleCanEdit, roleCanExportData, roleCanImport, roleCanInspectReturns, roleCanLoadStarterCatalog, roleCanManageFinance, roleCanManageTeam, roleCanPrintInvoice, roleCanReset, roleCanViewAudit } from '../lib/roles.ts';
+import { roleCanBackup, roleCanCloseFinance, roleCanEdit, roleCanExportData, roleCanImport, roleCanInspectReturns, roleCanLoadStarterCatalog, roleCanManageFinance, roleCanManageTeam, roleCanPrintInvoice, roleCanReset, roleCanViewAudit, roleCanViewSection } from '../lib/roles.ts';
 import { applyRoleChanges, visibleState, validateRoleRelations, validateWorkspaceChange } from '../lib/role-data.ts';
-import { accountBalance, allocate, applyCancellationQuarantine, applyDeliveryFollowUps, applyPurchaseOrderReceipt, batchRemaining, cashflow, collectedAmount, initialState, metrics, nextStatuses, orderBalance, orderPaymentStatus, purchaseOrderProgress, purchaseOrderReceivedUnits, purchaseOrderValue, receivable, stateSchema, statuses, shiftDate, stock, stockPosition, supplierInsight, today, uid, validateRelations, type Order, type State } from '../lib/crm.ts';
+import { accountBalance, allocate, applyCancellationQuarantine, applyDeliveryFollowUps, applyPurchaseOrderReceipt, automationSignals, batchRemaining, cashflow, collectedAmount, defaultAutomationSettings, initialState, metrics, nextStatuses, orderBalance, orderPaymentStatus, purchaseOrderProgress, purchaseOrderReceivedUnits, purchaseOrderValue, receivable, stateSchema, statuses, shiftDate, stock, stockPosition, supplierInsight, today, uid, validateRelations, type Order, type State } from '../lib/crm.ts';
 
 function baseOrder(overrides:Partial<Order>={}):Order{
   return {
@@ -22,6 +22,73 @@ function baseState(order:Order):State{
   state.purchaseOrders=[];state.stockAdjustments=[];state.inventoryHolds=[];state.expenses=[];state.cashEntries=[];state.accountOpenings=[];state.accountMatches=[];state.financeCloses=[];state.tasks=[];
   return state;
 }
+
+test('legacy workspaces receive safe automation defaults',()=>{
+  const raw=structuredClone(baseState(baseOrder())) as unknown as Record<string,unknown>;
+  delete raw.automationSettings;
+  const parsed=stateSchema.parse(raw);
+  assert.deepEqual(parsed.automationSettings,defaultAutomationSettings());
+  assert.equal(parsed.automationSettings.deliveryFollowUp.enabled,true);
+  assert.equal(parsed.automationSettings.deliveryFollowUp.delayDays,7);
+});
+
+test('delivery follow-up automation respects enablement and configured delay',()=>{
+  const previous=baseState(baseOrder({status:'Out for delivery',delivered:undefined}));
+  const next=structuredClone(previous);
+  next.automationSettings.deliveryFollowUp.delayDays=10;
+  next.orders[0].status='Delivered';
+  next.orders[0].delivered=today();
+  const scheduled=applyDeliveryFollowUps(previous,next);
+  assert.equal(scheduled.tasks.length,1);
+  assert.equal(scheduled.tasks[0].due,shiftDate(10));
+
+  const disabledPrevious=baseState(baseOrder({status:'Out for delivery',delivered:undefined}));
+  const disabledNext=structuredClone(disabledPrevious);
+  disabledNext.automationSettings.deliveryFollowUp.enabled=false;
+  disabledNext.orders[0].status='Delivered';
+  disabledNext.orders[0].delivered=today();
+  assert.equal(applyDeliveryFollowUps(disabledPrevious,disabledNext).tasks.length,0);
+});
+
+test('automation signals cover stock, purchasing, finance, retention and order workflow',()=>{
+  const order=baseOrder({id:'delivered-order',number:'SK-DUE',created:shiftDate(-100),delivered:shiftDate(-100),status:'Delivered'});
+  const state=baseState(order);
+  state.products[0].reorderAt=15;
+  state.batches[0].expiry=shiftDate(20);
+  state.batches[0].dueDate=shiftDate(3);
+  state.purchaseOrders=[{id:'po-overdue',number:'PO-OVERDUE',supplierId:'supplier-1',created:shiftDate(-20),expected:shiftDate(-5),status:'Sent',notes:'',items:[{productId:'product-1',qty:5,unitCost:400,receivedQty:0}]}];
+  state.customers[0].created=shiftDate(-200);
+  state.automationSettings.customerRetention.inactivityDays=30;
+  const signals=automationSignals(state);
+  const keys=new Set(signals.map(signal=>signal.rule));
+  assert.equal(keys.has('lowStock'),true);
+  assert.equal(keys.has('expiringStock'),true);
+  assert.equal(keys.has('overduePurchaseOrders'),true);
+  assert.equal(keys.has('supplierPayments'),true);
+  assert.equal(keys.has('customerCollections'),true);
+  assert.equal(keys.has('customerRetention'),true);
+});
+
+test('disabled automation rules stop producing their signals',()=>{
+  const state=baseState(baseOrder({created:shiftDate(-10),delivered:undefined,status:'Confirmed'}));
+  state.products[0].reorderAt=15;
+  state.automationSettings.lowStock.enabled=false;
+  state.automationSettings.staleOrders.enabled=false;
+  const signals=automationSignals(state);
+  assert.equal(signals.some(signal=>signal.rule==='lowStock'),false);
+  assert.equal(signals.some(signal=>signal.rule==='staleOrders'),false);
+});
+
+test('automation settings are owner/admin controlled',()=>{
+  assert.equal(roleCanViewSection('owner','Automation'),true);
+  assert.equal(roleCanViewSection('admin','Automation'),true);
+  assert.equal(roleCanEdit('owner','automationSettings'),true);
+  assert.equal(roleCanEdit('admin','automationSettings'),true);
+  for(const role of ['sales','inventory','viewer'] as const){
+    assert.equal(roleCanViewSection(role,'Automation'),false);
+    assert.equal(roleCanEdit(role,'automationSettings'),false);
+  }
+});
 
 test('legacy follow-ups migrate to the expanded customer-care model',()=>{
   const raw=structuredClone(baseState(baseOrder())) as unknown as Record<string,unknown>;
