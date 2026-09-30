@@ -2,6 +2,7 @@ import { getAppUser, checkOrigin } from '@/app/local-auth';
 import { AccessDenied, resolveWorkspace } from '@/app/team-access';
 import { database } from '@/db/raw';
 import { fixedBusinessName, stateSchema, validateRelations } from '@/lib/crm';
+import { roleCanLoadStarterCatalog } from '@/lib/roles';
 
 export const dynamic='force-dynamic';
 const response=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
@@ -23,7 +24,7 @@ export async function POST(request:Request){
  try{
   const user=await getAppUser(); if(!user)return response({error:'Please sign in first.'},401);
   if(!checkOrigin(request))return response({error:'Invalid request origin.'},403);
-  const {ownerId,role}=await resolveWorkspace(user); if(role!=='owner')return response({error:'Only the owner can load the starter catalog.'},403);
+  const {ownerId,role}=await resolveWorkspace(user); if(!roleCanLoadStarterCatalog(role))return response({error:'Your role cannot load the starter catalog.'},403);
   const db=database(); const row=await db.prepare('SELECT data,version FROM crm_workspaces WHERE owner_id = ?').bind(ownerId).first<{data:string;version:number}>();
   if(!row)return response({error:'Workspace not found.'},404);
   const current=fixedBusinessName(stateSchema.parse(JSON.parse(row.data)));
