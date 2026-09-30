@@ -57,3 +57,6 @@ Retry full Inventory Steps 1-4 + centralized Hold stock workflow production depl
 
 
 Manual retry: deploy full Inventory Steps 1-4 and centralized Hold stock workflow.
+
+
+Manual retry: full Inventory Steps 1-4 production deployment.
