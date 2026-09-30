@@ -73,7 +73,6 @@ const customerInsights=s.customers.map((customer,index)=>{
 });
 const customerNew30=customerInsights.filter(x=>x.customer.created>=shiftDate(-29));
 const customerRepeat=customerInsights.filter(x=>x.segment==='Repeat');
-const customerActive=customerInsights.filter(x=>x.lastDelivered&&x.lastDelivered>=shiftDate(-60));
 const customerAttention=customerInsights.filter(x=>x.segment==='At risk'||x.segment==='Inactive');
 const customerDue=customerInsights.filter(x=>x.dueFollowUps.length>0);
 const customerRows=customerInsights.filter(x=>{
