@@ -51,14 +51,14 @@ test('delivery follow-up automation respects enablement and configured delay',()
 });
 
 test('automation signals cover stock, purchasing, finance, retention and order workflow',()=>{
-  const order=baseOrder({id:'delivered-order',number:'SK-DUE',created:shiftDate(-10),delivered:shiftDate(-10),status:'Delivered'});
+  const order=baseOrder({id:'delivered-order',number:'SK-DUE',created:shiftDate(-100),delivered:shiftDate(-100),status:'Delivered'});
   const state=baseState(order);
   state.products[0].reorderAt=15;
   state.batches[0].expiry=shiftDate(20);
   state.batches[0].dueDate=shiftDate(3);
   state.purchaseOrders=[{id:'po-overdue',number:'PO-OVERDUE',supplierId:'supplier-1',created:shiftDate(-20),expected:shiftDate(-5),status:'Sent',notes:'',items:[{productId:'product-1',qty:5,unitCost:400,receivedQty:0}]}];
   state.customers[0].created=shiftDate(-200);
-  state.automationSettings.customerRetention.inactivityDays=5;
+  state.automationSettings.customerRetention.inactivityDays=30;
   const signals=automationSignals(state);
   const keys=new Set(signals.map(signal=>signal.rule));
   assert.equal(keys.has('lowStock'),true);
