@@ -87,6 +87,23 @@ export const orderBalance=(o:Order)=>{if(o.status==='Cancelled'||o.status==='Ret
 export const orderPaymentStatus=(o:Order)=>{if(o.status==='Cancelled'||o.status==='Returned')return 'Closed';const collected=collectedAmount(o),balance=orderBalance(o);if(balance<=.001&&receivable(o)>0)return 'Paid';if(collected>0)return 'Part paid';if(o.payment==='COD'&&o.status!=='Delivered')return 'Due on delivery';return 'Pending'};
 export const costOfOrder=(o:Order)=>o.items.flatMap(i=>i.allocations).reduce((n,a)=>n+a.unitCost*a.qty,0);
 export const contribution=(o:Order)=>subtotal(o)-costOfOrder(o)+o.deliveryCharge-o.courierCost-o.packaging-o.paymentFee;
+export type CustomerSegment='New'|'Repeat'|'At risk'|'Inactive'|'No orders';
+export function customerInsight(s:State,customerId:string){
+  const orders=s.orders.filter(o=>o.customerId===customerId);
+  const delivered=orders.filter(o=>o.status==='Delivered').sort((a,b)=>(b.delivered||b.created).localeCompare(a.delivered||a.created));
+  const lastDelivered=delivered[0]?.delivered||delivered[0]?.created||'';
+  const deliveredSpend=delivered.reduce((n,o)=>n+total(o),0);
+  const avgOrderValue=delivered.length?deliveredSpend/delivered.length:0;
+  const openFollowUps=s.tasks.filter(t=>t.customerId===customerId&&!t.done);
+  const dueFollowUps=openFollowUps.filter(t=>t.due<=today());
+  let segment:CustomerSegment='No orders';
+  if(delivered.length){
+    if(lastDelivered>=shiftDate(-60))segment=delivered.length>=2?'Repeat':'New';
+    else if(lastDelivered>=shiftDate(-120))segment='At risk';
+    else segment='Inactive';
+  }
+  return {orders,delivered,lastDelivered,deliveredSpend,avgOrderValue,openFollowUps,dueFollowUps,segment};
+}
 export function allocate(s:State,productId:string,quantity:number) {let remaining=quantity;const result:{batchId:string;qty:number;unitCost:number}[]=[];for(const b of s.batches.filter(b=>b.productId===productId&&b.expiry>today()).sort((a,b)=>a.expiry.localeCompare(b.expiry))){const amount=Math.min(remaining,batchRemaining(s,b));if(amount>0){result.push({batchId:b.id,qty:amount,unitCost:b.unitCost});remaining-=amount;}if(!remaining)break;}if(remaining)throw new Error('Not enough unexpired stock. Receive stock first.');return result;}
 export function nextStatuses(o:Order):Order['status'][] {return ({New:['Confirmed','Cancelled'],Confirmed:['Ready to pack','Cancelled'],'Ready to pack':['Packed','Cancelled'],Packed:['Shipped','Cancelled'],Shipped:['Out for delivery'],'Out for delivery':['Delivered','Returned'],Delivered:['Returned'],Returned:[],Cancelled:[]} as Record<Order['status'],Order['status'][]>)[o.status];}
 export function applyCancellationQuarantine(previous:State,next:State):State {
