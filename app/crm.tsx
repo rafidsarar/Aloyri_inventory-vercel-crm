@@ -162,6 +162,19 @@ const canReset=roleCanReset(role);
 const canBackup=roleCanBackup(role);
 const canPrint=roleCanPrintInvoice(role);
 const salesMode=role==='sales';
+async function scheduleReplenishment(signal:ReplenishmentSignal){
+  if(!canEdit('tasks')){toast.error('Your role cannot create follow-ups.');return}
+  if(signal.hasOpenOrder){toast.error('This customer already has an active order for that product.');return}
+  if(s.tasks.some(t=>!t.done&&t.kind==='Replenishment'&&t.customerId===signal.customerId&&t.productId===signal.productId)){toast.info('A replenishment reminder is already open.');return}
+  const next=structuredClone(s);next.tasks.push(replenishmentTaskForSignal(signal));await save(next);
+}
+async function scheduleDueReplenishments(){
+  if(!canEdit('tasks')){toast.error('Your role cannot create follow-ups.');return}
+  if(!unscheduledReplenishmentDue.length){toast.info('All due replenishment signals already have reminders.');return}
+  const next=structuredClone(s);
+  for(const signal of unscheduledReplenishmentDue)next.tasks.push(replenishmentTaskForSignal(signal));
+  await save(next);
+}
 async function updateFollowUp(task:Task,patch:Partial<Task>){
   if(!canEdit('tasks')){toast.error('Your role cannot update follow-ups.');return}
   const next=structuredClone(s),record=next.tasks.find(t=>t.id===task.id);if(!record)return;
