@@ -94,12 +94,12 @@ export function applyCancellationQuarantine(previous:State,next:State):State {
   }
   return result;
 }
-export function validateRelations(s:State) {
+export function validateRelations(s:State,options:{skipOrderNumberUniqueness?:boolean}={}) {
   if(new Set(s.productCategories.map(c=>c.toLowerCase())).size!==s.productCategories.length)throw new Error('Product categories must have unique names.');
   for(const p of s.products)if(!s.productCategories.includes(p.category))throw new Error('A product uses a category that is missing from Inventory.');
   for(const list of [s.products,s.customers,s.suppliers,s.purchaseOrders,s.batches,s.stockAdjustments,s.inventoryHolds,s.orders,s.expenses,s.cashEntries,s.tasks])if(new Set(list.map(x=>x.id)).size!==list.length)throw new Error('Duplicate record identifiers.');
   if(new Set(s.purchaseOrders.map(p=>p.number.toLowerCase())).size!==s.purchaseOrders.length)throw new Error('Purchase order numbers must be unique.');
-  if(new Set(s.orders.map(o=>o.number.toLowerCase())).size!==s.orders.length)throw new Error('Order numbers must be unique.');
+  if(!options.skipOrderNumberUniqueness&&new Set(s.orders.map(o=>o.number.toLowerCase())).size!==s.orders.length)throw new Error('Order numbers must be unique.');
   if(new Set(s.financeCloses.map(x=>x.month)).size!==s.financeCloses.length)throw new Error('Each month can only be closed once.');
   for(const close of s.financeCloses)if(close.month>today().slice(0,7)||close.closedAt>today())throw new Error('Finance close dates cannot be in the future.');
   if(new Set(s.accountOpenings.map(a=>a.account)).size!==s.accountOpenings.length)throw new Error('Each account needs one opening balance.');
