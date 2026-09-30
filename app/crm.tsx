@@ -14,7 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
 import { AreaChart,Area,CartesianGrid,XAxis,YAxis,Tooltip,ResponsiveContainer } from 'recharts';
-import { State,Product,Order,Customer,Task,initialState,uid,today,shiftDate,taka,dateLabel,stock,batchRemaining,stockPosition,metrics,cashflow,subtotal,total,receivable,collectedAmount,orderBalance,orderPaymentStatus,contribution,customerInsight,statuses,nextStatuses,stateSchema,accountIds,accountNames,accountBalance } from '@/lib/crm';
+import { State,Product,Order,Customer,Task,initialState,uid,today,shiftDate,taka,dateLabel,stock,batchRemaining,stockPosition,metrics,cashflow,subtotal,total,receivable,collectedAmount,orderBalance,orderPaymentStatus,contribution,customerInsight,replenishmentSignals,replenishmentTaskForSignal,statuses,nextStatuses,stateSchema,accountIds,accountNames,accountBalance,type ReplenishmentSignal } from '@/lib/crm';
 import { validateRoleRelations, validateWorkspaceChange } from '@/lib/role-data';
 import Form,{Choice,Modal} from './forms';
 import Invoice from './invoice';
@@ -27,7 +27,7 @@ const navIcons=[LayoutDashboard,Bell,ShoppingBag,Package,Users,Truck,Wallet,Cale
 const visibleSections=(role:WorkspaceRole):View[]=>sections.filter(section=>roleCanViewSection(role,section));
 const modalCollection:Record<Modal['type'],string>={order:'orders',orderEdit:'orders',customer:'customers',task:'tasks',product:'products',category:'productCategories',batch:'batches',stockAdjust:'stockAdjustments',stockHold:'inventoryHolds',supplier:'suppliers',expense:'expenses',cashEntry:'cashEntries',settings:'businessName'};
 const titles:Record<View,string>={Overview:'Business overview',Alerts:'Alert center',Orders:'Orders',Inventory:'Inventory',Customers:'Customers',Suppliers:'Suppliers',Finances:'Finances', 'Follow-ups':'Follow-ups',Activity:'Activity log'};
-const descriptions:Record<View,string>={Overview:'Monitor sales, stock and actions that need attention.',Alerts:'Automatic business alerts, prioritized for your role.',Orders:'Track fulfillment, delivery and payment from one workspace.',Inventory:'Monitor stock health, batches, expiry and purchasing from one workspace.',Customers:'View contact details, preferences and order history.',Suppliers:'Manage supplier contacts and sourcing records.',Finances:'Review sales, expenses, cashflow and collections in BDT.', 'Follow-ups':'Track customer follow-ups and replenishment tasks.',Activity:'Review protected employee and administrator change history.'};
+const descriptions:Record<View,string>={Overview:'Monitor sales, stock and actions that need attention.',Alerts:'Automatic business alerts, prioritized for your role.',Orders:'Track fulfillment, delivery and payment from one workspace.',Inventory:'Monitor stock health, batches, expiry and purchasing from one workspace.',Customers:'Manage customer relationships, retention signals and repurchase timing.',Suppliers:'Manage supplier contacts and sourcing records.',Finances:'Review sales, expenses, cashflow and collections in BDT.', 'Follow-ups':'Track customer follow-ups and replenishment tasks.',Activity:'Review protected employee and administrator change history.'};
 const signedTaka=(amount:number)=>amount<0?'− '+taka(-amount):taka(amount);
 const isCollectible=(o:Order)=>o.status==='Delivered'||(o.payment!=='COD'&&!['Cancelled','Returned'].includes(o.status));
 function Status({value}:{value:string}){return <span className={'status '+value.toLowerCase().replaceAll(' ','-')}>{value}</span>}
@@ -75,8 +75,16 @@ const customerNew30=customerInsights.filter(x=>x.customer.created>=shiftDate(-29
 const customerRepeat=customerInsights.filter(x=>x.segment==='Repeat');
 const customerAttention=customerInsights.filter(x=>x.segment==='At risk'||x.segment==='Inactive');
 const customerDue=customerInsights.filter(x=>x.dueFollowUps.length>0);
+const retentionCandidates=customerInsights.filter(x=>(x.segment==='At risk'||x.segment==='Inactive')&&!x.openFollowUps.some(t=>t.kind!=='Replenishment')).sort((a,b)=>a.lastActivity.localeCompare(b.lastActivity));
+const replenishmentAll=replenishmentSignals(s);
+const replenishmentOpenTasks=new Map(s.tasks.filter(t=>!t.done&&t.kind==='Replenishment'&&t.productId).map(t=>[t.customerId+'|'+t.productId,t]));
+const replenishmentDue=replenishmentAll.filter(x=>!x.hasOpenOrder&&x.due<=today());
+const replenishmentUpcoming=replenishmentAll.filter(x=>!x.hasOpenOrder&&x.due>today()&&x.due<=shiftDate(14));
+const replenishmentDueCustomerIds=new Set(replenishmentDue.map(x=>x.customerId));
+const replenishmentWatch=replenishmentAll.filter(x=>!x.hasOpenOrder).slice(0,5);
+const unscheduledReplenishmentDue=replenishmentDue.filter(x=>!replenishmentOpenTasks.has(x.customerId+'|'+x.productId));
 const customerRows=customerInsights.filter(x=>{
-  const filterMatch=filter==='All'||filter==='New · 30d'&&x.customer.created>=shiftDate(-29)||filter==='Repeat'&&x.segment==='Repeat'||filter==='Active · 60d'&&Boolean(x.lastDelivered&&x.lastDelivered>=shiftDate(-60))||filter==='Needs attention'&&(x.segment==='At risk'||x.segment==='Inactive')||filter==='At risk'&&x.segment==='At risk'||filter==='Inactive'&&x.segment==='Inactive'||filter==='No orders'&&x.segment==='No orders'||filter==='Follow-up due'&&x.dueFollowUps.length>0;
+  const filterMatch=filter==='All'||filter==='New · 30d'&&x.customer.created>=shiftDate(-29)||filter==='Repeat'&&x.segment==='Repeat'||filter==='Active · 60d'&&Boolean(x.lastDelivered&&x.lastDelivered>=shiftDate(-60))||filter==='Needs attention'&&(x.segment==='At risk'||x.segment==='Inactive')||filter==='At risk'&&x.segment==='At risk'||filter==='Inactive'&&x.segment==='Inactive'||filter==='No orders'&&x.segment==='No orders'||filter==='Follow-up due'&&x.dueFollowUps.length>0||filter==='Replenishment due'&&replenishmentDueCustomerIds.has(x.customer.id);
   const orderRefs=x.orders.map(o=>o.number);
   const productNames=x.topProducts.map(x=>x.product?.name||'');
   return filterMatch&&match(x.customer.name,x.customer.phone,x.customer.city,x.customer.preference,x.customer.notes,...orderRefs,...productNames);
@@ -324,6 +332,7 @@ const customerDetailProductQty=new Map<string,number>();
 if(customerDetail)for(const deliveredOrder of customerDetail.delivered)for(const item of deliveredOrder.items)customerDetailProductQty.set(item.productId,(customerDetailProductQty.get(item.productId)||0)+item.qty);
 const customerDetailProducts=[...customerDetailProductQty.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5).map(([productId,qty])=>({product:s.products.find(p=>p.id===productId),qty})).filter(x=>x.product);
 const customerDetailFollowUps=customerDetail?[...customerDetail.openFollowUps].sort((a,b)=>a.due.localeCompare(b.due)):[];
+const customerDetailReplenishment=customer?replenishmentSignals(s,customer.id):[];
 
 function orderTable(list:Order[]){if(!list.length)return <Empty title={query||filter!=='All'?"No matching orders":"No orders yet"} text={query||filter!=='All'?"Clear the search or choose another status to see more orders.":"Add a customer and receive stock to create your first order."} action={query||filter!=='All'?<button className="btn secondary" onClick={()=>{setQuery('');setFilter('All')}}>Clear filters</button>:undefined}/>;
 const nextActionLabel=(status:Order['status'])=>({Confirmed:'Confirm','Ready to pack':'Ready to pack',Packed:'Mark packed',Shipped:'Mark shipped','Out for delivery':'Out for delivery',Delivered:'Mark delivered'} as Partial<Record<Order['status'],string>>)[status]||status;
