@@ -2,7 +2,7 @@ name: CRM CI
 
 on:
   push:
-    branches: [main, audit-fixes-2026-09-30]
+    branches: [main]
   pull_request:
     branches: [main]
 
