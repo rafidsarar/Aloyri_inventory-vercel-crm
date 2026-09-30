@@ -60,3 +60,6 @@ Manual retry: deploy full Inventory Steps 1-4 and centralized Hold stock workflo
 
 
 Manual retry: full Inventory Steps 1-4 production deployment.
+
+
+Production deployment trigger for centralized Holds & Returns workflow on stable Inventory Steps 1-3. Step 4 remains excluded. Source commit: `13637a9167637d8d05aa118f39046c39d3a7a7f2`.
