@@ -18,10 +18,13 @@ const recordCounts=(data:State)=>({
   cashEntries:data.cashEntries.length,
   tasks:data.tasks.length,
   inventoryHolds:data.inventoryHolds.length,
-  stockAdjustments:data.stockAdjustments.length
+  stockAdjustments:data.stockAdjustments.length,
+  accountOpenings:data.accountOpenings.length,
+  accountMatches:data.accountMatches.length,
+  financeCloses:data.financeCloses.length
 });
 
-async function sha256(data:State){
+async function sha256(data:unknown){
   const bytes=new TextEncoder().encode(JSON.stringify(data));
   const digest=await crypto.subtle.digest('SHA-256',bytes);
   return Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');
@@ -30,18 +33,18 @@ async function sha256(data:State){
 async function parseBackup(backup:any){
   if(backup?.format!=='aloyri-workspace-backup'||![1,2].includes(backup?.schemaVersion))
     throw new Error('This is not a supported ALOYRI workspace backup.');
-  const restored=fixedBusinessName(stateSchema.parse(backup.data));
-  validateRelations(restored,{skipOrderNumberUniqueness:true});
-  const counts=recordCounts(restored);
-  const checksum=await sha256(restored);
+  const rawChecksum=await sha256(backup.data);
   if(backup.schemaVersion===2){
     if(backup?.integrity?.algorithm!=='SHA-256'||typeof backup?.integrity?.checksum!=='string')
       throw new Error('Backup integrity metadata is missing.');
-    if(backup.integrity.checksum!==checksum)throw new Error('Backup integrity check failed. The file may be incomplete or modified.');
-    if(backup.integrity.counts&&Object.entries(counts).some(([key,value])=>backup.integrity.counts[key]!==value))
-      throw new Error('Backup record counts do not match the file contents.');
+    if(backup.integrity.checksum!==rawChecksum)throw new Error('Backup integrity check failed. The file may be incomplete or modified.');
   }
-  return {restored,counts,checksum};
+  const restored=fixedBusinessName(stateSchema.parse(backup.data));
+  validateRelations(restored,{skipOrderNumberUniqueness:true});
+  const counts=recordCounts(restored);
+  if(backup.schemaVersion===2&&backup.integrity.counts&&Object.entries(counts).some(([key,value])=>backup.integrity.counts[key]!==value))
+    throw new Error('Backup record counts do not match the file contents.');
+  return {restored,counts,checksum:rawChecksum};
 }
 
 export async function GET(){
