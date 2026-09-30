@@ -114,12 +114,12 @@ const monthlyTrend=Array.from({length:6},(_,idx)=>{const d=new Date();d.setUTCDa
 
 
 type AutoAlert={id:string;level:'Critical'|'Action needed'|'Upcoming';title:string;detail:string;view:View;role:'all'|'finance'|'sales'|'inventory'};
-const autoAlerts:AutoAlert[]=[];
-low.forEach(p=>autoAlerts.push({id:'low-'+p.id,level:stock(s,p.id)<=0?'Critical':'Action needed',title:(stock(s,p.id)<=0?'Out of stock: ':'Reorder: ')+p.name,detail:stock(s,p.id)+' units available · reorder at '+p.reorderAt,view:'Inventory',role:'inventory'}));
-expiring.forEach(b=>{const p=s.products.find(x=>x.id===b.productId);autoAlerts.push({id:'expiry-'+b.id,level:b.expiry<=shiftDate(30)?'Critical':'Upcoming',title:'Expiry: '+(p?.name||'Inventory batch'),detail:batchRemaining(s,b)+' units · expires '+dateLabel(b.expiry),view:'Inventory',role:'inventory'})});
-s.orders.filter(o=>!['Delivered','Cancelled','Returned'].includes(o.status)&&o.created<shiftDate(-3)).forEach(o=>autoAlerts.push({id:'order-'+o.id,level:o.created<shiftDate(-7)?'Critical':'Action needed',title:'Order #'+o.number+' needs progress',detail:o.status+' since '+dateLabel(o.created),view:'Orders',role:'sales'}));
-s.orders.filter(o=>o.status==='Delivered').forEach(o=>{const due=receivable(o),legacy=o.settled&&o.collections.length===0?due:0,balance=Math.max(0,due-o.collections.reduce((n,p)=>n+p.amount,0)-legacy);if(balance>.001)autoAlerts.push({id:'collect-'+o.id,level:(o.delivered||o.created)<shiftDate(-7)?'Critical':'Action needed',title:'Collect '+taka(balance)+' · #'+o.number,detail:'Delivered '+dateLabel(o.delivered||o.created)+' · customer balance outstanding',view:'Finances',role:'finance'})});
-s.batches.forEach(b=>{const amount=b.qty*b.unitCost,legacy=b.paid&&b.payments.length===0?amount:0,balance=Math.max(0,amount-b.payments.reduce((n,p)=>n+p.amount,0)-legacy);if(balance>.001&&b.dueDate&&b.dueDate<=shiftDate(7))autoAlerts.push({id:'pay-'+b.id,level:b.dueDate<today()?'Critical':'Upcoming',title:(b.dueDate<today()?'Overdue supplier payment ':'Supplier payment due ')+taka(balance),detail:'Due '+dateLabel(b.dueDate)+(b.invoice?' · '+b.invoice:''),view:'Finances',role:'finance'})});
+const automationLive=automationSignals(s);
+const automationActiveRules=Object.values(s.automationSettings).filter(rule=>rule.enabled).length;
+const automationCritical=automationLive.filter(signal=>signal.level==='Critical').length;
+const automationAction=automationLive.filter(signal=>signal.level==='Action needed').length;
+const automationUpcoming=automationLive.filter(signal=>signal.level==='Upcoming').length;
+const autoAlerts:AutoAlert[]=automationLive.map(signal=>({id:signal.key,level:signal.level,title:signal.title,detail:signal.detail,view:signal.view,role:signal.role}));
 s.tasks.filter(t=>!t.done&&t.due<=shiftDate(2)).forEach(t=>autoAlerts.push({id:'task-'+t.id,level:t.due<today()||t.priority==='High'?'Critical':'Upcoming',title:t.title,detail:t.priority+' priority · '+(t.due<today()?'overdue · ':'due ')+dateLabel(t.due),view:'Follow-ups',role:'sales'}));
 if(unassignedMovements)autoAlerts.push({id:'reconcile',level:unassignedMovements>5?'Critical':'Action needed',title:'Reconcile '+unassignedMovements+' cash movements',detail:'Assign recorded movements to Cash, Bank, bKash or Nagad.',view:'Finances',role:'finance'});
 if(projected30<0)autoAlerts.push({id:'liquidity',level:'Critical',title:'Negative 30-day planning position',detail:'Projected shortfall '+taka(Math.abs(projected30))+' based on current CRM assumptions.',view:'Finances',role:'finance'});
