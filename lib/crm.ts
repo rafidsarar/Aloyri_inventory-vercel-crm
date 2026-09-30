@@ -96,6 +96,36 @@ export function supplierInsight(s:State,supplierId:string){
     avgLeadDays
   };
 }
+export type PurchaseReceiptLine={productId:string;qty:number;expiry:string};
+export function applyPurchaseOrderReceipt(state:State,input:{purchaseOrderId:string;received:string;invoice:string;dueDate?:string;lines:PurchaseReceiptLine[]}):State{
+  const next=structuredClone(state),po=next.purchaseOrders.find(p=>p.id===input.purchaseOrderId);
+  if(!po)throw new Error('Purchase order not found.');
+  if(!['Sent','Part received'].includes(po.status))throw new Error('Only sent purchase orders can receive stock.');
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(input.received)||input.received>today())throw new Error('Choose a valid receipt date that is not in the future.');
+  if(input.dueDate&&input.dueDate<input.received)throw new Error('Supplier due date cannot be before the receipt date.');
+  if(new Set(input.lines.map(line=>line.productId)).size!==input.lines.length)throw new Error('Each received product can only appear once.');
+  let receivedUnits=0;
+  for(const line of input.lines){
+    if(!Number.isInteger(line.qty)||line.qty<0)throw new Error('Received quantities must be whole numbers.');
+    if(line.qty===0)continue;
+    const item=po.items.find(i=>i.productId===line.productId);
+    if(!item)throw new Error('Receipt includes a product that is not on the purchase order.');
+    const outstanding=item.qty-item.receivedQty;
+    if(line.qty>outstanding)throw new Error('Received quantity cannot exceed the outstanding purchase order quantity.');
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(line.expiry)||line.expiry<=input.received)throw new Error('Each received product needs an expiry date after the receipt date.');
+    next.batches.push({
+      id:uid(),productId:item.productId,qty:line.qty,unitCost:item.unitCost,expiry:line.expiry,received:input.received,
+      supplierId:po.supplierId,invoice:input.invoice.trim()||po.number,dueDate:input.dueDate||undefined,payments:[],paid:false
+    });
+    item.receivedQty+=line.qty;
+    receivedUnits+=line.qty;
+  }
+  if(!receivedUnits)throw new Error('Enter at least one received quantity.');
+  const ordered=purchaseOrderUnits(po),received=purchaseOrderReceivedUnits(po);
+  po.status=received>=ordered?'Received':'Part received';
+  return next;
+}
+
 export function initialState():State {return {businessName:'ALOYRI',businessProfile:emptyBusinessProfile(),productCategories:[...categories],customers:[],suppliers:[],purchaseOrders:[],batches:[],stockAdjustments:[],inventoryHolds:[],orders:[],expenses:[],cashEntries:[],accountOpenings:[],accountMatches:[],financeCloses:[],tasks:[],products:[
   {id:'simple-wash',brand:'Simple',name:'Refreshing Facial Wash',size:'150ml · Poland',category:'Cleanser',price:749,cost:520,targetQty:12,reorderAt:4,active:true},
   {id:'simple-light',brand:'Simple',name:'Hydrating Light Moisturiser',size:'125ml · Hungary',category:'Moisturizer',price:749,cost:520,targetQty:10,reorderAt:4,active:true},
