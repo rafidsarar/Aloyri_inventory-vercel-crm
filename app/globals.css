@@ -448,6 +448,9 @@ html,body{max-width:100%;overflow-x:hidden}
 .inventory-signal-card strong{display:block;margin-top:3px;font-size:12px;font-weight:600;line-height:1.3;color:#4b6753;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .inventory-signal-card>svg:last-child{color:#aab5ad}
 .inventory-records{overflow:hidden}
+.inventory-records [data-slot=tabs]{min-width:0;max-width:100%}
+.inventory-records [data-slot=tabs-list]{max-width:100%;overflow-x:auto;overflow-y:hidden;justify-content:flex-start;scrollbar-width:thin;-webkit-overflow-scrolling:touch}
+.inventory-records [data-slot=tabs-trigger]{flex:0 0 auto}
 @media(max-width:1100px){.inventory-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.inventory-signal-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:820px){.inventory-command-hero{flex-direction:column;padding:20px}.inventory-command-actions{min-width:0;justify-content:flex-start}.inventory-command-copy h2{font-size:24px}.inventory-records .table-toolbar{align-items:stretch;flex-direction:column}.inventory-records .toolbar-right{width:100%}.inventory-records .search-input{max-width:none}}
 @media(max-width:600px){.inventory-command-hero{padding:17px}.inventory-command-copy h2{font-size:22px}.inventory-command-actions{width:100%}.inventory-command-actions .btn{flex:1}.inventory-kpi-grid{grid-template-columns:1fr 1fr}.inventory-kpi-grid>button{grid-template-columns:auto minmax(0,1fr);min-height:94px;padding:14px 12px}.inventory-kpi-grid>button>svg:last-child{display:none}.inventory-kpi-grid strong{font-size:18px}.inventory-signal-grid{grid-template-columns:1fr}.inventory-records .toolbar-right{flex-direction:column;align-items:stretch}.inventory-records .choice{width:100%}}
