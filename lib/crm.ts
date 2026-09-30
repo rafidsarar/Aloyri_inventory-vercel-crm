@@ -51,10 +51,30 @@ const taskSchema = z.object({
   completedAt:z.union([date,z.literal('')]).default('')
 });
 const financeCloseSchema=z.object({month:z.string().regex(/^\d{4}-\d{2}$/),closedAt:date,closedBy:str,notes:str.default('')});
-export const stateSchema = z.object({products:z.array(productSchema).max(2000),productCategories:z.array(z.string().trim().min(1).max(50)).min(1).max(100).default(()=>[...categories]),customers:z.array(customerSchema).max(10000),suppliers:z.array(supplierSchema).max(1000),purchaseOrders:z.array(purchaseOrderSchema).max(5000).default([]),batches:z.array(batchSchema).max(10000),stockAdjustments:z.array(stockAdjustmentSchema).max(10000).default([]),inventoryHolds:z.array(inventoryHoldSchema).max(10000).default([]),orders:z.array(orderSchema).max(10000),expenses:z.array(expenseSchema).max(10000),cashEntries:z.array(cashEntrySchema).max(10000).default([]),accountOpenings:z.array(accountOpeningSchema).max(4).default([]),accountMatches:z.array(accountMatchSchema).max(30000).default([]),financeCloses:z.array(financeCloseSchema).max(120).default([]),tasks:z.array(taskSchema).max(10000),businessName:str.min(1),businessProfile:businessProfileSchema.default(emptyBusinessProfile)});
+export const defaultAutomationSettings=()=>({
+  deliveryFollowUp:{enabled:true,delayDays:7},
+  lowStock:{enabled:true},
+  expiringStock:{enabled:true,daysBefore:90},
+  overduePurchaseOrders:{enabled:true},
+  supplierPayments:{enabled:true,daysBefore:7},
+  customerCollections:{enabled:true,graceDays:2},
+  customerRetention:{enabled:true,inactivityDays:90},
+  staleOrders:{enabled:true,daysOpen:3}
+});
+const automationSettingsSchema=z.object({
+  deliveryFollowUp:z.object({enabled:z.boolean(),delayDays:z.number().int().min(1).max(30)}).default(()=>defaultAutomationSettings().deliveryFollowUp),
+  lowStock:z.object({enabled:z.boolean()}).default(()=>defaultAutomationSettings().lowStock),
+  expiringStock:z.object({enabled:z.boolean(),daysBefore:z.number().int().min(7).max(365)}).default(()=>defaultAutomationSettings().expiringStock),
+  overduePurchaseOrders:z.object({enabled:z.boolean()}).default(()=>defaultAutomationSettings().overduePurchaseOrders),
+  supplierPayments:z.object({enabled:z.boolean(),daysBefore:z.number().int().min(0).max(60)}).default(()=>defaultAutomationSettings().supplierPayments),
+  customerCollections:z.object({enabled:z.boolean(),graceDays:z.number().int().min(0).max(30)}).default(()=>defaultAutomationSettings().customerCollections),
+  customerRetention:z.object({enabled:z.boolean(),inactivityDays:z.number().int().min(30).max(365)}).default(()=>defaultAutomationSettings().customerRetention),
+  staleOrders:z.object({enabled:z.boolean(),daysOpen:z.number().int().min(1).max(30)}).default(()=>defaultAutomationSettings().staleOrders)
+}).default(defaultAutomationSettings);
+export const stateSchema = z.object({products:z.array(productSchema).max(2000),productCategories:z.array(z.string().trim().min(1).max(50)).min(1).max(100).default(()=>[...categories]),customers:z.array(customerSchema).max(10000),suppliers:z.array(supplierSchema).max(1000),purchaseOrders:z.array(purchaseOrderSchema).max(5000).default([]),batches:z.array(batchSchema).max(10000),stockAdjustments:z.array(stockAdjustmentSchema).max(10000).default([]),inventoryHolds:z.array(inventoryHoldSchema).max(10000).default([]),orders:z.array(orderSchema).max(10000),expenses:z.array(expenseSchema).max(10000),cashEntries:z.array(cashEntrySchema).max(10000).default([]),accountOpenings:z.array(accountOpeningSchema).max(4).default([]),accountMatches:z.array(accountMatchSchema).max(30000).default([]),financeCloses:z.array(financeCloseSchema).max(120).default([]),tasks:z.array(taskSchema).max(10000),businessName:str.min(1),businessProfile:businessProfileSchema.default(emptyBusinessProfile),automationSettings:automationSettingsSchema});
 export type State=z.infer<typeof stateSchema>;
 export type Product=State['products'][number]; export type Customer=State['customers'][number]; export type Order=State['orders'][number]; export type Batch=State['batches'][number];
-export type Supplier=State['suppliers'][number]; export type PurchaseOrder=State['purchaseOrders'][number]; export type Task=State['tasks'][number];
+export type Supplier=State['suppliers'][number]; export type PurchaseOrder=State['purchaseOrders'][number]; export type Task=State['tasks'][number]; export type AutomationSettings=State['automationSettings'];
 export const uid=()=>{if(typeof crypto.randomUUID==='function')return crypto.randomUUID();const b=crypto.getRandomValues(new Uint8Array(16));b[6]=(b[6]&15)|64;b[8]=(b[8]&63)|128;const h=Array.from(b,x=>x.toString(16).padStart(2,'0')).join('');return h.slice(0,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)+'-'+h.slice(16,20)+'-'+h.slice(20);};
 export const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Dhaka',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 export const shiftDate=(days:number,base=today())=>{const d=new Date(base+'T12:00:00Z'); d.setUTCDate(d.getUTCDate()+days); return d.toISOString().slice(0,10)};
@@ -126,7 +146,7 @@ export function applyPurchaseOrderReceipt(state:State,input:{purchaseOrderId:str
   return next;
 }
 
-export function initialState():State {return {businessName:'ALOYRI',businessProfile:emptyBusinessProfile(),productCategories:[...categories],customers:[],suppliers:[],purchaseOrders:[],batches:[],stockAdjustments:[],inventoryHolds:[],orders:[],expenses:[],cashEntries:[],accountOpenings:[],accountMatches:[],financeCloses:[],tasks:[],products:[
+export function initialState():State {return {businessName:'ALOYRI',businessProfile:emptyBusinessProfile(),automationSettings:defaultAutomationSettings(),productCategories:[...categories],customers:[],suppliers:[],purchaseOrders:[],batches:[],stockAdjustments:[],inventoryHolds:[],orders:[],expenses:[],cashEntries:[],accountOpenings:[],accountMatches:[],financeCloses:[],tasks:[],products:[
   {id:'simple-wash',brand:'Simple',name:'Refreshing Facial Wash',size:'150ml · Poland',category:'Cleanser',price:749,cost:520,targetQty:12,reorderAt:4,active:true},
   {id:'simple-light',brand:'Simple',name:'Hydrating Light Moisturiser',size:'125ml · Hungary',category:'Moisturizer',price:749,cost:520,targetQty:10,reorderAt:4,active:true},
   {id:'simple-rich',brand:'Simple',name:'Replenishing Rich Moisturizer',size:'125ml',category:'Moisturizer',price:775,cost:540,targetQty:6,reorderAt:3,active:true},
