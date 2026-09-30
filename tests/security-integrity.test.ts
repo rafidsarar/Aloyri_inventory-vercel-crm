@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { roleCanEdit, roleCanManageFinance, roleCanManageTeam, roleCanReset } from '../lib/roles.ts';
 import { applyRoleChanges, visibleState } from '../lib/role-data.ts';
-import { accountBalance, allocate, batchRemaining, cashflow, collectedAmount, initialState, metrics, nextStatuses, orderBalance, orderPaymentStatus, receivable, stateSchema, statuses, shiftDate, stock, stockPosition, today, uid, validateRelations, type Order, type State } from '../lib/crm.ts';
+import { accountBalance, allocate, batchRemaining, buildInventoryBatchRows, cashflow, collectedAmount, initialState, metrics, nextStatuses, orderBalance, orderPaymentStatus, receivable, stateSchema, statuses, shiftDate, stock, stockPosition, today, uid, validateRelations, type Order, type State } from '../lib/crm.ts';
 
 function baseOrder(overrides:Partial<Order>={}):Order{
   return {
@@ -317,4 +317,40 @@ test('batch manufacturing date must be on or before receipt and before expiry',(
   assert.throws(()=>validateRelations(state),/Manufacturing date cannot be after the stock receipt date/i);
   state.batches[0].manufactured=state.batches[0].expiry;
   assert.throws(()=>validateRelations(state),/Manufacturing date cannot be after the stock receipt date|before expiry/i);
+});
+
+
+test('Step 4 batch projection preserves stock positions and FEFO without nested render assumptions',()=>{
+  const state=baseState(baseOrder({status:'Confirmed',delivered:undefined}));
+  state.batches.push({id:'batch-2',productId:'product-1',batchNumber:'LOT-EARLY',qty:5,unitCost:420,manufactured:shiftDate(-60),expiry:shiftDate(120),received:shiftDate(-10),supplierId:'supplier-1',invoice:'INV-2',payments:[],paid:false});
+  const rows=buildInventoryBatchRows(state);
+  const first=rows.find(r=>r.batch.id==='batch-2');
+  const second=rows.find(r=>r.batch.id==='batch-1');
+  assert.ok(first&&second);
+  assert.equal(first.fefoPosition,1);
+  assert.equal(second.fefoPosition,2);
+  assert.equal(second.reserved,1);
+  assert.equal(second.available,batchRemaining(state,state.batches[0]));
+  assert.equal(second.physical,stockPosition(state,'product-1').physical-first.physical);
+});
+
+test('Step 4 batch projection cannot crash the CRM on legacy orphan display relations',()=>{
+  const state=baseState(baseOrder({status:'Cancelled',delivered:undefined}));
+  state.batches[0].productId='legacy-missing-product';
+  state.batches[0].supplierId='legacy-missing-supplier';
+  const rows=buildInventoryBatchRows(state);
+  assert.equal(rows.length,1);
+  assert.equal(rows[0].product,undefined);
+  assert.equal(rows[0].supplier,undefined);
+  assert.equal(rows[0].batch.batchNumber,'LOT-TEST');
+  assert.equal(typeof rows[0].status,'string');
+});
+
+test('Step 4 batch projection keeps one trace entry per order even with multiple allocations',()=>{
+  const state=baseState(baseOrder({status:'Confirmed',delivered:undefined}));
+  state.orders[0].items[0].allocations=[{batchId:'batch-1',qty:1,unitCost:400}];
+  state.orders.push({...baseOrder({id:uid(),number:'SK-TEST-2',status:'Confirmed',delivered:undefined}),items:[{productId:'product-1',qty:2,price:1000,allocations:[{batchId:'batch-1',qty:2,unitCost:400}]}]});
+  const row=buildInventoryBatchRows(state)[0];
+  assert.equal(row.tracedOrders.length,2);
+  assert.equal(row.reserved,3);
 });
