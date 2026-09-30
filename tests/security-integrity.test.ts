@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { roleCanBackup, roleCanCloseFinance, roleCanEdit, roleCanExportData, roleCanImport, roleCanInspectReturns, roleCanLoadStarterCatalog, roleCanManageFinance, roleCanManageTeam, roleCanPrintInvoice, roleCanReset, roleCanViewAudit } from '../lib/roles.ts';
 import { applyRoleChanges, visibleState, validateRoleRelations, validateWorkspaceChange } from '../lib/role-data.ts';
-import { accountBalance, allocate, applyCancellationQuarantine, applyDeliveryFollowUps, batchRemaining, cashflow, collectedAmount, initialState, metrics, nextStatuses, orderBalance, orderPaymentStatus, receivable, stateSchema, statuses, shiftDate, stock, stockPosition, today, uid, validateRelations, type Order, type State } from '../lib/crm.ts';
+import { accountBalance, allocate, applyCancellationQuarantine, applyDeliveryFollowUps, applyPurchaseOrderReceipt, batchRemaining, cashflow, collectedAmount, initialState, metrics, nextStatuses, orderBalance, orderPaymentStatus, purchaseOrderProgress, purchaseOrderReceivedUnits, purchaseOrderValue, receivable, stateSchema, statuses, shiftDate, stock, stockPosition, supplierInsight, today, uid, validateRelations, type Order, type State } from '../lib/crm.ts';
 
 function baseOrder(overrides:Partial<Order>={}):Order{
   return {
@@ -16,7 +16,7 @@ function baseState(order:Order):State{
   state.products=[{id:'product-1',brand:'Test',name:'Test product',size:'1',category:'Other',price:1000,cost:400,targetQty:1,reorderAt:0,active:true}];
   state.productCategories=['Other'];
   state.customers=[{id:'customer-1',name:'Customer',phone:'',address:'',city:'',preference:'',notes:'',consent:false,created:today()}];
-  state.suppliers=[{id:'supplier-1',name:'Supplier',contact:'',phone:'',notes:'',verified:true}];
+  state.suppliers=[{id:'supplier-1',name:'Supplier',contact:'',phone:'',email:'supplier@example.com',address:'Dhaka',leadDays:14,paymentTermsDays:30,notes:'',verified:true}];
   state.batches=[{id:'batch-1',productId:'product-1',qty:10,unitCost:400,expiry:shiftDate(365),received:today(),supplierId:'supplier-1',invoice:'INV-1',payments:[],paid:false}];
   state.orders=[order];
   state.purchaseOrders=[];state.stockAdjustments=[];state.inventoryHolds=[];state.expenses=[];state.cashEntries=[];state.accountOpenings=[];state.accountMatches=[];state.financeCloses=[];state.tasks=[];
@@ -188,6 +188,70 @@ test('broken account transfers are rejected by production validation',()=>{
   const state=baseState(baseOrder());
   state.cashEntries=[{id:'x1',date:today(),kind:'out',category:'Transfer',description:'Transfer',amount:500,transferId:'t1'}];
   assert.throws(()=>validateRelations(state),/Transfer t1/);
+});
+
+test('legacy suppliers migrate with safe purchasing defaults',()=>{
+  const raw=structuredClone(baseState(baseOrder())) as unknown as {suppliers:Array<Record<string,unknown>>};
+  delete raw.suppliers[0].email;
+  delete raw.suppliers[0].address;
+  delete raw.suppliers[0].leadDays;
+  delete raw.suppliers[0].paymentTermsDays;
+  const parsed=stateSchema.parse(raw);
+  assert.equal(parsed.suppliers[0].email,'');
+  assert.equal(parsed.suppliers[0].address,'');
+  assert.equal(parsed.suppliers[0].leadDays,14);
+  assert.equal(parsed.suppliers[0].paymentTermsDays,30);
+});
+
+test('purchase order helpers report value and receiving progress',()=>{
+  const state=baseState(baseOrder());
+  const po={id:'po-progress',number:'PO-PROGRESS',supplierId:'supplier-1',created:today(),expected:shiftDate(7),status:'Part received' as const,notes:'',items:[{productId:'product-1',qty:10,unitCost:400,receivedQty:4}]};
+  state.purchaseOrders=[po];
+  assert.equal(purchaseOrderValue(po),4000);
+  assert.equal(purchaseOrderReceivedUnits(po),4);
+  assert.equal(purchaseOrderProgress(po),40);
+});
+
+test('partial purchase receiving creates real batches and keeps outstanding stock open',()=>{
+  const state=baseState(baseOrder());
+  state.purchaseOrders=[{id:'po-partial',number:'PO-PARTIAL',supplierId:'supplier-1',created:shiftDate(-3),expected:today(),status:'Sent',notes:'',items:[{productId:'product-1',qty:5,unitCost:420,receivedQty:0}]}];
+  const next=applyPurchaseOrderReceipt(state,{purchaseOrderId:'po-partial',received:today(),invoice:'INV-PO-1',dueDate:shiftDate(30),lines:[{productId:'product-1',qty:2,expiry:shiftDate(300)}]});
+  const po=next.purchaseOrders[0];
+  assert.equal(po.status,'Part received');
+  assert.equal(po.items[0].receivedQty,2);
+  const batch=next.batches.find(b=>b.invoice==='INV-PO-1')!;
+  assert.equal(batch.qty,2);
+  assert.equal(batch.unitCost,420);
+  assert.equal(batch.supplierId,'supplier-1');
+  assert.equal(batch.dueDate,shiftDate(30));
+  validateRelations(next);
+});
+
+test('final purchase receipt closes the purchase order and rejects over-receiving',()=>{
+  const state=baseState(baseOrder());
+  state.purchaseOrders=[{id:'po-final',number:'PO-FINAL',supplierId:'supplier-1',created:shiftDate(-5),expected:today(),status:'Part received',notes:'',items:[{productId:'product-1',qty:5,unitCost:400,receivedQty:2}]}];
+  const completed=applyPurchaseOrderReceipt(state,{purchaseOrderId:'po-final',received:today(),invoice:'PO-FINAL',dueDate:shiftDate(30),lines:[{productId:'product-1',qty:3,expiry:shiftDate(365)}]});
+  assert.equal(completed.purchaseOrders[0].status,'Received');
+  assert.equal(completed.purchaseOrders[0].items[0].receivedQty,5);
+  assert.throws(()=>applyPurchaseOrderReceipt(state,{purchaseOrderId:'po-final',received:today(),invoice:'PO-FINAL',dueDate:shiftDate(30),lines:[{productId:'product-1',qty:4,expiry:shiftDate(365)}]}),/outstanding purchase order quantity/i);
+});
+
+test('supplier insights combine PO pipeline, receipts, lead time and payable balance',()=>{
+  const state=baseState(baseOrder());
+  state.batches=[];
+  state.purchaseOrders=[
+    {id:'po-received',number:'PO-RECEIVED',supplierId:'supplier-1',created:shiftDate(-20),expected:shiftDate(-10),status:'Received',notes:'',items:[{productId:'product-1',qty:2,unitCost:400,receivedQty:2}]},
+    {id:'po-late',number:'PO-LATE',supplierId:'supplier-1',created:shiftDate(-10),expected:shiftDate(-2),status:'Sent',notes:'',items:[{productId:'product-1',qty:3,unitCost:450,receivedQty:0}]}
+  ];
+  state.batches=[{id:'batch-received',productId:'product-1',qty:2,unitCost:400,expiry:shiftDate(300),received:shiftDate(-8),supplierId:'supplier-1',invoice:'PO-RECEIVED',dueDate:shiftDate(20),payments:[{id:'pay-1',date:shiftDate(-5),amount:300,note:'Part'}],paid:false}];
+  const insight=supplierInsight(state,'supplier-1');
+  assert.equal(insight.purchaseOrders.length,2);
+  assert.equal(insight.activePurchaseOrders.length,1);
+  assert.equal(insight.overduePurchaseOrders.length,1);
+  assert.equal(insight.receivedValue,800);
+  assert.equal(insight.paidValue,300);
+  assert.equal(insight.payable,500);
+  assert.equal(insight.avgLeadDays,12);
 });
 
 test('purchase orders enforce supplier, product and receiving integrity',()=>{
