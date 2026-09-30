@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { roleCanEdit, roleCanManageFinance, roleCanManageTeam, roleCanReset } from '../lib/roles.ts';
 import { applyRoleChanges, visibleState } from '../lib/role-data.ts';
-import { accountBalance, allocate, batchRemaining, cashflow, collectedAmount, initialState, metrics, nextStatuses, orderBalance, orderPaymentStatus, receivable, stateSchema, statuses, shiftDate, stock, stockPosition, today, uid, validateRelations, type Order, type State } from '../lib/crm.ts';
+import { accountBalance, allocate, applyCancellationQuarantine, batchRemaining, cashflow, collectedAmount, initialState, metrics, nextStatuses, orderBalance, orderPaymentStatus, receivable, stateSchema, statuses, shiftDate, stock, stockPosition, today, uid, validateRelations, type Order, type State } from '../lib/crm.ts';
 
 function baseOrder(overrides:Partial<Order>={}):Order{
   return {
@@ -218,7 +218,7 @@ test('stock positions separate physical, reserved and available units',()=>{
 
 test('inventory holds block sale allocation without reducing physical stock',()=>{
   const state=baseState(baseOrder({status:'Confirmed',delivered:undefined}));
-  state.inventoryHolds=[{id:'hold-1',batchId:'batch-1',qty:2,date:today(),type:'Quarantine',reason:'Seal check'}];
+  state.inventoryHolds=[{id:'hold-1',batchId:'batch-1',qty:2,date:today(),type:'Quarantine',reason:'Seal check',source:'Manual'}];
   validateRelations(state);
   const position=stockPosition(state,'product-1');
   assert.equal(position.physical,10);
@@ -233,7 +233,7 @@ test('inventory holds block sale allocation without reducing physical stock',()=
 
 test('released inventory holds return units to available stock',()=>{
   const state=baseState(baseOrder({status:'Confirmed',delivered:undefined}));
-  state.inventoryHolds=[{id:'hold-1',batchId:'batch-1',qty:2,date:today(),type:'Damaged',reason:'Outer box crushed',releasedAt:today()}];
+  state.inventoryHolds=[{id:'hold-1',batchId:'batch-1',qty:2,date:today(),type:'Damaged',reason:'Outer box crushed',source:'Manual',releasedAt:today()}];
   validateRelations(state);
   const position=stockPosition(state,'product-1');
   assert.equal(position.held,0);
@@ -278,7 +278,7 @@ test('expired physical units are blocked rather than sellable',()=>{
 
 test('inventory holds cannot exceed uncommitted available stock',()=>{
   const state=baseState(baseOrder({status:'Confirmed',delivered:undefined}));
-  state.inventoryHolds=[{id:'hold-1',batchId:'batch-1',qty:10,date:today(),type:'Quarantine',reason:'Check'}];
+  state.inventoryHolds=[{id:'hold-1',batchId:'batch-1',qty:10,date:today(),type:'Quarantine',reason:'Check',source:'Manual'}];
   assert.throws(()=>validateRelations(state),/over-allocated/i);
 });
 
@@ -294,4 +294,43 @@ test('inventory employee can restock a returned order without gaining general or
   const bad=visibleState(current,'inventory');
   bad.orders[0].status='Cancelled';
   assert.throws(()=>applyRoleChanges(current,bad,'inventory'),/only complete return inspection/i);
+});
+
+
+test('cancelling an order replaces its reservation with quarantine until inventory inspection',()=>{
+  const current=baseState(baseOrder({status:'Confirmed',delivered:undefined}));
+  assert.equal(stockPosition(current,'product-1').reserved,1);
+  assert.equal(stockPosition(current,'product-1').available,9);
+  const proposed=structuredClone(current);
+  proposed.orders[0].status='Cancelled';
+  const quarantined=applyCancellationQuarantine(current,proposed);
+  validateRelations(quarantined);
+  const hold=quarantined.inventoryHolds.find(h=>h.source==='Cancelled');
+  assert.equal(hold?.sourceOrderId,current.orders[0].id);
+  assert.equal(hold?.type,'Quarantine');
+  assert.equal(hold?.qty,1);
+  assert.equal(stockPosition(quarantined,'product-1').reserved,0);
+  assert.equal(stockPosition(quarantined,'product-1').held,1);
+  assert.equal(stockPosition(quarantined,'product-1').available,9);
+});
+
+test('legacy inventory holds migrate as manual holds',()=>{
+  const state=baseState(baseOrder({status:'Cancelled',delivered:undefined}));
+  const legacy=structuredClone(state) as unknown as {inventoryHolds:Array<Record<string,unknown>>};
+  legacy.inventoryHolds=[{id:'legacy-hold',batchId:'batch-1',qty:1,date:today(),type:'Quarantine',reason:'Legacy inspection'}];
+  const parsed=stateSchema.parse(legacy);
+  assert.equal(parsed.inventoryHolds[0].source,'Manual');
+  assert.equal(parsed.inventoryHolds[0].sourceOrderId,undefined);
+});
+
+test('inventory employee can classify a returned item as damaged without gaining general order access',()=>{
+  const current=baseState(baseOrder({status:'Returned',returnedAt:today(),delivered:today(),restocked:false}));
+  const proposed=visibleState(current,'inventory');
+  proposed.orders[0].restocked=true;
+  proposed.inventoryHolds.push({id:'return-damaged',batchId:'batch-1',qty:1,date:today(),type:'Damaged',reason:'Returned stock inspected as damaged',source:'Return',sourceOrderId:current.orders[0].id});
+  const merged=applyRoleChanges(current,proposed,'inventory');
+  validateRelations(merged);
+  assert.equal(merged.orders[0].restocked,true);
+  assert.equal(stockPosition(merged,'product-1').held,1);
+  assert.equal(stockPosition(merged,'product-1').available,9);
 });
