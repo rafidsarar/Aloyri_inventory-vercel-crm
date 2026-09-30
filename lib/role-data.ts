@@ -21,8 +21,6 @@ export function visibleState(source:State,role:WorkspaceRole):State {
     state.products.forEach(p=>{p.cost=0});
     state.batches.forEach(b=>{
       b.unitCost=0;
-      b.batchNumber='';
-      b.manufactured=undefined;
       b.supplierId='';
       b.invoice='';
       b.dueDate=undefined;
