@@ -1,9 +1,9 @@
 import { getAppUser, checkOrigin } from '@/app/local-auth';
 import { AccessDenied, resolveWorkspace } from '@/app/team-access';
-import { visibleState, applyRoleChanges } from '@/lib/role-data';
+import { visibleState, applyRoleChanges, validateRoleRelations } from '@/lib/role-data';
 import { canManageBusinessSettings } from '@/lib/roles';
 import { database } from '@/db/raw';
-import { initialState, stateSchema, validateRelations, fixedBusinessName, nextStatuses, applyCancellationQuarantine, type State } from '@/lib/crm';
+import { initialState, stateSchema, fixedBusinessName, nextStatuses, applyCancellationQuarantine, type State } from '@/lib/crm';
 
 export const dynamic='force-dynamic';
 const response=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
@@ -58,7 +58,7 @@ export async function PUT(request:Request){
     let merged:typeof previous;
     try{merged=applyRoleChanges(previous,parsed.data,role)}catch(e){return response({error:e instanceof Error?e.message:'You cannot change that section.'},403)}
     merged=applyCancellationQuarantine(previous,fixedBusinessName(merged));
-    try{validateTransitions(previous,merged);validateRelations(merged,{skipOrderNumberUniqueness:role==='inventory'})}catch(e){return response({error:e instanceof Error?e.message:'Invalid records.'},400)}
+    try{validateTransitions(previous,merged);validateRoleRelations(merged,role)}catch(e){return response({error:e instanceof Error?e.message:'Invalid records.'},400)}
     const changedSections=(Object.keys(previous) as (keyof typeof previous)[]).filter(key=>JSON.stringify(previous[key])!==JSON.stringify(merged[key])).map(String);
     const now=new Date().toISOString();
     await db.prepare('CREATE TABLE IF NOT EXISTS crm_audit_log (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, actor_id TEXT NOT NULL, actor_name TEXT NOT NULL, role TEXT NOT NULL, summary TEXT NOT NULL, sections TEXT NOT NULL, created_at TEXT NOT NULL)').run();
