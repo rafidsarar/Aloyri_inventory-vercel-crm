@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { roleCanBackup, roleCanCloseFinance, roleCanEdit, roleCanExportData, roleCanImport, roleCanInspectReturns, roleCanLoadStarterCatalog, roleCanManageFinance, roleCanManageTeam, roleCanPrintInvoice, roleCanReset, roleCanViewAudit } from '../lib/roles.ts';
 import { applyRoleChanges, visibleState, validateRoleRelations, validateWorkspaceChange } from '../lib/role-data.ts';
-import { accountBalance, allocate, applyCancellationQuarantine, applyDeliveryFollowUps, batchRemaining, cashflow, collectedAmount, customerInsight, initialState, metrics, nextStatuses, orderBalance, orderPaymentStatus, receivable, stateSchema, statuses, shiftDate, stock, stockPosition, today, uid, validateRelations, type Order, type State } from '../lib/crm.ts';
+import { accountBalance, allocate, applyCancellationQuarantine, applyDeliveryFollowUps, applyRetentionIntelligence, batchRemaining, cashflow, collectedAmount, customerInsight, initialState, metrics, nextStatuses, orderBalance, orderPaymentStatus, receivable, replenishmentSignals, stateSchema, statuses, shiftDate, stock, stockPosition, today, uid, validateRelations, type Order, type State } from '../lib/crm.ts';
 
 function baseOrder(overrides:Partial<Order>={}):Order{
   return {
@@ -13,7 +13,7 @@ function baseOrder(overrides:Partial<Order>={}):Order{
 }
 function baseState(order:Order):State{
   const state=initialState();
-  state.products=[{id:'product-1',brand:'Test',name:'Test product',size:'1',category:'Other',price:1000,cost:400,targetQty:1,reorderAt:0,active:true}];
+  state.products=[{id:'product-1',brand:'Test',name:'Test product',size:'1',category:'Other',price:1000,cost:400,targetQty:1,reorderAt:0,replenishDays:0,active:true}];
   state.productCategories=['Other'];
   state.customers=[{id:'customer-1',name:'Customer',phone:'',address:'',city:'',preference:'',notes:'',consent:false,created:today()}];
   state.suppliers=[{id:'supplier-1',name:'Supplier',contact:'',phone:'',notes:'',verified:true}];
@@ -51,14 +51,72 @@ test('customer insights classify retention states from delivered history',()=>{
 test('customer insights surface due and open follow-ups',()=>{
   const state=baseState(baseOrder());
   state.tasks=[
-    {id:'task-due',customerId:'customer-1',orderId:'',title:'Due',due:today(),done:false,kind:'Follow-up',priority:'High',channel:'Phone',notes:'',completedAt:''},
-    {id:'task-later',customerId:'customer-1',orderId:'',title:'Later',due:shiftDate(5),done:false,kind:'Replenishment',priority:'Normal',channel:'WhatsApp',notes:'',completedAt:''},
-    {id:'task-done',customerId:'customer-1',orderId:'',title:'Done',due:today(),done:true,kind:'Other',priority:'Low',channel:'Other',notes:'',completedAt:today()}
+    {id:'task-due',customerId:'customer-1',orderId:'',productId:'',title:'Due',due:today(),done:false,kind:'Follow-up',priority:'High',channel:'Phone',notes:'',completedAt:'',source:'Manual'},
+    {id:'task-later',customerId:'customer-1',orderId:'',productId:'',title:'Later',due:shiftDate(5),done:false,kind:'Replenishment',priority:'Normal',channel:'WhatsApp',notes:'',completedAt:'',source:'Manual'},
+    {id:'task-done',customerId:'customer-1',orderId:'',productId:'',title:'Done',due:today(),done:true,kind:'Other',priority:'Low',channel:'Other',notes:'',completedAt:today(),source:'Manual'}
   ];
   const insight=customerInsight(state,'customer-1');
   assert.equal(insight.openFollowUps.length,2);
   assert.equal(insight.dueFollowUps.length,1);
   assert.equal(insight.dueFollowUps[0].id,'task-due');
+});
+
+test('replenishment timing prefers customer purchase history over configured product cycles',()=>{
+  const state=baseState(baseOrder({id:'order-latest',number:'SK-LATEST',created:shiftDate(-30),delivered:shiftDate(-30)}));
+  state.products[0].replenishDays=90;
+  state.orders.push(baseOrder({id:'order-earlier',number:'SK-EARLIER',created:shiftDate(-90),delivered:shiftDate(-90)}));
+  const [signal]=replenishmentSignals(state,'customer-1');
+  assert.equal(signal.basis,'Purchase history');
+  assert.equal(signal.intervalDays,60);
+  assert.equal(signal.due,shiftDate(30));
+  assert.equal(signal.purchaseCount,2);
+});
+
+test('replenishment timing uses product cycle then category estimate as fallbacks',()=>{
+  const state=baseState(baseOrder());
+  state.products[0].replenishDays=70;
+  let [signal]=replenishmentSignals(state,'customer-1');
+  assert.equal(signal.basis,'Product cycle');
+  assert.equal(signal.intervalDays,70);
+  assert.equal(signal.due,shiftDate(70));
+  state.products[0].replenishDays=0;
+  signal=replenishmentSignals(state,'customer-1')[0];
+  assert.equal(signal.basis,'Category estimate');
+  assert.equal(signal.intervalDays,75);
+});
+
+test('delivery schedules one automated replenishment reminder without duplicates',()=>{
+  const previous=baseState(baseOrder({id:'order-delivery',number:'SK-DEL',status:'Out for delivery',delivered:undefined}));
+  previous.products[0].replenishDays=60;
+  const next=structuredClone(previous);
+  next.orders[0].status='Delivered';next.orders[0].delivered=today();
+  const once=applyRetentionIntelligence(previous,next);
+  const reminders=once.tasks.filter(t=>t.kind==='Replenishment');
+  assert.equal(reminders.length,1);
+  assert.equal(reminders[0].source,'Replenishment');
+  assert.equal(reminders[0].productId,'product-1');
+  assert.equal(reminders[0].orderId,'order-delivery');
+  assert.equal(reminders[0].due,shiftDate(60));
+  const twice=applyRetentionIntelligence(previous,once);
+  assert.equal(twice.tasks.filter(t=>t.kind==='Replenishment').length,1);
+});
+
+test('a real repurchase resolves the previous automated replenishment reminder',()=>{
+  const source=baseOrder({id:'order-old',number:'SK-OLD',created:shiftDate(-70),delivered:shiftDate(-70)});
+  const previous=baseState(source);
+  previous.tasks=[{id:'replenish-old',customerId:'customer-1',orderId:'order-old',productId:'product-1',title:'Replenishment · Test product',due:shiftDate(-10),done:false,kind:'Replenishment',priority:'High',channel:'WhatsApp',notes:'',completedAt:'',source:'Replenishment'}];
+  const next=structuredClone(previous);
+  next.orders.push(baseOrder({id:'order-new',number:'SK-NEW',status:'New',created:today(),delivered:undefined}));
+  const result=applyRetentionIntelligence(previous,next);
+  assert.equal(result.tasks[0].done,true);
+  assert.equal(result.tasks[0].completedAt,today());
+});
+
+test('legacy products receive an automatic replenishment-cycle default',()=>{
+  const raw=structuredClone(baseState(baseOrder())) as any;
+  delete raw.products[0].replenishDays;
+  const parsed=stateSchema.parse(raw);
+  assert.equal(parsed.products[0].replenishDays,0);
 });
 
 test('legacy follow-ups migrate to the expanded customer-care model',()=>{
@@ -69,7 +127,9 @@ test('legacy follow-ups migrate to the expanded customer-care model',()=>{
   assert.equal(parsed.tasks[0].channel,'WhatsApp');
   assert.equal(parsed.tasks[0].notes,'');
   assert.equal(parsed.tasks[0].orderId,'');
+  assert.equal(parsed.tasks[0].productId,'');
   assert.equal(parsed.tasks[0].completedAt,'');
+  assert.equal(parsed.tasks[0].source,'Manual');
 });
 
 test('delivery creates exactly one post-delivery customer follow-up',()=>{
@@ -84,6 +144,8 @@ test('delivery creates exactly one post-delivery customer follow-up',()=>{
   assert.equal(once.tasks[0].due,shiftDate(7));
   assert.equal(once.tasks[0].kind,'Follow-up');
   assert.equal(once.tasks[0].priority,'Normal');
+  assert.equal(once.tasks[0].source,'Delivery');
+  assert.equal(once.tasks[0].productId,'');
   assert.equal(once.tasks[0].done,false);
   const twice=applyDeliveryFollowUps(previous,once);
   assert.equal(twice.tasks.length,1);
@@ -92,7 +154,7 @@ test('delivery creates exactly one post-delivery customer follow-up',()=>{
 test('linked follow-ups must match the linked order customer',()=>{
   const state=baseState(baseOrder());
   state.customers.push({id:'customer-2',name:'Other customer',phone:'',address:'',city:'',preference:'',notes:'',consent:false,created:today()});
-  state.tasks=[{id:'task-1',customerId:'customer-2',orderId:state.orders[0].id,title:'Wrong customer',due:today(),done:false,kind:'Follow-up',priority:'Normal',channel:'Phone',notes:'',completedAt:''}];
+  state.tasks=[{id:'task-1',customerId:'customer-2',orderId:state.orders[0].id,productId:'',title:'Wrong customer',due:today(),done:false,kind:'Follow-up',priority:'Normal',channel:'Phone',notes:'',completedAt:'',source:'Manual'}];
   assert.throws(()=>validateRelations(state),/does not match the linked order/);
 });
 
