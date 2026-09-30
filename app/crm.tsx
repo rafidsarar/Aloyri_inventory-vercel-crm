@@ -301,8 +301,51 @@ function exportData(){if(!canExport){toast.error('Only the owner or an admin can
 const chart=Array.from({length:Number(range)},(_,i)=>{const date=shiftDate(i-Number(range)+1);return {date:dateLabel(date),sales:s.orders.filter(o=>o.status==='Delivered'&&o.delivered===date).reduce((n,o)=>n+subtotal(o),0)}});const periodSales=chart.reduce((n,d)=>n+d.sales,0);
 const match=(...values:unknown[])=>values.join(' ').toLowerCase().includes(deferredQuery.toLowerCase());
 const globalNeedle=deferredGlobalQuery.trim().toLowerCase();
-const globalResults:GlobalResult[]=globalNeedle?[...(visibleSections(role).includes('Orders')?s.orders.filter(o=>{const customer=s.customers.find(c=>c.id===o.customerId);return [o.number,o.tracking,o.channel,o.payment,o.status,customer?.name,customer?.phone].join(' ').toLowerCase().includes(globalNeedle)}).map(o=>({id:'order-'+o.id,view:'Orders' as View,title:'#'+o.number,meta:(s.customers.find(c=>c.id===o.customerId)?.name||'Customer')+' · '+o.status,query:o.number,detail:{type:'order' as const,id:o.id}})):[]),...(visibleSections(role).includes('Customers')?s.customers.filter(x=>[x.name,x.phone,x.city,x.preference].join(' ').toLowerCase().includes(globalNeedle)).map(x=>({id:'customer-'+x.id,view:'Customers' as View,title:x.name,meta:(x.phone||'No phone')+(x.city?' · '+x.city:''),query:x.name,detail:{type:'customer' as const,id:x.id}})):[]),...(visibleSections(role).includes('Inventory')?s.products.filter(x=>[x.name,x.brand,x.category,x.size,x.id].join(' ').toLowerCase().includes(globalNeedle)).map(x=>({id:'product-'+x.id,view:'Inventory' as View,title:x.brand+' '+x.name,meta:x.category+' · '+stock(s,x.id)+' available',query:x.name})):[]),...(visibleSections(role).includes('Suppliers')?s.suppliers.filter(x=>[x.name,x.contact,x.phone,x.email,x.address].join(' ').toLowerCase().includes(globalNeedle)).map(x=>({id:'supplier-'+x.id,view:'Suppliers' as View,title:x.name,meta:x.contact||x.phone||'Supplier',query:x.name,detail:{type:'supplier' as const,id:x.id}})):[]),...(visibleSections(role).includes('Suppliers')?s.purchaseOrders.filter(x=>[x.number,x.status,x.notes].join(' ').toLowerCase().includes(globalNeedle)).map(x=>({id:'po-'+x.id,view:'Suppliers' as View,title:x.number,meta:'Purchase order · '+x.status,query:x.number})):[]),...(visibleSections(role).includes('Follow-ups')?s.tasks.filter(x=>[x.title,x.kind,x.priority,x.notes].join(' ').toLowerCase().includes(globalNeedle)).map(x=>({id:'task-'+x.id,view:'Follow-ups' as View,title:x.title,meta:x.kind+' · '+dateLabel(x.due),query:x.title})):[])].slice(0,12):[];
-function openGlobalResult(result:GlobalResult){setGlobalQuery('');changeView(result.view);setQuery(result.query);if(result.view==='Suppliers'&&result.id.startsWith('po-'))setPurchasingTab('Purchase orders');if(result.detail)setDetail(result.detail);}
+const globalResults=useMemo<GlobalResult[]>(()=>{
+  if(!globalNeedle)return [];
+  const results:GlobalResult[]=[];
+  if(visibleSections(role).includes('Orders'))for(const o of s.orders){
+    const customer=s.customers.find(c=>c.id===o.customerId);
+    if([o.number,o.tracking,o.channel,o.payment,o.status,customer?.name,customer?.phone].join(' ').toLowerCase().includes(globalNeedle))
+      results.push({id:'order-'+o.id,view:'Orders',title:'#'+o.number,meta:(customer?.name||'Customer')+' · '+o.status,query:o.number,detail:{type:'order',id:o.id}});
+  }
+  if(visibleSections(role).includes('Customers'))for(const x of s.customers)
+    if([x.name,x.phone,x.city,x.preference,x.notes].join(' ').toLowerCase().includes(globalNeedle))
+      results.push({id:'customer-'+x.id,view:'Customers',title:x.name,meta:(x.phone||'No phone')+(x.city?' · '+x.city:''),query:x.name,detail:{type:'customer',id:x.id}});
+  if(visibleSections(role).includes('Inventory')){
+    for(const x of s.products)if([x.name,x.brand,x.category,x.size,x.id].join(' ').toLowerCase().includes(globalNeedle))
+      results.push({id:'product-'+x.id,view:'Inventory',title:x.brand+' '+x.name,meta:x.category+' · '+stock(s,x.id)+' available',query:x.name});
+    for(const b of s.batches){
+      const product=s.products.find(p=>p.id===b.productId),supplier=s.suppliers.find(x=>x.id===b.supplierId);
+      if([b.invoice,b.received,b.expiry,product?.name,product?.brand,supplier?.name].join(' ').toLowerCase().includes(globalNeedle))
+        results.push({id:'batch-'+b.id,view:'Inventory',title:b.invoice||product?.name||'Inventory batch',meta:(product?.name||'Product')+' · expires '+dateLabel(b.expiry),query:b.invoice||product?.name||''});
+    }
+  }
+  if(visibleSections(role).includes('Suppliers')){
+    for(const x of s.suppliers)if([x.name,x.contact,x.phone,x.email,x.address,x.notes].join(' ').toLowerCase().includes(globalNeedle))
+      results.push({id:'supplier-'+x.id,view:'Suppliers',title:x.name,meta:x.contact||x.phone||'Supplier',query:x.name,detail:{type:'supplier',id:x.id}});
+    for(const x of s.purchaseOrders)if([x.number,x.status,x.notes,s.suppliers.find(y=>y.id===x.supplierId)?.name].join(' ').toLowerCase().includes(globalNeedle))
+      results.push({id:'po-'+x.id,view:'Suppliers',title:x.number,meta:'Purchase order · '+x.status,query:x.number});
+  }
+  if(visibleSections(role).includes('Follow-ups'))for(const x of s.tasks)
+    if([x.title,x.kind,x.priority,x.notes,s.customers.find(c=>c.id===x.customerId)?.name].join(' ').toLowerCase().includes(globalNeedle))
+      results.push({id:'task-'+x.id,view:'Follow-ups',title:x.title,meta:x.kind+' · '+dateLabel(x.due),query:x.title});
+  if(visibleSections(role).includes('Finances')){
+    for(const x of s.expenses)if([x.category,x.vendor,x.reference,x.notes,x.date].join(' ').toLowerCase().includes(globalNeedle))
+      results.push({id:'expense-'+x.id,view:'Finances',title:x.vendor||x.category,meta:'Expense · '+taka(x.amount)+' · '+dateLabel(x.date),query:x.vendor||x.category});
+    for(const x of s.cashEntries)if([x.category,x.description,x.date,x.kind].join(' ').toLowerCase().includes(globalNeedle))
+      results.push({id:'cash-'+x.id,view:'Finances',title:x.description||x.category,meta:(x.kind==='in'?'Cash in':'Cash out')+' · '+taka(x.amount),query:x.description||x.category});
+  }
+  return results.slice(0,14);
+},[globalNeedle,role,s]);
+function openGlobalResult(result:GlobalResult){
+  setGlobalQuery('');changeView(result.view);setQuery(result.query);
+  if(result.view==='Suppliers'&&result.id.startsWith('po-'))setPurchasingTab('Purchase orders');
+  if(result.view==='Inventory'&&result.id.startsWith('batch-'))setInventoryTab('Batches');
+  if(result.view==='Finances'&&result.id.startsWith('expense-'))setFinanceTab('Expenses');
+  if(result.view==='Finances'&&result.id.startsWith('cash-'))setFinanceTab('Cashflow');
+  if(result.detail)setDetail(result.detail);
+}
 const supplierInsights=s.suppliers.map((supplier,index)=>({supplier,index,...supplierInsight(s,supplier.id)}));
 const purchasingOpen=s.purchaseOrders.filter(po=>!['Received','Cancelled'].includes(po.status));
 const purchasingOverdue=purchasingOpen.filter(po=>['Sent','Part received'].includes(po.status)&&po.expected<today());
