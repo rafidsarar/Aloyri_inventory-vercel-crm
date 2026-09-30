@@ -66,6 +66,53 @@ export function stockPosition(s:State,productId:string){
   const blocked=held+expired;
   return {physical,available,reserved,returnedPending,held,expired,blocked};
 }
+
+export function buildInventoryBatchRows(s:State){
+  const productById=new Map(s.products.map(p=>[p.id,p] as const));
+  const supplierById=new Map(s.suppliers.map(x=>[x.id,x] as const));
+  const adjustmentByBatch=new Map<string,number>();
+  const activeHeldByBatch=new Map<string,number>();
+  const usedByBatchMap=new Map<string,number>();
+  const reservedByBatchMap=new Map<string,number>();
+  const returnedPendingByBatchMap=new Map<string,number>();
+  const awayByBatchMap=new Map<string,number>();
+  const tracedOrdersByBatch=new Map<string,Order[]>();
+  for(const a of s.stockAdjustments)adjustmentByBatch.set(a.batchId,(adjustmentByBatch.get(a.batchId)||0)+a.delta);
+  for(const h of s.inventoryHolds)if(!h.releasedAt)activeHeldByBatch.set(h.batchId,(activeHeldByBatch.get(h.batchId)||0)+h.qty);
+  for(const order of s.orders){
+    const consumes=order.status!=='Cancelled'&&!(order.status==='Returned'&&order.restocked);
+    const reserved=reservedStatuses.has(order.status);
+    const returnedPending=order.status==='Returned'&&!order.restocked;
+    const away=['Shipped','Out for delivery','Delivered'].includes(order.status);
+    const seen=new Set<string>();
+    for(const item of order.items)for(const allocation of item.allocations){
+      const id=allocation.batchId;
+      if(consumes)usedByBatchMap.set(id,(usedByBatchMap.get(id)||0)+allocation.qty);
+      if(reserved)reservedByBatchMap.set(id,(reservedByBatchMap.get(id)||0)+allocation.qty);
+      if(returnedPending)returnedPendingByBatchMap.set(id,(returnedPendingByBatchMap.get(id)||0)+allocation.qty);
+      if(away)awayByBatchMap.set(id,(awayByBatchMap.get(id)||0)+allocation.qty);
+      if(!seen.has(id)){seen.add(id);tracedOrdersByBatch.set(id,[...(tracedOrdersByBatch.get(id)||[]),order]);}
+    }
+  }
+  const base=s.batches.map(batch=>{
+    const raw=batch.qty+(adjustmentByBatch.get(batch.id)||0);
+    const held=activeHeldByBatch.get(batch.id)||0;
+    const used=usedByBatchMap.get(batch.id)||0;
+    const reserved=reservedByBatchMap.get(batch.id)||0;
+    const returnPending=returnedPendingByBatchMap.get(batch.id)||0;
+    const physical=Math.max(0,raw-(awayByBatchMap.get(batch.id)||0));
+    const available=batch.expiry>today()?Math.max(0,raw-used-held):0;
+    const status=batch.expiry<=today()?'Expired':held>0&&available===0?'Held':held>0?'Part held':available===0?'Depleted':batch.expiry<=shiftDate(90)?'Expiring':'Active';
+    return {batch,product:productById.get(batch.productId),supplier:supplierById.get(batch.supplierId),available,held,reserved,returnPending,physical,allocated:used,status,value:available*batch.unitCost,fefoPosition:0,fefoCount:0,tracedOrders:tracedOrdersByBatch.get(batch.id)||[]};
+  });
+  const byProduct=new Map<string,typeof base>();
+  for(const row of base)if(row.batch.expiry>today()&&row.available>0)byProduct.set(row.batch.productId,[...(byProduct.get(row.batch.productId)||[]),row]);
+  for(const rows of byProduct.values()){
+    rows.sort((a,b)=>String(a.batch.expiry||'').localeCompare(String(b.batch.expiry||''))||String(a.batch.received||'').localeCompare(String(b.batch.received||''))||String(a.batch.id||'').localeCompare(String(b.batch.id||'')));
+    rows.forEach((row,index)=>{row.fefoPosition=index+1;row.fefoCount=rows.length;});
+  }
+  return base;
+}
 export const subtotal=(o:Order)=>o.items.reduce((n,i)=>n+i.price*i.qty,0)-o.discount;
 export const total=(o:Order)=>subtotal(o)+o.deliveryCharge;
 /** Amount expected from the customer/courier. COD is a net courier remittance; direct payments are gross customer receipts. */
