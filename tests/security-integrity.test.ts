@@ -101,15 +101,21 @@ test('delivery schedules one automated replenishment reminder without duplicates
   assert.equal(twice.tasks.filter(t=>t.kind==='Replenishment').length,1);
 });
 
-test('a real repurchase resolves the previous automated replenishment reminder',()=>{
+test('a delivered repurchase resolves the previous replenishment cycle and starts the next one',()=>{
   const source=baseOrder({id:'order-old',number:'SK-OLD',created:shiftDate(-70),delivered:shiftDate(-70)});
   const previous=baseState(source);
   previous.tasks=[{id:'replenish-old',customerId:'customer-1',orderId:'order-old',productId:'product-1',title:'Replenishment · Test product',due:shiftDate(-10),done:false,kind:'Replenishment',priority:'High',channel:'WhatsApp',notes:'',completedAt:'',source:'Replenishment'}];
+  previous.orders.push(baseOrder({id:'order-new',number:'SK-NEW',status:'Out for delivery',created:today(),delivered:undefined}));
   const next=structuredClone(previous);
-  next.orders.push(baseOrder({id:'order-new',number:'SK-NEW',status:'New',created:today(),delivered:undefined}));
+  next.orders.find(o=>o.id==='order-new')!.status='Delivered';
+  next.orders.find(o=>o.id==='order-new')!.delivered=today();
   const result=applyRetentionIntelligence(previous,next);
-  assert.equal(result.tasks[0].done,true);
-  assert.equal(result.tasks[0].completedAt,today());
+  const oldTask=result.tasks.find(t=>t.id==='replenish-old')!;
+  assert.equal(oldTask.done,true);
+  assert.equal(oldTask.completedAt,today());
+  const current=result.tasks.filter(t=>t.kind==='Replenishment'&&!t.done);
+  assert.equal(current.length,1);
+  assert.equal(current[0].orderId,'order-new');
 });
 
 test('legacy products receive an automatic replenishment-cycle default',()=>{
