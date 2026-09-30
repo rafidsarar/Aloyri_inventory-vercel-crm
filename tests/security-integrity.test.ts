@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { roleCanBackup, roleCanCloseFinance, roleCanEdit, roleCanExportData, roleCanImport, roleCanInspectReturns, roleCanLoadStarterCatalog, roleCanManageFinance, roleCanManageTeam, roleCanPrintInvoice, roleCanReset, roleCanViewAudit } from '../lib/roles.ts';
 import { applyRoleChanges, visibleState, validateRoleRelations, validateWorkspaceChange } from '../lib/role-data.ts';
-import { accountBalance, allocate, applyCancellationQuarantine, batchRemaining, cashflow, collectedAmount, initialState, metrics, nextStatuses, orderBalance, orderPaymentStatus, receivable, stateSchema, statuses, shiftDate, stock, stockPosition, today, uid, validateRelations, type Order, type State } from '../lib/crm.ts';
+import { accountBalance, allocate, applyCancellationQuarantine, applyDeliveryFollowUps, batchRemaining, cashflow, collectedAmount, initialState, metrics, nextStatuses, orderBalance, orderPaymentStatus, receivable, stateSchema, statuses, shiftDate, stock, stockPosition, today, uid, validateRelations, type Order, type State } from '../lib/crm.ts';
 
 function baseOrder(overrides:Partial<Order>={}):Order{
   return {
@@ -22,6 +22,41 @@ function baseState(order:Order):State{
   state.purchaseOrders=[];state.stockAdjustments=[];state.inventoryHolds=[];state.expenses=[];state.cashEntries=[];state.accountOpenings=[];state.accountMatches=[];state.financeCloses=[];state.tasks=[];
   return state;
 }
+
+test('legacy follow-ups migrate to the expanded customer-care model',()=>{
+  const raw=structuredClone(baseState(baseOrder())) as unknown as Record<string,unknown>;
+  raw.tasks=[{id:'task-legacy',customerId:'customer-1',title:'Check in',due:today(),done:false,kind:'Follow-up'}];
+  const parsed=stateSchema.parse(raw);
+  assert.equal(parsed.tasks[0].priority,'Normal');
+  assert.equal(parsed.tasks[0].channel,'WhatsApp');
+  assert.equal(parsed.tasks[0].notes,'');
+  assert.equal(parsed.tasks[0].orderId,'');
+  assert.equal(parsed.tasks[0].completedAt,'');
+});
+
+test('delivery creates exactly one post-delivery customer follow-up',()=>{
+  const previous=baseState(baseOrder({status:'Out for delivery',delivered:undefined}));
+  const next=structuredClone(previous);
+  next.orders[0].status='Delivered';
+  next.orders[0].delivered=today();
+  const once=applyDeliveryFollowUps(previous,next);
+  assert.equal(once.tasks.length,1);
+  assert.equal(once.tasks[0].customerId,'customer-1');
+  assert.equal(once.tasks[0].orderId,next.orders[0].id);
+  assert.equal(once.tasks[0].due,shiftDate(7));
+  assert.equal(once.tasks[0].kind,'Follow-up');
+  assert.equal(once.tasks[0].priority,'Normal');
+  assert.equal(once.tasks[0].done,false);
+  const twice=applyDeliveryFollowUps(previous,once);
+  assert.equal(twice.tasks.length,1);
+});
+
+test('linked follow-ups must match the linked order customer',()=>{
+  const state=baseState(baseOrder());
+  state.customers.push({id:'customer-2',name:'Other customer',phone:'',address:'',city:'',preference:'',notes:'',consent:false,created:today()});
+  state.tasks=[{id:'task-1',customerId:'customer-2',orderId:state.orders[0].id,title:'Wrong customer',due:today(),done:false,kind:'Follow-up',priority:'Normal',channel:'Phone',notes:'',completedAt:''}];
+  assert.throws(()=>validateRelations(state),/does not match the linked order/);
+});
 
 test('legacy starting capital is ignored and new workspaces do not contain it',()=>{
   const fresh=initialState() as State & {budget?:number};

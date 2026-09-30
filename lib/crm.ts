@@ -26,7 +26,19 @@ const accountOpeningSchema=z.object({account:z.enum(accountIds),date,balance:mon
 const accountMatchSchema=z.object({entryId:id,account:z.enum(accountIds),matched:z.boolean(),reference:z.string().trim().max(200)});
 const businessProfileSchema=z.object({phone:z.string().trim().max(40),email:z.union([z.literal(''),z.string().trim().email().max(200)]),address:z.string().trim().max(500),bin:z.string().trim().max(60),logoDataUrl:z.union([z.literal(''),z.string().regex(/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/).max(150000)]),invoiceFooter:z.string().trim().max(500),returnPolicy:z.string().trim().max(500)});
 export const emptyBusinessProfile=()=>({phone:'',email:'',address:'',bin:'',logoDataUrl:'',invoiceFooter:'',returnPolicy:''});
-const taskSchema = z.object({id,customerId:str,title:str.min(1),due:date,done:z.boolean(),kind:z.enum(['Follow-up','Replenishment','Other'])});
+const taskSchema = z.object({
+  id,
+  customerId:str,
+  orderId:str.default(''),
+  title:z.string().trim().min(1).max(160),
+  due:date,
+  done:z.boolean(),
+  kind:z.enum(['Follow-up','Replenishment','Other']),
+  priority:z.enum(['Low','Normal','High']).default('Normal'),
+  channel:z.enum(['WhatsApp','Phone','Messenger','Email','Other']).default('WhatsApp'),
+  notes:z.string().trim().max(1000).default(''),
+  completedAt:z.union([date,z.literal('')]).default('')
+});
 const financeCloseSchema=z.object({month:z.string().regex(/^\d{4}-\d{2}$/),closedAt:date,closedBy:str,notes:str.default('')});
 export const stateSchema = z.object({products:z.array(productSchema).max(2000),productCategories:z.array(z.string().trim().min(1).max(50)).min(1).max(100).default(()=>[...categories]),customers:z.array(customerSchema).max(10000),suppliers:z.array(supplierSchema).max(1000),purchaseOrders:z.array(purchaseOrderSchema).max(5000).default([]),batches:z.array(batchSchema).max(10000),stockAdjustments:z.array(stockAdjustmentSchema).max(10000).default([]),inventoryHolds:z.array(inventoryHoldSchema).max(10000).default([]),orders:z.array(orderSchema).max(10000),expenses:z.array(expenseSchema).max(10000),cashEntries:z.array(cashEntrySchema).max(10000).default([]),accountOpenings:z.array(accountOpeningSchema).max(4).default([]),accountMatches:z.array(accountMatchSchema).max(30000).default([]),financeCloses:z.array(financeCloseSchema).max(120).default([]),tasks:z.array(taskSchema).max(10000),businessName:str.min(1),businessProfile:businessProfileSchema.default(emptyBusinessProfile)});
 export type State=z.infer<typeof stateSchema>;
@@ -94,6 +106,30 @@ export function applyCancellationQuarantine(previous:State,next:State):State {
   }
   return result;
 }
+
+/** Create one customer-care reminder when an order is delivered. No message is sent automatically. */
+export function applyDeliveryFollowUps(previous:State,next:State):State {
+  const result=structuredClone(next),beforeById=new Map(previous.orders.map(o=>[o.id,o]));
+  for(const order of result.orders){
+    const before=beforeById.get(order.id);
+    if(!before||before.status==='Delivered'||order.status!=='Delivered')continue;
+    if(result.tasks.some(task=>task.orderId===order.id&&task.kind==='Follow-up'))continue;
+    result.tasks.push({
+      id:uid(),
+      customerId:order.customerId,
+      orderId:order.id,
+      title:'Post-delivery check-in · #'+order.number,
+      due:shiftDate(7,order.delivered||today()),
+      done:false,
+      kind:'Follow-up',
+      priority:'Normal',
+      channel:'WhatsApp',
+      notes:'Ask whether the products arrived well and how they are working. No message is sent automatically.',
+      completedAt:''
+    });
+  }
+  return result;
+}
 export function validateRelations(s:State,options:{skipOrderNumberUniqueness?:boolean}={}) {
   if(new Set(s.productCategories.map(c=>c.toLowerCase())).size!==s.productCategories.length)throw new Error('Product categories must have unique names.');
   for(const p of s.products)if(!s.productCategories.includes(p.category))throw new Error('A product uses a category that is missing from Inventory.');
@@ -116,7 +152,16 @@ export function validateRelations(s:State,options:{skipOrderNumberUniqueness?:bo
   for(const o of s.orders){if(!s.customers.some(c=>c.id===o.customerId))throw new Error('Select a customer.');if(subtotal(o)<0)throw new Error('Discount exceeds the product total.');if(o.status==='Delivered'&&!o.delivered)throw new Error('Delivery date is required.');if(o.restocked&&o.status!=='Returned')throw new Error('Only returned orders can be restocked.');if(o.returnedAt&&o.status!=='Returned')throw new Error('Only returned orders can have a return date.');if(o.settled&&o.payment==='COD'&&o.status!=='Delivered'&&!(o.status==='Returned'&&!!o.delivered))throw new Error('COD orders can only be settled after delivery.');for(const i of o.items){if(!s.products.some(p=>p.id===i.productId))throw new Error('Unknown product.');if(i.allocations.reduce((n,a)=>n+a.qty,0)!==i.qty)throw new Error('Invalid stock allocation.');for(const a of i.allocations){const b=s.batches.find(b=>b.id===a.batchId);if(!b||b.productId!==i.productId||b.unitCost!==a.unitCost)throw new Error('Invalid batch allocation.');}}}
   const transfers=new Map<string,State['cashEntries']>();for(const e of s.cashEntries)if(e.transferId)transfers.set(e.transferId,[...(transfers.get(e.transferId)||[]),e]);for(const [transferId,list] of transfers){if(list.length!==2||list[0].amount!==list[1].amount||list[0].kind===list[1].kind)throw new Error('Transfer '+transferId+' must have one equal cash-out and cash-in entry.');}
   const reversalCounts=new Map<string,number>();for(const e of s.cashEntries)if(e.reversalOf){const source=s.cashEntries.find(x=>x.id===e.reversalOf);if(!source)throw new Error('Cash reversal refers to a missing source movement.');if(source.reversalOf)throw new Error('A reversal cannot reverse another reversal.');reversalCounts.set(e.reversalOf,(reversalCounts.get(e.reversalOf)||0)+1);}for(const count of reversalCounts.values())if(count>1)throw new Error('A cash movement can only be reversed once.');
-  for(const t of s.tasks)if(t.customerId&&!s.customers.some(c=>c.id===t.customerId))throw new Error('Unknown follow-up customer.');
+  for(const t of s.tasks){
+    if(t.customerId&&!s.customers.some(c=>c.id===t.customerId))throw new Error('Unknown follow-up customer.');
+    if(t.orderId){
+      const order=s.orders.find(o=>o.id===t.orderId);
+      if(!order)throw new Error('Follow-up refers to an unknown order.');
+      if(t.customerId&&order.customerId!==t.customerId)throw new Error('Follow-up customer does not match the linked order.');
+    }
+    if(!t.done&&t.completedAt)throw new Error('Open follow-ups cannot have a completion date.');
+    if(t.completedAt&&t.completedAt>today())throw new Error('Follow-up completion date cannot be in the future.');
+  }
 }
 export function metrics(s:State) {const delivered=s.orders.filter(o=>o.status==='Delivered');const returned=s.orders.filter(o=>o.status==='Returned');const sales=delivered.reduce((n,o)=>n+subtotal(o),0);const costs=s.expenses.reduce((n,e)=>n+e.amount,0);const returnLoss=returned.reduce((n,o)=>n+(o.restocked?0:costOfOrder(o))+o.courierCost+o.returnFee+o.packaging+o.paymentFee,0);const collectible=s.orders.filter(o=>o.status==='Delivered'||(o.payment!=='COD'&&!['Cancelled','Returned'].includes(o.status)));const profit=delivered.reduce((n,o)=>n+contribution(o),0)-returnLoss-costs;return {sales,profit,expenses:costs,delivered:delivered.length,open:s.orders.filter(o=>!['Delivered','Returned','Cancelled'].includes(o.status)).length,pending:collectible.reduce((n,o)=>{const due=receivable(o),legacy=o.settled&&o.collections.length===0?due:0;return n+Math.max(0,due-o.collections.reduce((x,p)=>x+p.amount,0)-legacy)},0),stockValue:s.batches.filter(b=>b.expiry>today()).reduce((n,b)=>n+batchRemaining(s,b)*b.unitCost,0),stockPurchases:s.batches.reduce((n,b)=>n+b.qty*b.unitCost,0),unpaidStock:s.batches.reduce((n,b)=>n+Math.max(0,b.qty*b.unitCost-b.payments.reduce((x,p)=>x+p.amount,0)-(b.paid&&b.payments.length===0?b.qty*b.unitCost:0)),0)};}
 export const accountBalance=(s:State,account:typeof accountIds[number])=>{const opening=s.accountOpenings.find(a=>a.account===account);if(!opening)return null;const links=new Map(s.accountMatches.map(m=>[m.entryId,m]));return opening.balance+cashflow(s).entries.filter(e=>e.date>=opening.date&&links.get(e.id)?.account===account).reduce((n,e)=>n+(e.kind==='in'?e.amount:-e.amount),0)};
