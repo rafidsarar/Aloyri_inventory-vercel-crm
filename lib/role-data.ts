@@ -41,7 +41,7 @@ export function visibleState(source:State,role:WorkspaceRole):State {
   }else{
     // Inventory can manage stock and suppliers, but not customer identity, collections, or supplier payments.
     state.customers=source.customers.map(c=>({...c,name:'Private customer',phone:'',address:'',city:'',preference:'',notes:'',consent:false}));
-    state.orders=source.orders.map(o=>({...o,number:'Private order',tracking:'',notes:'',discount:0,deliveryCharge:0,courierCost:0,packaging:0,paymentFee:0,returnFee:0,collections:[],settled:false,settledAt:undefined,items:o.items.map(i=>({...i,price:0}))}));
+    state.orders=source.orders.map((o,index)=>({...o,number:'Private order '+String(index+1).padStart(4,'0'),tracking:'',notes:'',discount:0,deliveryCharge:0,courierCost:0,packaging:0,paymentFee:0,returnFee:0,collections:[],settled:false,settledAt:undefined,items:o.items.map(i=>({...i,price:0}))}));
     state.tasks=[];
     state.batches.forEach(b=>{b.payments=[];b.paid=false;b.paidAt=undefined});
   }
