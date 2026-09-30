@@ -10,7 +10,18 @@ const money = z.number().finite().min(0).max(10000000), qty = z.number().int().m
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(v=>!isNaN(Date.parse(v)) && new Date(v).toISOString().slice(0,10)===v);
 export const productSchema = z.object({id,name:str.min(1),brand:str,size:str,category:z.string().trim().min(1).max(50),price:money,cost:money,targetQty:z.number().int().min(0).max(100000),reorderAt:z.number().int().min(0).max(100000),active:z.boolean()});
 const customerSchema = z.object({id,name:str.min(1),phone:str,address:str,city:str,preference:str,notes:str,consent:z.boolean(),created:date});
-const supplierSchema = z.object({id,name:str.min(1),contact:str,phone:str,notes:str,verified:z.boolean()});
+const supplierSchema = z.object({
+  id,
+  name:str.min(1),
+  contact:str,
+  phone:str,
+  email:z.union([z.literal(''),z.string().trim().email().max(200)]).default(''),
+  address:str.default(''),
+  leadDays:z.number().int().min(0).max(365).default(14),
+  paymentTermsDays:z.number().int().min(0).max(365).default(30),
+  notes:str,
+  verified:z.boolean()
+});
 const purchaseOrderSchema=z.object({id,number:str.min(1),supplierId:id,created:date,expected:date,status:z.enum(['Draft','Sent','Part received','Received','Cancelled']),notes:str,items:z.array(z.object({productId:id,qty,unitCost:money,receivedQty:z.number().int().min(0).max(100000).default(0)})).min(1).max(100)});
 const purchasePaymentSchema=z.object({id,date,amount:money.refine(n=>n>0),note:str.default('')});
 const batchSchema = z.object({id,productId:id,qty,unitCost:money,expiry:date,received:date,supplierId:str,invoice:str,dueDate:date.optional(),payments:z.array(purchasePaymentSchema).max(100).default([]),paid:z.boolean(),paidAt:date.optional()});
@@ -49,6 +60,42 @@ export const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Dhaka',ye
 export const shiftDate=(days:number,base=today())=>{const d=new Date(base+'T12:00:00Z'); d.setUTCDate(d.getUTCDate()+days); return d.toISOString().slice(0,10)};
 export const taka=(n:number)=>'৳'+Math.round(n).toLocaleString('en-BD');
 export const dateLabel=(d:string)=>new Date(d+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+export const purchaseOrderValue=(po:PurchaseOrder)=>po.items.reduce((n,i)=>n+i.qty*i.unitCost,0);
+export const purchaseOrderUnits=(po:PurchaseOrder)=>po.items.reduce((n,i)=>n+i.qty,0);
+export const purchaseOrderReceivedUnits=(po:PurchaseOrder)=>po.items.reduce((n,i)=>n+i.receivedQty,0);
+export const purchaseOrderOutstandingUnits=(po:PurchaseOrder)=>Math.max(0,purchaseOrderUnits(po)-purchaseOrderReceivedUnits(po));
+export const purchaseOrderProgress=(po:PurchaseOrder)=>{const ordered=purchaseOrderUnits(po);return ordered?Math.round(purchaseOrderReceivedUnits(po)/ordered*100):0};
+const calendarDaysBetween=(from:string,to:string)=>Math.round((Date.parse(to+'T12:00:00Z')-Date.parse(from+'T12:00:00Z'))/86400000);
+export function supplierInsight(s:State,supplierId:string){
+  const purchaseOrders=s.purchaseOrders.filter(po=>po.supplierId===supplierId);
+  const activePurchaseOrders=purchaseOrders.filter(po=>!['Received','Cancelled'].includes(po.status));
+  const overduePurchaseOrders=activePurchaseOrders.filter(po=>['Sent','Part received'].includes(po.status)&&po.expected<today());
+  const batches=s.batches.filter(b=>b.supplierId===supplierId);
+  const orderedValue=purchaseOrders.filter(po=>po.status!=='Cancelled').reduce((n,po)=>n+purchaseOrderValue(po),0);
+  const receivedValue=batches.reduce((n,b)=>n+b.qty*b.unitCost,0);
+  const paidValue=batches.reduce((n,b)=>{const amount=b.qty*b.unitCost,legacy=b.paid&&b.payments.length===0?amount:0;return n+legacy+b.payments.reduce((x,p)=>x+p.amount,0)},0);
+  const payable=Math.max(0,receivedValue-paidValue);
+  const lastReceived=[...batches].sort((a,b)=>b.received.localeCompare(a.received))[0]?.received||'';
+  const leadSamples=purchaseOrders.filter(po=>po.status==='Received').map(po=>{
+    const receipts=batches.filter(b=>b.invoice===po.number);
+    if(!receipts.length)return null;
+    const finalReceipt=[...receipts].sort((a,b)=>b.received.localeCompare(a.received))[0].received;
+    return Math.max(0,calendarDaysBetween(po.created,finalReceipt));
+  }).filter((value):value is number=>value!==null);
+  const avgLeadDays=leadSamples.length?Math.round(leadSamples.reduce((n,v)=>n+v,0)/leadSamples.length):null;
+  return {
+    purchaseOrders,
+    activePurchaseOrders,
+    overduePurchaseOrders,
+    batches,
+    orderedValue,
+    receivedValue,
+    paidValue,
+    payable,
+    lastReceived,
+    avgLeadDays
+  };
+}
 export function initialState():State {return {businessName:'ALOYRI',businessProfile:emptyBusinessProfile(),productCategories:[...categories],customers:[],suppliers:[],purchaseOrders:[],batches:[],stockAdjustments:[],inventoryHolds:[],orders:[],expenses:[],cashEntries:[],accountOpenings:[],accountMatches:[],financeCloses:[],tasks:[],products:[
   {id:'simple-wash',brand:'Simple',name:'Refreshing Facial Wash',size:'150ml · Poland',category:'Cleanser',price:749,cost:520,targetQty:12,reorderAt:4,active:true},
   {id:'simple-light',brand:'Simple',name:'Hydrating Light Moisturiser',size:'125ml · Hungary',category:'Moisturizer',price:749,cost:520,targetQty:10,reorderAt:4,active:true},
