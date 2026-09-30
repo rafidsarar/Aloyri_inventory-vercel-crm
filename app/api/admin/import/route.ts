@@ -1,9 +1,10 @@
 import { getAppUser, checkOrigin } from '@/app/local-auth';
 import { database } from '@/db/raw';
 import { fixedBusinessName,stateSchema,validateRelations } from '@/lib/crm';
+import { roleCanImport } from '@/lib/roles';
 export async function POST(request:Request){
   if(!checkOrigin(request))return Response.json({error:'Invalid request origin.'},{status:403});
-  const user=await getAppUser();if(!user||!['owner','admin'].includes(user.role))return Response.json({error:'Only the owner or an admin can import records.'},{status:403});
+  const user=await getAppUser();if(!user||!roleCanImport(user.role))return Response.json({error:'Only the owner or an admin can import records.'},{status:403});
   const text=await request.text();if(text.length>1800000)return Response.json({error:'Backup is too large.'},{status:413});
   let raw:any;try{raw=JSON.parse(text)}catch{return Response.json({error:'Invalid JSON backup.'},{status:400})}
   const parsed=stateSchema.safeParse(raw.data||raw);
