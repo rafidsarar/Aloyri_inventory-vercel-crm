@@ -28,6 +28,16 @@ const visibleSections=(role:WorkspaceRole):View[]=>sections.filter(section=>role
 const modalCollection:Record<Modal['type'],string>={order:'orders',orderEdit:'orders',customer:'customers',task:'tasks',product:'products',category:'productCategories',batch:'batches',stockAdjust:'stockAdjustments',stockHold:'inventoryHolds',supplier:'suppliers',expense:'expenses',cashEntry:'cashEntries',settings:'businessName'};
 const titles:Record<View,string>={Overview:'Business overview',Alerts:'Alert center',Automation:'Automation center',Orders:'Orders',Inventory:'Inventory',Customers:'Customers',Suppliers:'Suppliers',Finances:'Finances', 'Follow-ups':'Follow-ups',Activity:'Activity log'};
 const descriptions:Record<View,string>={Overview:'Monitor sales, stock and actions that need attention.',Alerts:'Automatic business alerts, prioritized for your role.',Automation:'Control safe internal automations and review the signals they are producing.',Orders:'Track fulfillment, delivery and payment from one workspace.',Inventory:'Monitor stock health, batches, expiry and purchasing from one workspace.',Customers:'View contact details, preferences and order history.',Suppliers:'Manage supplier relationships, purchase orders, receiving and sourcing performance.',Finances:'Review sales, expenses, cashflow and collections in BDT.', 'Follow-ups':'Track customer follow-ups and replenishment tasks.',Activity:'Review protected employee and administrator change history.'};
+const automationRuleNames:Record<keyof AutomationSettings,string>={
+  deliveryFollowUp:'Post-delivery follow-up',
+  lowStock:'Low-stock watch',
+  expiringStock:'Expiry watch',
+  overduePurchaseOrders:'Overdue purchase orders',
+  supplierPayments:'Supplier payment due',
+  customerCollections:'Customer collection due',
+  customerRetention:'Customer inactivity',
+  staleOrders:'Stale order watch'
+};
 const signedTaka=(amount:number)=>amount<0?'− '+taka(-amount):taka(amount);
 const isCollectible=(o:Order)=>o.status==='Delivered'||(o.payment!=='COD'&&!['Cancelled','Returned'].includes(o.status));
 function Status({value}:{value:string}){return <span className={'status '+value.toLowerCase().replaceAll(' ','-')}>{value}</span>}
@@ -136,6 +146,12 @@ const canReset=roleCanReset(role);
 const canBackup=roleCanBackup(role);
 const canPrint=roleCanPrintInvoice(role);
 const salesMode=role==='sales';
+async function updateAutomationRule<K extends keyof AutomationSettings>(rule:K,patch:Partial<AutomationSettings[K]>){
+  if(!canEdit('automationSettings')){toast.error('Only the owner or an admin can change automation rules.');return}
+  const next=structuredClone(s);
+  Object.assign(next.automationSettings[rule],patch);
+  await save(next);
+}
 async function updateFollowUp(task:Task,patch:Partial<Task>){
   if(!canEdit('tasks')){toast.error('Your role cannot update follow-ups.');return}
   const next=structuredClone(s),record=next.tasks.find(t=>t.id===task.id);if(!record)return;
