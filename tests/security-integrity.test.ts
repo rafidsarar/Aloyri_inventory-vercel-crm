@@ -119,7 +119,7 @@ test('a delivered repurchase resolves the previous replenishment cycle and start
 });
 
 test('legacy products receive an automatic replenishment-cycle default',()=>{
-  const raw=structuredClone(baseState(baseOrder())) as any;
+  const raw=structuredClone(baseState(baseOrder())) as unknown as {products:Array<Record<string,unknown>>};
   delete raw.products[0].replenishDays;
   const parsed=stateSchema.parse(raw);
   assert.equal(parsed.products[0].replenishDays,0);
