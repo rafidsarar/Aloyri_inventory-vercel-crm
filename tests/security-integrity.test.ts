@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { roleCanBackup, roleCanCloseFinance, roleCanEdit, roleCanExportData, roleCanImport, roleCanInspectReturns, roleCanLoadStarterCatalog, roleCanManageFinance, roleCanManageTeam, roleCanPrintInvoice, roleCanReset, roleCanViewAudit } from '../lib/roles.ts';
 import { applyRoleChanges, visibleState, validateRoleRelations, validateWorkspaceChange } from '../lib/role-data.ts';
-import { accountBalance, allocate, applyCancellationQuarantine, applyDeliveryFollowUps, batchRemaining, cashflow, collectedAmount, initialState, metrics, nextStatuses, orderBalance, orderPaymentStatus, receivable, stateSchema, statuses, shiftDate, stock, stockPosition, today, uid, validateRelations, type Order, type State } from '../lib/crm.ts';
+import { accountBalance, allocate, applyCancellationQuarantine, applyDeliveryFollowUps, batchRemaining, cashflow, collectedAmount, customerInsight, initialState, metrics, nextStatuses, orderBalance, orderPaymentStatus, receivable, stateSchema, statuses, shiftDate, stock, stockPosition, today, uid, validateRelations, type Order, type State } from '../lib/crm.ts';
 
 function baseOrder(overrides:Partial<Order>={}):Order{
   return {
@@ -22,6 +22,44 @@ function baseState(order:Order):State{
   state.purchaseOrders=[];state.stockAdjustments=[];state.inventoryHolds=[];state.expenses=[];state.cashEntries=[];state.accountOpenings=[];state.accountMatches=[];state.financeCloses=[];state.tasks=[];
   return state;
 }
+
+test('customer insights classify retention states from delivered history',()=>{
+  const current=baseState(baseOrder({id:'order-1',number:'SK-1',delivered:today(),created:today()}));
+  let insight=customerInsight(current,'customer-1');
+  assert.equal(insight.segment,'New');
+  assert.equal(insight.delivered.length,1);
+  assert.equal(insight.deliveredSpend,1100);
+
+  current.orders.push(baseOrder({id:'order-2',number:'SK-2',delivered:shiftDate(-20),created:shiftDate(-22)}));
+  insight=customerInsight(current,'customer-1');
+  assert.equal(insight.segment,'Repeat');
+  assert.equal(insight.delivered.length,2);
+
+  current.orders=current.orders.map(o=>({...o,delivered:shiftDate(-75),created:shiftDate(-80)}));
+  insight=customerInsight(current,'customer-1');
+  assert.equal(insight.segment,'At risk');
+
+  current.orders=current.orders.map(o=>({...o,delivered:shiftDate(-130),created:shiftDate(-135)}));
+  insight=customerInsight(current,'customer-1');
+  assert.equal(insight.segment,'Inactive');
+
+  current.orders=[baseOrder({id:'order-3',number:'SK-3',status:'Cancelled',delivered:undefined})];
+  insight=customerInsight(current,'customer-1');
+  assert.equal(insight.segment,'No orders');
+});
+
+test('customer insights surface due and open follow-ups',()=>{
+  const state=baseState(baseOrder());
+  state.tasks=[
+    {id:'task-due',customerId:'customer-1',orderId:'',title:'Due',due:today(),done:false,kind:'Follow-up',priority:'High',channel:'Phone',notes:'',completedAt:''},
+    {id:'task-later',customerId:'customer-1',orderId:'',title:'Later',due:shiftDate(5),done:false,kind:'Replenishment',priority:'Normal',channel:'WhatsApp',notes:'',completedAt:''},
+    {id:'task-done',customerId:'customer-1',orderId:'',title:'Done',due:today(),done:true,kind:'Other',priority:'Low',channel:'Other',notes:'',completedAt:today()}
+  ];
+  const insight=customerInsight(state,'customer-1');
+  assert.equal(insight.openFollowUps.length,2);
+  assert.equal(insight.dueFollowUps.length,1);
+  assert.equal(insight.dueFollowUps[0].id,'task-due');
+});
 
 test('legacy follow-ups migrate to the expanded customer-care model',()=>{
   const raw=structuredClone(baseState(baseOrder())) as unknown as Record<string,unknown>;
