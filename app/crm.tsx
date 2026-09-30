@@ -73,9 +73,9 @@ const customerInsights=s.customers.map((customer,index)=>{
 });
 const customerNew30=customerInsights.filter(x=>x.customer.created>=shiftDate(-29));
 const customerRepeat=customerInsights.filter(x=>x.segment==='Repeat');
-const customerAttention=customerInsights.filter(x=>x.segment==='At risk'||x.segment==='Inactive');
+const customerAttention=customerInsights.filter(x=>(x.segment==='At risk'||x.segment==='Inactive')&&!x.orders.some(o=>!['Delivered','Returned','Cancelled'].includes(o.status)));
 const customerDue=customerInsights.filter(x=>x.dueFollowUps.length>0);
-const retentionCandidates=customerInsights.filter(x=>(x.segment==='At risk'||x.segment==='Inactive')&&!x.openFollowUps.some(t=>t.kind!=='Replenishment')).sort((a,b)=>a.lastActivity.localeCompare(b.lastActivity));
+const retentionCandidates=customerInsights.filter(x=>(x.segment==='At risk'||x.segment==='Inactive')&&!x.orders.some(o=>!['Delivered','Returned','Cancelled'].includes(o.status))&&!x.openFollowUps.some(t=>t.kind!=='Replenishment')).sort((a,b)=>a.lastActivity.localeCompare(b.lastActivity));
 const replenishmentAll=replenishmentSignals(s);
 const replenishmentOpenTasks=new Map(s.tasks.filter(t=>!t.done&&t.kind==='Replenishment'&&t.productId).map(t=>[t.customerId+'|'+t.productId,t]));
 const replenishmentDue=replenishmentAll.filter(x=>!x.hasOpenOrder&&x.due<=today());
