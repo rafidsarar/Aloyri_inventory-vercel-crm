@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { roleCanEdit, roleCanManageFinance, roleCanManageTeam, roleCanReset } from '../lib/roles.ts';
+import { roleCanBackup, roleCanCloseFinance, roleCanEdit, roleCanExportData, roleCanImport, roleCanInspectReturns, roleCanLoadStarterCatalog, roleCanManageFinance, roleCanManageTeam, roleCanPrintInvoice, roleCanReset, roleCanViewAudit } from '../lib/roles.ts';
 import { applyRoleChanges, visibleState, validateRoleRelations, validateWorkspaceChange } from '../lib/role-data.ts';
 import { accountBalance, allocate, applyCancellationQuarantine, batchRemaining, cashflow, collectedAmount, initialState, metrics, nextStatuses, orderBalance, orderPaymentStatus, receivable, stateSchema, statuses, shiftDate, stock, stockPosition, today, uid, validateRelations, type Order, type State } from '../lib/crm.ts';
 
@@ -44,15 +44,68 @@ test('order lifecycle follows the requested queue sequence and migrates legacy s
   assert.equal(stateSchema.parse(readyToShip).orders[0].status,'Packed');
 });
 
-test('production role permissions keep finance and destructive controls restricted',()=>{
+test('integrated role matrix covers finance, admin, inventory and read-only features',()=>{
   assert.equal(roleCanManageFinance('owner'),true);
   assert.equal(roleCanManageFinance('admin'),true);
-  for(const role of ['sales','inventory','viewer'] as const)assert.equal(roleCanManageFinance(role),false);
+  assert.equal(roleCanCloseFinance('owner'),true);
+  assert.equal(roleCanCloseFinance('admin'),true);
+  assert.equal(roleCanEdit('admin','financeCloses'),true);
+  for(const role of ['sales','inventory','viewer'] as const){
+    assert.equal(roleCanManageFinance(role),false);
+    assert.equal(roleCanCloseFinance(role),false);
+  }
+
   assert.equal(roleCanManageTeam('owner'),true);
   assert.equal(roleCanReset('owner'),true);
-  for(const role of ['admin','sales','inventory','viewer'] as const){assert.equal(roleCanManageTeam(role),false);assert.equal(roleCanReset(role),false);}
+  assert.equal(roleCanBackup('owner'),true);
+  for(const role of ['admin','sales','inventory','viewer'] as const){
+    assert.equal(roleCanManageTeam(role),false);
+    assert.equal(roleCanReset(role),false);
+    assert.equal(roleCanBackup(role),false);
+  }
+
+  assert.equal(roleCanImport('owner'),true);
+  assert.equal(roleCanImport('admin'),true);
+  assert.equal(roleCanViewAudit('owner'),true);
+  assert.equal(roleCanViewAudit('admin'),true);
+  assert.equal(roleCanExportData('owner'),true);
+  assert.equal(roleCanExportData('admin'),true);
+  for(const role of ['sales','inventory','viewer'] as const){
+    assert.equal(roleCanImport(role),false);
+    assert.equal(roleCanViewAudit(role),false);
+    assert.equal(roleCanExportData(role),false);
+  }
+
+  assert.equal(roleCanLoadStarterCatalog('owner'),true);
+  assert.equal(roleCanLoadStarterCatalog('admin'),true);
+  assert.equal(roleCanLoadStarterCatalog('inventory'),true);
+  assert.equal(roleCanLoadStarterCatalog('sales'),false);
+  assert.equal(roleCanLoadStarterCatalog('viewer'),false);
+
+  for(const role of ['owner','admin','inventory'] as const)assert.equal(roleCanInspectReturns(role),true);
+  for(const role of ['sales','viewer'] as const)assert.equal(roleCanInspectReturns(role),false);
+
+  for(const role of ['owner','admin','sales','viewer'] as const)assert.equal(roleCanPrintInvoice(role),true);
+  assert.equal(roleCanPrintInvoice('inventory'),false);
+
   assert.equal(roleCanEdit('sales','orders'),true);
+  assert.equal(roleCanEdit('sales','customers'),true);
+  assert.equal(roleCanEdit('sales','tasks'),true);
   assert.equal(roleCanEdit('sales','cashEntries'),false);
+
+  for(const key of ['products','productCategories','batches','suppliers','purchaseOrders','stockAdjustments','inventoryHolds'])
+    assert.equal(roleCanEdit('inventory',key),true);
+  for(const key of ['orders','customers','tasks','expenses','cashEntries','accountMatches','financeCloses'])
+    assert.equal(roleCanEdit('inventory',key),false);
+});
+
+test('admin month-end close is accepted by the same server-side role merge used for workspace saves',()=>{
+  const current=baseState(baseOrder());
+  const proposed=structuredClone(current);
+  proposed.financeCloses.push({month:today().slice(0,7),closedAt:today(),closedBy:'Admin',notes:'Reviewed'});
+  const merged=applyRoleChanges(current,proposed,'admin');
+  assert.equal(merged.financeCloses.length,1);
+  assert.equal(merged.financeCloses[0].closedBy,'Admin');
 });
 
 test('COD receivable is courier net while direct payments remain gross customer receipts',()=>{
