@@ -89,7 +89,7 @@ export function applyCancellationQuarantine(previous:State,next:State):State {
       if(!batch)throw new Error('Cancelled order refers to a missing inventory batch.');
       if(batch.expiry<=today())continue;
       if(batchRemaining(result,batch)<qty)throw new Error('Cancelled order stock could not be quarantined safely. Refresh inventory and try again.');
-      result.inventoryHolds.push({id:uid(),batchId,qty,date:today(),type:'Quarantine',reason:'Cancelled order '+order.number+' awaiting inspection',source:'Cancelled',sourceOrderId:order.id});
+      result.inventoryHolds.push({id:uid(),batchId,qty,date:today(),type:'Quarantine',reason:'Cancelled order awaiting inspection',source:'Cancelled',sourceOrderId:order.id});
     }
   }
   return result;
