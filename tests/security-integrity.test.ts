@@ -198,6 +198,22 @@ test('inventory-visible state hides finance and inventory saves preserve supplie
   validateRelations(merged);
 });
 
+test('inventory-visible orders keep unique private references so stock receipts validate client-side',()=>{
+  const current=baseState(baseOrder());
+  current.orders.push(baseOrder({id:'order-2',number:'SK-TEST-2'}));
+  validateRelations(current);
+  const proposed=visibleState(current,'inventory');
+  assert.equal(proposed.orders.length,2);
+  assert.equal(new Set(proposed.orders.map(o=>o.number)).size,2);
+  assert.ok(proposed.orders.every(o=>o.number.startsWith('Private order ')));
+  validateRelations(stateSchema.parse(proposed));
+  proposed.batches.push({...structuredClone(current.batches[0]),id:'batch-2',qty:3,invoice:'INV-2',payments:[],paid:false,paidAt:undefined});
+  const merged=applyRoleChanges(current,proposed,'inventory');
+  assert.equal(merged.batches.length,2);
+  assert.deepEqual(merged.orders.map(o=>o.number),current.orders.map(o=>o.number));
+  validateRelations(merged);
+});
+
 test('role capabilities keep operational boundaries aligned',()=>{
   for(const key of ['orders','customers','tasks'])assert.equal(roleCanEdit('sales',key),true);
   for(const key of ['batches','suppliers','purchaseOrders','cashEntries','expenses','accountMatches'])assert.equal(roleCanEdit('sales',key),false);
