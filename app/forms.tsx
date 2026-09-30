@@ -57,12 +57,11 @@ case 'cashEntry':if(f.amount<=0)throw Error('Enter an amount above zero.');if(f.
 case 'task':{
   const title=String(f.title||'').trim(),notes=String(f.notes||'').trim(),customerId=String(f.customerId||''),orderId=String(f.orderId||'');
   if(!title)throw Error('Enter a follow-up title.');
-  const productId=String(f.productId||'');
+  const productId=String(f.productId||''),savedProductId=f.kind==='Replenishment'?productId:'';
   if(f.kind==='Replenishment'&&!productId)throw Error('Choose the product this replenishment reminder is for.');
   if(f.kind==='Replenishment'&&productId&&!next.products.some(p=>p.id===productId))throw Error('Choose a valid replenishment product.');
-  if(f.kind!=='Replenishment')f.productId='';
   if(orderId){const linked=next.orders.find(o=>o.id===orderId);if(!linked)throw Error('Choose a valid related order.');if(customerId&&linked.customerId!==customerId)throw Error('The related order belongs to a different customer.');}
-  upsert('tasks',{...f,title,notes,customerId,orderId,completedAt:f.done?(f.completedAt||today()):''});
+  upsert('tasks',{...f,title,notes,customerId,orderId,productId:savedProductId,completedAt:f.done?(f.completedAt||today()):''});
   break;
 }
 case 'settings':{if(f.phone&& !/^[+()\d\s-]{7,40}$/.test(f.phone.trim()))throw Error('Enter a valid customer care phone number.');next.businessName='ALOYRI';next.businessProfile={phone:f.phone.trim(),email:f.email.trim(),address:f.address.trim(),bin:f.bin.trim(),logoDataUrl:f.logoDataUrl,invoiceFooter:f.invoiceFooter.trim(),returnPolicy:f.returnPolicy.trim()};break;}
