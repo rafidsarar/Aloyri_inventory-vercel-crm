@@ -7,7 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select,SelectTrigger,SelectContent,SelectItem,SelectValue } from '@/components/ui/select';
 import { Tabs,TabsList,TabsTrigger } from '@/components/ui/tabs';
 import { Plus,Trash2 } from 'lucide-react';
-import { State,Product,Customer,Supplier,Order,Task,uid,today,shiftDate,stock,batchRemaining,allocate,taka,channels,expenseCategories,total,accountIds,accountNames,accountBalance } from '@/lib/crm';
+import { State,Product,Customer,Supplier,Order,Task,uid,today,shiftDate,dateLabel,stock,batchRemaining,allocate,taka,channels,expenseCategories,total,accountIds,accountNames,accountBalance } from '@/lib/crm';
 import { roleCanBackup, roleCanManageFinance, roleCanManageTeam, roleCanReset, type WorkspaceRole } from '@/lib/roles';
 export type Modal={type:'order'|'product'|'category'|'customer'|'supplier'|'batch'|'stockAdjust'|'stockHold'|'expense'|'cashEntry'|'task'|'settings'|'orderEdit';record?:Product|Customer|Supplier|Order|Task;productId?:string;customerId?:string};
 export function Choice({value,onChange,options,label,placeholder='Select…'}:{value:string;onChange:(v:string)=>void;options:readonly (string|{value:string;label:string})[];label?:string;placeholder?:string}){return <Select value={value||undefined} onValueChange={onChange}><SelectTrigger className="choice" aria-label={label}><SelectValue placeholder={placeholder}/></SelectTrigger><SelectContent>{options.map(o=>typeof o==='string'?<SelectItem key={o} value={o}>{o}</SelectItem>:<SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent></Select>}
