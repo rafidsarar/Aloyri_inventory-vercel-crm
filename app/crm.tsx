@@ -14,7 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
 import { AreaChart,Area,CartesianGrid,XAxis,YAxis,Tooltip,ResponsiveContainer } from 'recharts';
-import { State,Product,Order,Customer,initialState,uid,today,shiftDate,taka,dateLabel,stock,batchRemaining,stockPosition,activeHoldQty,reservedByBatch,returnedPendingByBatch,physicalByBatch,usedByBatch,metrics,cashflow,subtotal,total,receivable,collectedAmount,orderBalance,orderPaymentStatus,contribution,statuses,nextStatuses,stateSchema,validateRelations,accountIds,accountNames,accountBalance } from '@/lib/crm';
+import { State,Product,Order,Customer,initialState,uid,today,shiftDate,taka,dateLabel,stock,batchRemaining,stockPosition,buildInventoryBatchRows,metrics,cashflow,subtotal,total,receivable,collectedAmount,orderBalance,orderPaymentStatus,contribution,statuses,nextStatuses,stateSchema,validateRelations,accountIds,accountNames,accountBalance } from '@/lib/crm';
 import Form,{Choice,Modal} from './forms';
 import Invoice from './invoice';
 import Team from './team';
@@ -61,37 +61,23 @@ const inventoryReturnPendingUnits=inventoryPositions.reduce((n,x)=>n+x.returnedP
 const inventoryBlockedUnits=inventoryPositions.reduce((n,x)=>n+x.blocked,0);
 const activeInventoryHolds=s.inventoryHolds.filter(h=>!h.releasedAt);
 const pendingReturnOrders=s.orders.filter(o=>o.status==='Returned'&&!o.restocked);
-const inventoryBatchRows=s.batches.map(batch=>{
-  const product=s.products.find(p=>p.id===batch.productId);
-  const supplier=s.suppliers.find(x=>x.id===batch.supplierId);
-  const available=Math.max(0,batchRemaining(s,batch));
-  const held=activeHoldQty(s,batch.id);
-  const reserved=reservedByBatch(s,batch.id);
-  const returnPending=returnedPendingByBatch(s,batch.id);
-  const physical=physicalByBatch(s,batch);
-  const allocated=usedByBatch(s,batch.id);
-  const fefoCandidates=s.batches.filter(b=>b.productId===batch.productId&&b.expiry>today()&&batchRemaining(s,b)>0).sort((a,b)=>a.expiry.localeCompare(b.expiry)||a.received.localeCompare(b.received));
-  const fefoIndex=fefoCandidates.findIndex(b=>b.id===batch.id);
-  const status=batch.expiry<=today()?'Expired':held>0&&available===0?'Held':held>0?'Part held':available===0?'Depleted':batch.expiry<=shiftDate(90)?'Expiring':'Active';
-  const value=available*batch.unitCost;
-  const tracedOrders=s.orders.filter(o=>o.items.some(i=>i.allocations.some(a=>a.batchId===batch.id)));
-  return {batch,product,supplier,available,held,reserved,returnPending,physical,allocated,status,value,fefoPosition:fefoIndex>=0?fefoIndex+1:0,fefoCount:fefoCandidates.length,tracedOrders};
-});
-const visibleInventoryBatches=inventoryBatchRows.filter(row=>
-  (filter==='All'||filter==='Active'&&row.status==='Active'||filter==='Expiring'&&row.status==='Expiring'||filter==='Expired'&&row.status==='Expired'||filter==='Held'&&row.held>0||filter==='Depleted'&&row.status==='Depleted'||filter==='Received this month'&&row.batch.received.slice(0,7)===currentInventoryMonth)
+const inventoryBatchRows=loaded&&(view==='Inventory'||!!batchDetailId)?buildInventoryBatchRows(s):[];
+const visibleInventoryBatches=(inventoryTab==='Batches'?inventoryBatchRows:[]).filter(row=>
+  (filter==='All'||filter==='Active'&&row.status==='Active'||filter==='Expiring'&&row.status==='Expiring'||filter==='Expired'&&row.status==='Expired'||filter==='Held'&&row.held>0||filter==='Depleted'&&row.status==='Depleted'||filter==='Received this month'&&String(row.batch.received||'').slice(0,7)===currentInventoryMonth)
   &&match(row.product?.name,row.product?.brand,row.batch.batchNumber,row.batch.invoice,row.supplier?.name,row.status)
 ).sort((a,b)=>{
-  if(batchSort==='Received newest')return b.batch.received.localeCompare(a.batch.received)||a.batch.expiry.localeCompare(b.batch.expiry);
-  if(batchSort==='Expiry latest')return b.batch.expiry.localeCompare(a.batch.expiry);
-  if(batchSort==='Available ↓')return b.available-a.available||a.batch.expiry.localeCompare(b.batch.expiry);
-  if(batchSort==='Value ↓')return b.value-a.value||a.batch.expiry.localeCompare(b.batch.expiry);
-  if(batchSort==='Batch A–Z')return (a.batch.batchNumber||a.batch.invoice||a.batch.id).localeCompare(b.batch.batchNumber||b.batch.invoice||b.batch.id);
-  const aRank=a.batch.expiry<=today()?9998:a.fefoPosition||9999,bRank=b.batch.expiry<=today()?9998:b.fefoPosition||9999;
-  return a.product?.name.localeCompare(b.product?.name||'')||aRank-bRank||a.batch.expiry.localeCompare(b.batch.expiry);
+  const expiryA=String(a.batch.expiry||''),expiryB=String(b.batch.expiry||''),receivedA=String(a.batch.received||''),receivedB=String(b.batch.received||'');
+  if(batchSort==='Received newest')return receivedB.localeCompare(receivedA)||expiryA.localeCompare(expiryB);
+  if(batchSort==='Expiry latest')return expiryB.localeCompare(expiryA);
+  if(batchSort==='Available ↓')return b.available-a.available||expiryA.localeCompare(expiryB);
+  if(batchSort==='Value ↓')return b.value-a.value||expiryA.localeCompare(expiryB);
+  if(batchSort==='Batch A–Z')return String(a.batch.batchNumber||a.batch.invoice||a.batch.id||'').localeCompare(String(b.batch.batchNumber||b.batch.invoice||b.batch.id||''));
+  const aRank=expiryA<=today()?9998:a.fefoPosition||9999,bRank=expiryB<=today()?9998:b.fefoPosition||9999;
+  return String(a.product?.name||'').localeCompare(String(b.product?.name||''))||aRank-bRank||expiryA.localeCompare(expiryB);
 });
 const batchDetail=s.batches.find(b=>b.id===batchDetailId);
 const batchDetailRow=inventoryBatchRows.find(r=>r.batch.id===batchDetailId);
-const batchTraceOrders=batchDetail?s.orders.filter(o=>o.items.some(i=>i.allocations.some(a=>a.batchId===batchDetail.id))).map(o=>({order:o,qty:o.items.flatMap(i=>i.allocations).filter(a=>a.batchId===batchDetail.id).reduce((n,a)=>n+a.qty,0)})).sort((a,b)=>b.order.created.localeCompare(a.order.created)):[];
+const batchTraceOrders=batchDetail&&batchDetailRow?batchDetailRow.tracedOrders.map(o=>({order:o,qty:o.items.flatMap(i=>i.allocations).filter(a=>a.batchId===batchDetail.id).reduce((n,a)=>n+a.qty,0)})).sort((a,b)=>String(b.order.created||'').localeCompare(String(a.order.created||''))):[];
 const batchAdjustments=batchDetail?s.stockAdjustments.filter(a=>a.batchId===batchDetail.id).sort((a,b)=>b.date.localeCompare(a.date)):[];
 const batchHolds=batchDetail?s.inventoryHolds.filter(h=>h.batchId===batchDetail.id).sort((a,b)=>b.date.localeCompare(a.date)):[];
 
