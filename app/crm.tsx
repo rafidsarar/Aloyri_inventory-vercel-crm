@@ -14,7 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
 import { AreaChart,Area,CartesianGrid,XAxis,YAxis,Tooltip,ResponsiveContainer } from 'recharts';
-import { State,Product,Order,Customer,initialState,uid,today,shiftDate,taka,dateLabel,stock,batchRemaining,stockPosition,metrics,cashflow,subtotal,total,receivable,collectedAmount,orderBalance,orderPaymentStatus,contribution,statuses,nextStatuses,stateSchema,accountIds,accountNames,accountBalance } from '@/lib/crm';
+import { State,Product,Order,Customer,Task,initialState,uid,today,shiftDate,taka,dateLabel,stock,batchRemaining,stockPosition,metrics,cashflow,subtotal,total,receivable,collectedAmount,orderBalance,orderPaymentStatus,contribution,statuses,nextStatuses,stateSchema,accountIds,accountNames,accountBalance } from '@/lib/crm';
 import { validateRoleRelations, validateWorkspaceChange } from '@/lib/role-data';
 import Form,{Choice,Modal} from './forms';
 import Invoice from './invoice';
@@ -42,6 +42,19 @@ export default function CRM(){
 const [live,setLive]=useState<State>(initialState),[version,setVersion]=useState(0),[loaded,setLoaded]=useState(false),[error,setError]=useState(''),[authRequired,setAuthRequired]=useState(false),[busy,setBusy]=useState(false),[view,setView]=useState<View>('Overview'),[query,setQuery]=useState(''),[filter,setFilter]=useState('All'),[inventoryTab,setInventoryTab]=useState('Products'),[inventorySort,setInventorySort]=useState('Stock health'),[financeTab,setFinanceTab]=useState('Overview'),[closeMonth,setCloseMonth]=useState(today().slice(0,7)),[reportMonth,setReportMonth]=useState(today().slice(0,7)),[cashRange,setCashRange]=useState('30'),[range,setRange]=useState('7'),[modal,setModal]=useState<Modal|null>(null),[detail,setDetail]=useState<{type:'order'|'customer';id:string}|null>(null),[invoiceId,setInvoiceId]=useState<string|null>(null),[teamOpen,setTeamOpen]=useState(false),[passwordOpen,setPasswordOpen]=useState(false),[memberName,setMemberName]=useState('Rafid'),[role,setRole]=useState<WorkspaceRole>('owner'),[confirm,setConfirm]=useState<{title:string;text:string;action:()=>void;confirmLabel?:string}|null>(null),[paymentDialog,setPaymentDialog]=useState<{kind:'collection'|'supplier';id:string;max:number;label:string}|null>(null),[paymentAmount,setPaymentAmount]=useState(''),[paymentDate,setPaymentDate]=useState(today()),[paymentAccount,setPaymentAccount]=useState<typeof accountIds[number]>('bkash'),[paymentReference,setPaymentReference]=useState(''),[ownerMoneyOpen,setOwnerMoneyOpen]=useState(false),[ownerMoneyKind,setOwnerMoneyKind]=useState<'capital'|'drawing'>('capital'),[ownerMoneyAmount,setOwnerMoneyAmount]=useState(''),[ownerMoneyDate,setOwnerMoneyDate]=useState(today()),[ownerMoneyAccount,setOwnerMoneyAccount]=useState<typeof accountIds[number]>('bank'),[ownerMoneyReference,setOwnerMoneyReference]=useState(''),[auditEvents,setAuditEvents]=useState<{id:string;actor_name:string;role:string;summary:string;sections:string[];created_at:string}[]>([]),[poOpen,setPoOpen]=useState(false),[poSupplier,setPoSupplier]=useState(''),[poExpected,setPoExpected]=useState(shiftDate(14)),[poNotes,setPoNotes]=useState(''),[poLines,setPoLines]=useState<{productId:string;qty:number;unitCost:number}[]>([]);
 const saving=useRef(false);const s=live;
 const m=metrics(s);const flow=cashflow(s);const visibleCash=flow.entries.filter(e=>cashRange==='all'||e.date>=shiftDate(-29));const visibleExternalCash=visibleCash.filter(e=>e.source!=='Transfer');const cashIn=visibleExternalCash.filter(e=>e.kind==='in').reduce((n,e)=>n+e.amount,0);const cashOut=visibleExternalCash.filter(e=>e.kind==='out').reduce((n,e)=>n+e.amount,0);const activeProducts=s.products.filter(p=>p.active);const stockedProducts=activeProducts.filter(p=>stock(s,p.id)>0);const low=activeProducts.filter(p=>s.batches.some(b=>b.productId===p.id)&&stock(s,p.id)<=p.reorderAt);const expiring=s.batches.filter(b=>batchRemaining(s,b)>0&&b.expiry<=shiftDate(90));const due=s.tasks.filter(t=>!t.done&&t.due<=today());const attention=low.length+expiring.length+due.length;
+const followUpOpen=s.tasks.filter(t=>!t.done);
+const followUpOverdue=followUpOpen.filter(t=>t.due<today());
+const followUpToday=followUpOpen.filter(t=>t.due===today());
+const followUpUpcoming=followUpOpen.filter(t=>t.due>today()&&t.due<=shiftDate(7));
+const followUpCompleted=s.tasks.filter(t=>t.done);
+const followUpPriorityRank:Record<Task['priority'],number>={High:0,Normal:1,Low:2};
+const followUpQuery=query.trim().toLowerCase();
+const followUpRows=s.tasks.filter(t=>{
+  const customer=s.customers.find(c=>c.id===t.customerId),order=s.orders.find(o=>o.id===t.orderId);
+  const filterMatch=filter==='All'||filter==='Open'&&!t.done||filter==='Completed'&&t.done||filter==='Overdue'&&!t.done&&t.due<today()||filter==='Today'&&!t.done&&t.due===today()||filter==='Next 7 days'&&!t.done&&t.due>today()&&t.due<=shiftDate(7)||filter==='Follow-up'&&t.kind==='Follow-up'||filter==='Replenishment'&&t.kind==='Replenishment'||filter==='High priority'&&!t.done&&t.priority==='High';
+  const searchMatch=!followUpQuery||[t.title,t.kind,t.priority,t.channel,t.notes,customer?.name,customer?.phone,order?.number].some(value=>String(value||'').toLowerCase().includes(followUpQuery));
+  return filterMatch&&searchMatch;
+}).sort((a,b)=>Number(a.done)-Number(b.done)||a.due.localeCompare(b.due)||followUpPriorityRank[a.priority]-followUpPriorityRank[b.priority]||a.title.localeCompare(b.title));
 const inventoryUnits=activeProducts.reduce((n,p)=>n+stock(s,p.id),0);
 const inventoryLow=activeProducts.filter(p=>{const qty=stock(s,p.id);return qty>0&&qty<=p.reorderAt});
 const inventoryOut=activeProducts.filter(p=>stock(s,p.id)===0);
@@ -99,7 +112,7 @@ expiring.forEach(b=>{const p=s.products.find(x=>x.id===b.productId);autoAlerts.p
 s.orders.filter(o=>!['Delivered','Cancelled','Returned'].includes(o.status)&&o.created<shiftDate(-3)).forEach(o=>autoAlerts.push({id:'order-'+o.id,level:o.created<shiftDate(-7)?'Critical':'Action needed',title:'Order #'+o.number+' needs progress',detail:o.status+' since '+dateLabel(o.created),view:'Orders',role:'sales'}));
 s.orders.filter(o=>o.status==='Delivered').forEach(o=>{const due=receivable(o),legacy=o.settled&&o.collections.length===0?due:0,balance=Math.max(0,due-o.collections.reduce((n,p)=>n+p.amount,0)-legacy);if(balance>.001)autoAlerts.push({id:'collect-'+o.id,level:(o.delivered||o.created)<shiftDate(-7)?'Critical':'Action needed',title:'Collect '+taka(balance)+' · #'+o.number,detail:'Delivered '+dateLabel(o.delivered||o.created)+' · customer balance outstanding',view:'Finances',role:'finance'})});
 s.batches.forEach(b=>{const amount=b.qty*b.unitCost,legacy=b.paid&&b.payments.length===0?amount:0,balance=Math.max(0,amount-b.payments.reduce((n,p)=>n+p.amount,0)-legacy);if(balance>.001&&b.dueDate&&b.dueDate<=shiftDate(7))autoAlerts.push({id:'pay-'+b.id,level:b.dueDate<today()?'Critical':'Upcoming',title:(b.dueDate<today()?'Overdue supplier payment ':'Supplier payment due ')+taka(balance),detail:'Due '+dateLabel(b.dueDate)+(b.invoice?' · '+b.invoice:''),view:'Finances',role:'finance'})});
-s.tasks.filter(t=>!t.done&&t.due<=shiftDate(2)).forEach(t=>autoAlerts.push({id:'task-'+t.id,level:t.due<today()?'Critical':'Upcoming',title:t.title,detail:(t.due<today()?'Overdue · ':'Due ')+dateLabel(t.due),view:'Follow-ups',role:'sales'}));
+s.tasks.filter(t=>!t.done&&t.due<=shiftDate(2)).forEach(t=>autoAlerts.push({id:'task-'+t.id,level:t.due<today()||t.priority==='High'?'Critical':'Upcoming',title:t.title,detail:t.priority+' priority · '+(t.due<today()?'overdue · ':'due ')+dateLabel(t.due),view:'Follow-ups',role:'sales'}));
 if(unassignedMovements)autoAlerts.push({id:'reconcile',level:unassignedMovements>5?'Critical':'Action needed',title:'Reconcile '+unassignedMovements+' cash movements',detail:'Assign recorded movements to Cash, Bank, bKash or Nagad.',view:'Finances',role:'finance'});
 if(projected30<0)autoAlerts.push({id:'liquidity',level:'Critical',title:'Negative 30-day planning position',detail:'Projected shortfall '+taka(Math.abs(projected30))+' based on current CRM assumptions.',view:'Finances',role:'finance'});
 const alertRank:Record<AutoAlert['level'],number>={Critical:0,'Action needed':1,Upcoming:2};const roleAlerts=autoAlerts.filter(a=>role==='owner'||role==='admin'||role==='viewer'||a.role==='all'||(role==='sales'&&a.role==='sales')||(role==='inventory'&&a.role==='inventory')).sort((a,b)=>alertRank[a.level]-alertRank[b.level]);
@@ -115,6 +128,19 @@ const canReset=roleCanReset(role);
 const canBackup=roleCanBackup(role);
 const canPrint=roleCanPrintInvoice(role);
 const salesMode=role==='sales';
+async function updateFollowUp(task:Task,patch:Partial<Task>){
+  if(!canEdit('tasks')){toast.error('Your role cannot update follow-ups.');return}
+  const next=structuredClone(s),record=next.tasks.find(t=>t.id===task.id);if(!record)return;
+  Object.assign(record,patch);
+  if(patch.done===true)record.completedAt=patch.completedAt||today();
+  if(patch.done===false)record.completedAt='';
+  await save(next);
+}
+function deleteFollowUp(task:Task){
+  if(!canEdit('tasks')){toast.error('Your role cannot delete follow-ups.');return}
+  setConfirm({title:'Delete follow-up?',text:'Remove “'+task.title+'” from the follow-up history? This cannot be undone.',confirmLabel:'Delete',action:()=>{const next=structuredClone(s);next.tasks=next.tasks.filter(t=>t.id!==task.id);void save(next)}});
+}
+const followUpDueLabel=(task:Task)=>task.done?'Completed':task.due<today()?'Overdue · '+dateLabel(task.due):task.due===today()?'Today':task.due===shiftDate(1)?'Tomorrow':dateLabel(task.due);
 const openModal=(record:Modal)=>{if(record.type==='settings'&&!canManageBusinessSettings(role)){toast.error('Only the owner or an admin can access Business settings.');return}if(!canEdit(modalCollection[record.type])){toast.error('Your role cannot edit this section.');return}setModal(record)};
 const changeView=(v:View)=>{if(!visibleSections(role).includes(v))return;setView(v);setQuery('');setFilter('All');setDetail(null);if(v==='Activity')fetch('/api/audit',{cache:'no-store'}).then(async r=>({ok:r.ok,data:await r.json()})).then(({ok,data})=>{if(ok)setAuditEvents(data.events||[]);else toast.error(data.error||'Could not load activity history.')}).catch(()=>toast.error('Could not load activity history.'))};
 async function loadLive(showErrors=true){setBusy(true);try{const res=await fetch('/api/workspace',{cache:'no-store'});const d:any=await res.json();if(!res.ok){setAuthRequired(res.status===401);throw Error(d.error||'Could not load records.')}setLive(d.data);setVersion(d.version);setRole(['owner','admin','sales','inventory','viewer'].includes(d.role)?d.role:'viewer');if(d.role==='sales')setView('Orders');if(d.role==='inventory')setView('Inventory');if(d.role==='viewer')setView('Overview');if(d.role==='viewer')setView('Overview');setMemberName(d.userName||'Team member');setLoaded(true);setError('');setAuthRequired(false);return true;}catch(e){if(showErrors)setError(e instanceof Error?e.message:'Could not load your workspace.');return false;}finally{setBusy(false)}}
