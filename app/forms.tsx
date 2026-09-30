@@ -47,13 +47,22 @@ async function submit(e:React.FormEvent){e.preventDefault();setError('');try{if(
 switch(modal.type){case 'product':if(!f.name.trim())throw Error('Enter a product name.');upsert('products',f);break;
 case 'category':{const name=String(f.name).trim();if(!name||name.length>50)throw Error('Enter a category name of up to 50 characters.');if(next.productCategories.some(c=>c.toLowerCase()===name.toLowerCase()))throw Error('This category already exists.');next.productCategories.push(name);break;}
 case 'customer':if(!f.name.trim())throw Error('Enter a customer name.');if(f.phone&&!/^(?:\+?88)?01[3-9]\d{8}$/.test(f.phone.replace(/[\s-]/g,'')))throw Error('Enter a valid Bangladesh mobile number, or leave it blank.');upsert('customers',f);break;
-case 'supplier':
-  if(!String(f.name||'').trim())throw Error('Enter a supplier name.');
-  if(f.phone&&!/^(?:\+?88)?01[3-9]\d{8}$/.test(String(f.phone).replace(/[\s-]/g,'')))throw Error('Enter a valid Bangladesh mobile number, or leave it blank.');
+case 'supplier':{
+  const name=String(f.name||'').trim(),contact=String(f.contact||'').trim(),phone=String(f.phone||'').trim(),email=String(f.email||'').trim().toLowerCase(),address=String(f.address||'').trim(),notes=String(f.notes||'').trim();
+  if(!name)throw Error('Enter a supplier name.');
+  if(phone&&!/^(?:\+?88)?01[3-9]\d{8}$/.test(phone.replace(/[\s-]/g,'')))throw Error('Enter a valid Bangladesh mobile number, or leave it blank.');
   if(!Number.isInteger(f.leadDays)||f.leadDays<0||f.leadDays>365)throw Error('Lead time must be a whole number from 0 to 365 days.');
   if(!Number.isInteger(f.paymentTermsDays)||f.paymentTermsDays<0||f.paymentTermsDays>365)throw Error('Payment terms must be a whole number from 0 to 365 days.');
-  upsert('suppliers',{...f,name:String(f.name).trim(),contact:String(f.contact||'').trim(),phone:String(f.phone||'').trim(),email:String(f.email||'').trim(),address:String(f.address||'').trim(),notes:String(f.notes||'').trim()});
+  const normalizedPhone=phone.replace(/[\s-]/g,'').replace(/^(?:\+?88)/,'');
+  const duplicate=next.suppliers.find(supplier=>supplier.id!==f.id&&(
+    supplier.name.trim().toLowerCase()===name.toLowerCase()||
+    (normalizedPhone&&supplier.phone.replace(/[\s-]/g,'').replace(/^(?:\+?88)/,'')===normalizedPhone)||
+    (email&&String(supplier.email||'').trim().toLowerCase()===email)
+  ));
+  if(duplicate)throw Error('A supplier with the same name, phone or email already exists.');
+  upsert('suppliers',{...f,name,contact,phone,email,address,notes});
   break;
+}
 case 'batch':if(f.qty<1||!Number.isInteger(f.qty))throw Error('Quantity must be a positive whole number.');if(f.received>today())throw Error('Receipt date cannot be in the future.');if(f.expiry<=today())throw Error('Receive only unexpired stock.');if(f.dueDate&&f.dueDate<f.received)throw Error('Due date cannot be before the receipt date.');next.batches.push({...f,payments:[],paid:false,paidAt:undefined});break;
 case 'stockAdjust':{const batch=next.batches.find(b=>b.id===f.batchId&&b.productId===modal.productId&&b.expiry>today());if(!batch)throw Error('Choose an unexpired batch. Use Receive stock for a new batch.');if(!Number.isInteger(f.target)||f.target<0||f.target>100000)throw Error('Enter a whole-number available quantity between 0 and 100,000.');const delta=f.target-batchRemaining(next,batch);if(!delta)throw Error('Enter a different available quantity.');if(!f.reason.trim())throw Error('Enter a reason for this stock correction.');next.stockAdjustments.push({id:uid(),batchId:batch.id,delta,date:today(),reason:f.reason.trim()});break;}
 case 'stockHold':{const batch=next.batches.find(b=>b.id===f.batchId&&b.productId===f.productId&&b.expiry>today());if(!batch)throw Error('Choose an unexpired batch with available stock.');if(!Number.isInteger(f.qty)||f.qty<1||f.qty>batchRemaining(next,batch))throw Error('Hold quantity must be within the currently available batch stock.');if(!f.reason.trim())throw Error('Enter why this stock is being blocked.');next.inventoryHolds.push({id:uid(),batchId:batch.id,qty:f.qty,date:today(),type:f.type,reason:f.reason.trim(),source:'Manual'});break;}
