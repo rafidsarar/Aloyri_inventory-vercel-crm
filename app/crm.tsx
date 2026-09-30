@@ -85,10 +85,10 @@ const currentInventoryMonth=today().slice(0,7);
 const receivedThisMonth=s.batches.filter(b=>b.received.slice(0,7)===currentInventoryMonth);
 const receivedUnitsThisMonth=receivedThisMonth.reduce((n,b)=>n+b.qty,0);
 const recentDeliveredInventory=s.orders.filter(o=>o.status==='Delivered'&&(o.delivered||o.created)>=shiftDate(-29));
-const inventoryVelocity=activeProducts.map(product=>({product,units:recentDeliveredInventory.reduce((n,o)=>n+o.items.filter(i=>i.productId===product.id).reduce((x,i)=>x+i.qty,0),0)})).sort((a,b)=>b.units-a.units);
+const inventoryVelocity=useMemo(()=>{const delivered=s.orders.filter(o=>o.status==='Delivered'&&(o.delivered||o.created)>=shiftDate(-29));return s.products.filter(p=>p.active).map(product=>({product,units:delivered.reduce((n,o)=>n+o.items.filter(i=>i.productId===product.id).reduce((x,i)=>x+i.qty,0),0)})).sort((a,b)=>b.units-a.units)},[s]);
 const fastestMoving=inventoryVelocity.find(x=>x.units>0);
 const slowMovingCount=inventoryVelocity.filter(x=>stock(s,x.product.id)>0&&x.units===0).length;
-const inventoryPositions=activeProducts.map(product=>({product,...stockPosition(s,product.id)}));
+const inventoryPositions=useMemo(()=>s.products.filter(p=>p.active).map(product=>({product,...stockPosition(s,product.id)})),[s]);
 const inventoryPhysicalUnits=inventoryPositions.reduce((n,x)=>n+x.physical,0);
 const inventoryReservedUnits=inventoryPositions.reduce((n,x)=>n+x.reserved,0);
 const inventoryReturnPendingUnits=inventoryPositions.reduce((n,x)=>n+x.returnedPending,0);
@@ -358,7 +358,7 @@ function openGlobalResult(result:GlobalResult){
   if(result.view==='Finances'&&result.id.startsWith('cash-'))setFinanceTab('Cashflow');
   if(result.detail)setDetail(result.detail);
 }
-const supplierInsights=s.suppliers.map((supplier,index)=>({supplier,index,...supplierInsight(s,supplier.id)}));
+const supplierInsights=useMemo(()=>s.suppliers.map((supplier,index)=>({supplier,index,...supplierInsight(s,supplier.id)})),[s]);
 const purchasingOpen=s.purchaseOrders.filter(po=>!['Received','Cancelled'].includes(po.status));
 const purchasingOverdue=purchasingOpen.filter(po=>['Sent','Part received'].includes(po.status)&&po.expected<today());
 const purchasingIncomingUnits=purchasingOpen.reduce((n,po)=>n+purchaseOrderOutstandingUnits(po),0);
