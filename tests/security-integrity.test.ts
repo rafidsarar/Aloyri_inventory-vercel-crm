@@ -17,7 +17,7 @@ function baseState(order:Order):State{
   state.productCategories=['Other'];
   state.customers=[{id:'customer-1',name:'Customer',phone:'',address:'',city:'',preference:'',notes:'',consent:false,created:today()}];
   state.suppliers=[{id:'supplier-1',name:'Supplier',contact:'',phone:'',notes:'',verified:true}];
-  state.batches=[{id:'batch-1',productId:'product-1',qty:10,unitCost:400,expiry:shiftDate(365),received:today(),supplierId:'supplier-1',invoice:'INV-1',payments:[],paid:false}];
+  state.batches=[{id:'batch-1',productId:'product-1',batchNumber:'LOT-TEST',qty:10,unitCost:400,manufactured:shiftDate(-30),expiry:shiftDate(365),received:today(),supplierId:'supplier-1',invoice:'INV-1',payments:[],paid:false}];
   state.orders=[order];
   state.purchaseOrders=[];state.stockAdjustments=[];state.inventoryHolds=[];state.expenses=[];state.cashEntries=[];state.accountOpenings=[];state.accountMatches=[];state.financeCloses=[];state.tasks=[];
   return state;
@@ -135,6 +135,8 @@ test('sales-visible state hides supplier finance and remains safe for client val
   validateRelations(state);
   const sales=visibleState(state,'sales');
   assert.equal(sales.batches[0].unitCost,0);
+  assert.equal(sales.batches[0].batchNumber,'');
+  assert.equal(sales.batches[0].manufactured,undefined);
   assert.deepEqual(sales.batches[0].payments,[]);
   assert.equal(sales.batches[0].paid,false);
   assert.equal(sales.batches[0].paidAt,undefined);
@@ -266,6 +268,7 @@ test('shipped stock leaves physical on-hand while still remaining consumed',()=>
 
 test('expired physical units are blocked rather than sellable',()=>{
   const state=baseState(baseOrder({status:'Cancelled',delivered:undefined}));
+  state.batches[0].manufactured=shiftDate(-400);
   state.batches[0].received=shiftDate(-365);
   state.batches[0].expiry=shiftDate(-1);
   validateRelations(state);
@@ -294,4 +297,24 @@ test('inventory employee can restock a returned order without gaining general or
   const bad=visibleState(current,'inventory');
   bad.orders[0].status='Cancelled';
   assert.throws(()=>applyRoleChanges(current,bad,'inventory'),/only complete return inspection/i);
+});
+
+
+test('legacy batches migrate with empty batch number and optional manufacturing date',()=>{
+  const state=baseState(baseOrder());
+  type LegacyBatch=Omit<State['batches'][number],'batchNumber'|'manufactured'>&{batchNumber?:string;manufactured?:string};
+  const legacy=structuredClone(state) as Omit<State,'batches'>&{batches:LegacyBatch[]};
+  delete legacy.batches[0].batchNumber;
+  delete legacy.batches[0].manufactured;
+  const parsed=stateSchema.parse(legacy);
+  assert.equal(parsed.batches[0].batchNumber,'');
+  assert.equal(parsed.batches[0].manufactured,undefined);
+});
+
+test('batch manufacturing date must be on or before receipt and before expiry',()=>{
+  const state=baseState(baseOrder());
+  state.batches[0].manufactured=shiftDate(1);
+  assert.throws(()=>validateRelations(state),/Manufacturing date cannot be after the stock receipt date/i);
+  state.batches[0].manufactured=state.batches[0].expiry;
+  assert.throws(()=>validateRelations(state),/Manufacturing date cannot be after the stock receipt date|before expiry/i);
 });
