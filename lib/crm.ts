@@ -212,7 +212,8 @@ export function applyRetentionIntelligence(previous:State,next:State):State {
   for(const task of result.tasks){
     if(task.done||task.source!=='Replenishment'||!task.productId)continue;
     const sourceOrder=task.orderId?result.orders.find(o=>o.id===task.orderId):undefined;
-    const repurchase=result.orders.find(o=>o.customerId===task.customerId&&o.id!==task.orderId&&!['Cancelled','Returned'].includes(o.status)&&o.items.some(i=>i.productId===task.productId)&&(!sourceOrder||o.created>sourceOrder.created));
+    if(sourceOrder&&['Returned','Cancelled'].includes(sourceOrder.status)){task.done=true;task.completedAt=today();continue}
+    const repurchase=result.orders.find(o=>o.customerId===task.customerId&&o.id!==task.orderId&&o.status==='Delivered'&&o.items.some(i=>i.productId===task.productId)&&(!sourceOrder||(o.delivered||o.created)>(sourceOrder.delivered||sourceOrder.created)));
     if(repurchase){task.done=true;task.completedAt=today();}
   }
   const beforeById=new Map(previous.orders.map(o=>[o.id,o]));
