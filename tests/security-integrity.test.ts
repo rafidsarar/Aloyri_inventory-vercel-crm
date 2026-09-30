@@ -214,6 +214,18 @@ test('inventory-visible orders keep unique private references so stock receipts 
   validateRelations(merged);
 });
 
+test('inventory stock receipt can save when legacy real order numbers are duplicated but unchanged',()=>{
+  const current=baseState(baseOrder({number:'SK-LEGACY'}));
+  current.orders.push(baseOrder({id:'order-2',number:'SK-LEGACY'}));
+  assert.throws(()=>validateRelations(current),/Order numbers must be unique/);
+  const proposed=visibleState(current,'inventory');
+  proposed.batches.push({...structuredClone(current.batches[0]),id:'batch-2',qty:4,invoice:'INV-LEGACY-2',payments:[],paid:false,paidAt:undefined});
+  const merged=applyRoleChanges(current,proposed,'inventory');
+  assert.deepEqual(merged.orders.map(o=>o.number),['SK-LEGACY','SK-LEGACY']);
+  assert.equal(merged.batches.length,2);
+  validateRelations(merged,{skipOrderNumberUniqueness:true});
+});
+
 test('role capabilities keep operational boundaries aligned',()=>{
   for(const key of ['orders','customers','tasks'])assert.equal(roleCanEdit('sales',key),true);
   for(const key of ['batches','suppliers','purchaseOrders','cashEntries','expenses','accountMatches'])assert.equal(roleCanEdit('sales',key),false);
