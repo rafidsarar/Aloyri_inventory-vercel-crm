@@ -1,4 +1,4 @@
-import type { State } from './crm.ts';
+import { validateRelations, type State } from './crm.ts';
 import type { WorkspaceRole } from './roles.ts';
 import { roleCanEdit } from './roles.ts';
 
@@ -46,6 +46,11 @@ export function visibleState(source:State,role:WorkspaceRole):State {
     state.batches.forEach(b=>{b.payments=[];b.paid=false;b.paidAt=undefined});
   }
   return state;
+}
+
+/** Validate the state using the same role-aware rules in browser and server saves. */
+export function validateRoleRelations(state:State,role:WorkspaceRole){
+  validateRelations(state,{skipOrderNumberUniqueness:role==='inventory'});
 }
 
 /** Restore batch costs hidden from sales staff before validating newly created orders. */
