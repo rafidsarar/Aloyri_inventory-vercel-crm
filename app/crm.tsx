@@ -162,6 +162,13 @@ const canReset=roleCanReset(role);
 const canBackup=roleCanBackup(role);
 const canPrint=roleCanPrintInvoice(role);
 const salesMode=role==='sales';
+async function scheduleRetentionFollowUp(customer:Customer,segment:'At risk'|'Inactive'){
+  if(!canEdit('tasks')){toast.error('Your role cannot create follow-ups.');return}
+  if(s.tasks.some(t=>!t.done&&t.customerId===customer.id&&t.kind!=='Replenishment')){toast.info('This customer already has an open care follow-up.');return}
+  const next=structuredClone(s);
+  next.tasks.push({id:uid(),customerId:customer.id,orderId:'',productId:'',title:'Retention check-in · '+customer.name,due:today(),done:false,kind:'Follow-up',priority:segment==='Inactive'?'High':'Normal',channel:'WhatsApp',notes:'Review the customer’s last purchase and ask whether they need product support. Keep outreach service-led and check consent before promotional messaging.',completedAt:'',source:'Manual'});
+  await save(next);
+}
 async function scheduleReplenishment(signal:ReplenishmentSignal){
   if(!canEdit('tasks')){toast.error('Your role cannot create follow-ups.');return}
   if(signal.hasOpenOrder){toast.error('This customer already has an active order for that product.');return}
@@ -188,6 +195,7 @@ function deleteFollowUp(task:Task){
   setConfirm({title:'Delete follow-up?',text:'Remove “'+task.title+'” from the follow-up history? This cannot be undone.',confirmLabel:'Delete',action:()=>{const next=structuredClone(s);next.tasks=next.tasks.filter(t=>t.id!==task.id);void save(next)}});
 }
 const followUpDueLabel=(task:Task)=>task.done?'Completed':task.due<today()?'Overdue · '+dateLabel(task.due):task.due===today()?'Today':task.due===shiftDate(1)?'Tomorrow':dateLabel(task.due);
+const replenishmentDueLabel=(signal:ReplenishmentSignal)=>signal.due<today()?'Overdue · '+dateLabel(signal.due):signal.due===today()?'Today':signal.due===shiftDate(1)?'Tomorrow':dateLabel(signal.due);
 const openModal=(record:Modal)=>{if(record.type==='settings'&&!canManageBusinessSettings(role)){toast.error('Only the owner or an admin can access Business settings.');return}if(!canEdit(modalCollection[record.type])){toast.error('Your role cannot edit this section.');return}setModal(record)};
 const changeView=(v:View)=>{if(!visibleSections(role).includes(v))return;setView(v);setQuery('');setFilter('All');setDetail(null);if(v==='Activity')fetch('/api/audit',{cache:'no-store'}).then(async r=>({ok:r.ok,data:await r.json()})).then(({ok,data})=>{if(ok)setAuditEvents(data.events||[]);else toast.error(data.error||'Could not load activity history.')}).catch(()=>toast.error('Could not load activity history.'))};
 async function loadLive(showErrors=true){setBusy(true);try{const res=await fetch('/api/workspace',{cache:'no-store'});const d:any=await res.json();if(!res.ok){setAuthRequired(res.status===401);throw Error(d.error||'Could not load records.')}setLive(d.data);setVersion(d.version);setRole(['owner','admin','sales','inventory','viewer'].includes(d.role)?d.role:'viewer');if(d.role==='sales')setView('Orders');if(d.role==='inventory')setView('Inventory');if(d.role==='viewer')setView('Overview');if(d.role==='viewer')setView('Overview');setMemberName(d.userName||'Team member');setLoaded(true);setError('');setAuthRequired(false);return true;}catch(e){if(showErrors)setError(e instanceof Error?e.message:'Could not load your workspace.');return false;}finally{setBusy(false)}}
