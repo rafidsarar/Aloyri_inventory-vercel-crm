@@ -3,7 +3,7 @@ import { AccessDenied, resolveWorkspace } from '@/app/team-access';
 import { visibleState, applyRoleChanges, validateWorkspaceChange } from '@/lib/role-data';
 import { canManageBusinessSettings } from '@/lib/roles';
 import { database } from '@/db/raw';
-import { initialState, stateSchema, fixedBusinessName, nextStatuses, applyCancellationQuarantine, applyDeliveryFollowUps, type State } from '@/lib/crm';
+import { initialState, stateSchema, fixedBusinessName, nextStatuses, applyCancellationQuarantine, applyDeliveryFollowUps, applyRetentionIntelligence, type State } from '@/lib/crm';
 
 export const dynamic='force-dynamic';
 const response=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
@@ -57,7 +57,7 @@ export async function PUT(request:Request){
       return response({error:'Only the owner or an admin can edit Business settings.'},403);
     let merged:typeof previous;
     try{merged=applyRoleChanges(previous,parsed.data,role)}catch(e){return response({error:e instanceof Error?e.message:'You cannot change that section.'},403)}
-    merged=applyDeliveryFollowUps(previous,applyCancellationQuarantine(previous,fixedBusinessName(merged)));
+    merged=applyRetentionIntelligence(previous,applyDeliveryFollowUps(previous,applyCancellationQuarantine(previous,fixedBusinessName(merged))));
     try{validateTransitions(previous,merged);validateWorkspaceChange(previous,merged)}catch(e){return response({error:e instanceof Error?e.message:'Invalid records.'},400)}
     const changedSections=(Object.keys(previous) as (keyof typeof previous)[]).filter(key=>JSON.stringify(previous[key])!==JSON.stringify(merged[key])).map(String);
     const now=new Date().toISOString();

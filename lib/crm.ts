@@ -8,7 +8,7 @@ export const accountNames:Record<typeof accountIds[number],string>={cash:'Cash',
 const str = z.string().trim().max(2000), id = z.string().min(1).max(100);
 const money = z.number().finite().min(0).max(10000000), qty = z.number().int().min(1).max(100000);
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(v=>!isNaN(Date.parse(v)) && new Date(v).toISOString().slice(0,10)===v);
-export const productSchema = z.object({id,name:str.min(1),brand:str,size:str,category:z.string().trim().min(1).max(50),price:money,cost:money,targetQty:z.number().int().min(0).max(100000),reorderAt:z.number().int().min(0).max(100000),active:z.boolean()});
+export const productSchema = z.object({id,name:str.min(1),brand:str,size:str,category:z.string().trim().min(1).max(50),price:money,cost:money,targetQty:z.number().int().min(0).max(100000),reorderAt:z.number().int().min(0).max(100000),replenishDays:z.number().int().min(0).max(365).default(0),active:z.boolean()});
 const customerSchema = z.object({id,name:str.min(1),phone:str,address:str,city:str,preference:str,notes:str,consent:z.boolean(),created:date});
 const supplierSchema = z.object({id,name:str.min(1),contact:str,phone:str,notes:str,verified:z.boolean()});
 const purchaseOrderSchema=z.object({id,number:str.min(1),supplierId:id,created:date,expected:date,status:z.enum(['Draft','Sent','Part received','Received','Cancelled']),notes:str,items:z.array(z.object({productId:id,qty,unitCost:money,receivedQty:z.number().int().min(0).max(100000).default(0)})).min(1).max(100)});
@@ -30,6 +30,7 @@ const taskSchema = z.object({
   id,
   customerId:str,
   orderId:str.default(''),
+  productId:str.default(''),
   title:z.string().trim().min(1).max(160),
   due:date,
   done:z.boolean(),
@@ -37,7 +38,8 @@ const taskSchema = z.object({
   priority:z.enum(['Low','Normal','High']).default('Normal'),
   channel:z.enum(['WhatsApp','Phone','Messenger','Email','Other']).default('WhatsApp'),
   notes:z.string().trim().max(1000).default(''),
-  completedAt:z.union([date,z.literal('')]).default('')
+  completedAt:z.union([date,z.literal('')]).default(''),
+  source:z.enum(['Manual','Delivery','Replenishment']).default('Manual')
 });
 const financeCloseSchema=z.object({month:z.string().regex(/^\d{4}-\d{2}$/),closedAt:date,closedBy:str,notes:str.default('')});
 export const stateSchema = z.object({products:z.array(productSchema).max(2000),productCategories:z.array(z.string().trim().min(1).max(50)).min(1).max(100).default(()=>[...categories]),customers:z.array(customerSchema).max(10000),suppliers:z.array(supplierSchema).max(1000),purchaseOrders:z.array(purchaseOrderSchema).max(5000).default([]),batches:z.array(batchSchema).max(10000),stockAdjustments:z.array(stockAdjustmentSchema).max(10000).default([]),inventoryHolds:z.array(inventoryHoldSchema).max(10000).default([]),orders:z.array(orderSchema).max(10000),expenses:z.array(expenseSchema).max(10000),cashEntries:z.array(cashEntrySchema).max(10000).default([]),accountOpenings:z.array(accountOpeningSchema).max(4).default([]),accountMatches:z.array(accountMatchSchema).max(30000).default([]),financeCloses:z.array(financeCloseSchema).max(120).default([]),tasks:z.array(taskSchema).max(10000),businessName:str.min(1),businessProfile:businessProfileSchema.default(emptyBusinessProfile)});
@@ -50,12 +52,12 @@ export const shiftDate=(days:number,base=today())=>{const d=new Date(base+'T12:0
 export const taka=(n:number)=>'৳'+Math.round(n).toLocaleString('en-BD');
 export const dateLabel=(d:string)=>new Date(d+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short'});
 export function initialState():State {return {businessName:'ALOYRI',businessProfile:emptyBusinessProfile(),productCategories:[...categories],customers:[],suppliers:[],purchaseOrders:[],batches:[],stockAdjustments:[],inventoryHolds:[],orders:[],expenses:[],cashEntries:[],accountOpenings:[],accountMatches:[],financeCloses:[],tasks:[],products:[
-  {id:'simple-wash',brand:'Simple',name:'Refreshing Facial Wash',size:'150ml · Poland',category:'Cleanser',price:749,cost:520,targetQty:12,reorderAt:4,active:true},
-  {id:'simple-light',brand:'Simple',name:'Hydrating Light Moisturiser',size:'125ml · Hungary',category:'Moisturizer',price:749,cost:520,targetQty:10,reorderAt:4,active:true},
-  {id:'simple-rich',brand:'Simple',name:'Replenishing Rich Moisturizer',size:'125ml',category:'Moisturizer',price:775,cost:540,targetQty:6,reorderAt:3,active:true},
-  {id:'skin-cafe',brand:'Skin Cafe',name:'Lightweight Sunscreen SPF50 PA+++',size:'60g',category:'Sunscreen',price:549,cost:380,targetQty:12,reorderAt:4,active:true},
-  {id:'skin-aqua',brand:'Rohto',name:'Skin Aqua Super Moisture UV Gel',size:'110g · SPF50+ PA++++',category:'Sunscreen',price:1350,cost:940,targetQty:6,reorderAt:3,active:true},
-  {id:'cosrx',brand:'COSRX',name:'Low pH Good Morning Gel Cleanser',size:'50ml',category:'Cleanser',price:580,cost:400,targetQty:6,reorderAt:3,active:true}
+  {id:'simple-wash',brand:'Simple',name:'Refreshing Facial Wash',size:'150ml · Poland',category:'Cleanser',price:749,cost:520,targetQty:12,reorderAt:4,replenishDays:60,active:true},
+  {id:'simple-light',brand:'Simple',name:'Hydrating Light Moisturiser',size:'125ml · Hungary',category:'Moisturizer',price:749,cost:520,targetQty:10,reorderAt:4,replenishDays:60,active:true},
+  {id:'simple-rich',brand:'Simple',name:'Replenishing Rich Moisturizer',size:'125ml',category:'Moisturizer',price:775,cost:540,targetQty:6,reorderAt:3,replenishDays:60,active:true},
+  {id:'skin-cafe',brand:'Skin Cafe',name:'Lightweight Sunscreen SPF50 PA+++',size:'60g',category:'Sunscreen',price:549,cost:380,targetQty:12,reorderAt:4,replenishDays:45,active:true},
+  {id:'skin-aqua',brand:'Rohto',name:'Skin Aqua Super Moisture UV Gel',size:'110g · SPF50+ PA++++',category:'Sunscreen',price:1350,cost:940,targetQty:6,reorderAt:3,replenishDays:45,active:true},
+  {id:'cosrx',brand:'COSRX',name:'Low pH Good Morning Gel Cleanser',size:'50ml',category:'Cleanser',price:580,cost:400,targetQty:6,reorderAt:3,replenishDays:60,active:true}
 ]};}
 export const rawBatchUnits=(s:State,b:Batch)=>b.qty+(s.stockAdjustments||[]).filter(a=>a.batchId===b.id).reduce((n,a)=>n+a.delta,0);
 export function usedByBatch(s:State,batchId:string) {return s.orders.filter(o=>o.status!=='Cancelled' && !(o.status==='Returned'&&o.restocked)).flatMap(o=>o.items.flatMap(i=>i.allocations)).filter(a=>a.batchId===batchId).reduce((n,a)=>n+a.qty,0)}
@@ -104,6 +106,60 @@ export function customerInsight(s:State,customerId:string){
   }
   return {orders,delivered,lastDelivered,deliveredSpend,avgOrderValue,openFollowUps,dueFollowUps,segment};
 }
+export type ReplenishmentBasis='Purchase history'|'Product cycle'|'Category estimate';
+export type ReplenishmentConfidence='High'|'Medium'|'Estimate';
+export type ReplenishmentSignal={
+  customerId:string;productId:string;productName:string;lastOrderId:string;lastDelivered:string;lastQty:number;
+  intervalDays:number;due:string;basis:ReplenishmentBasis;confidence:ReplenishmentConfidence;purchaseCount:number;daysUntil:number;hasOpenOrder:boolean;
+};
+const categoryReplenishmentDays=(category:string)=>({cleanser:60,moisturizer:60,sunscreen:45,'lip care':75}[category.toLowerCase()]||75);
+const daysBetween=(a:string,b:string)=>Math.round((Date.parse(b+'T12:00:00Z')-Date.parse(a+'T12:00:00Z'))/86400000);
+const clampDays=(n:number,min:number,max:number)=>Math.min(max,Math.max(min,Math.round(n)));
+const median=(values:number[])=>{const sorted=[...values].sort((a,b)=>a-b),mid=Math.floor(sorted.length/2);return sorted.length%2?sorted[mid]:(sorted[mid-1]+sorted[mid])/2};
+export function replenishmentSignals(s:State,customerId?:string):ReplenishmentSignal[]{
+  const customers=customerId?[customerId]:s.customers.map(c=>c.id),signals:ReplenishmentSignal[]=[];
+  for(const id of customers){
+    const purchases=new Map<string,{date:string;orderId:string;qty:number}[]>();
+    for(const order of s.orders.filter(o=>o.customerId===id&&o.status==='Delivered')){
+      const date=order.delivered||order.created;
+      for(const item of order.items){
+        const list=purchases.get(item.productId)||[];
+        list.push({date,orderId:order.id,qty:item.qty});
+        purchases.set(item.productId,list);
+      }
+    }
+    for(const [productId,list] of purchases){
+      const product=s.products.find(p=>p.id===productId);
+      if(!product||!product.active)continue;
+      const ordered=[...list].sort((a,b)=>a.date.localeCompare(b.date)),last=ordered[ordered.length-1];
+      const gaps=ordered.slice(1).map((p,i)=>daysBetween(ordered[i].date,p.date)).filter(gap=>gap>=14&&gap<=365);
+      let intervalDays:number,basis:ReplenishmentBasis,confidence:ReplenishmentConfidence;
+      if(gaps.length){
+        intervalDays=clampDays(median(gaps),21,180);
+        basis='Purchase history';confidence=gaps.length>=2?'High':'Medium';
+      }else if(product.replenishDays>0){
+        intervalDays=clampDays(product.replenishDays*Math.min(Math.max(last.qty,1),3),21,240);
+        basis='Product cycle';confidence='Medium';
+      }else{
+        intervalDays=clampDays(categoryReplenishmentDays(product.category)*Math.min(Math.max(last.qty,1),3),21,240);
+        basis='Category estimate';confidence='Estimate';
+      }
+      const due=shiftDate(intervalDays,last.date);
+      const hasOpenOrder=s.orders.some(o=>o.customerId===id&&o.id!==last.orderId&&!['Delivered','Returned','Cancelled'].includes(o.status)&&o.created>=last.date&&o.items.some(item=>item.productId===productId));
+      signals.push({customerId:id,productId,productName:product.name,lastOrderId:last.orderId,lastDelivered:last.date,lastQty:last.qty,intervalDays,due,basis,confidence,purchaseCount:ordered.length,daysUntil:daysBetween(today(),due),hasOpenOrder});
+    }
+  }
+  return signals.sort((a,b)=>Number(a.hasOpenOrder)-Number(b.hasOpenOrder)||a.due.localeCompare(b.due)||a.productName.localeCompare(b.productName));
+}
+export function replenishmentTaskForSignal(signal:ReplenishmentSignal):Task{
+  return {
+    id:uid(),customerId:signal.customerId,orderId:signal.lastOrderId,productId:signal.productId,
+    title:'Replenishment · '+signal.productName,due:signal.due,done:false,kind:'Replenishment',
+    priority:signal.due<=today()?'High':'Normal',channel:'WhatsApp',
+    notes:'Estimated from '+signal.basis.toLowerCase()+' ('+signal.intervalDays+' days). Confirm actual product usage before suggesting a repurchase. No message is sent automatically.',
+    completedAt:'',source:'Replenishment'
+  };
+}
 export function allocate(s:State,productId:string,quantity:number) {let remaining=quantity;const result:{batchId:string;qty:number;unitCost:number}[]=[];for(const b of s.batches.filter(b=>b.productId===productId&&b.expiry>today()).sort((a,b)=>a.expiry.localeCompare(b.expiry))){const amount=Math.min(remaining,batchRemaining(s,b));if(amount>0){result.push({batchId:b.id,qty:amount,unitCost:b.unitCost});remaining-=amount;}if(!remaining)break;}if(remaining)throw new Error('Not enough unexpired stock. Receive stock first.');return result;}
 export function nextStatuses(o:Order):Order['status'][] {return ({New:['Confirmed','Cancelled'],Confirmed:['Ready to pack','Cancelled'],'Ready to pack':['Packed','Cancelled'],Packed:['Shipped','Cancelled'],Shipped:['Out for delivery'],'Out for delivery':['Delivered','Returned'],Delivered:['Returned'],Returned:[],Cancelled:[]} as Record<Order['status'],Order['status'][]>)[o.status];}
 export function applyCancellationQuarantine(previous:State,next:State):State {
@@ -135,6 +191,7 @@ export function applyDeliveryFollowUps(previous:State,next:State):State {
       id:uid(),
       customerId:order.customerId,
       orderId:order.id,
+      productId:'',
       title:'Post-delivery check-in · #'+order.number,
       due:shiftDate(7,order.delivered||today()),
       done:false,
@@ -142,8 +199,34 @@ export function applyDeliveryFollowUps(previous:State,next:State):State {
       priority:'Normal',
       channel:'WhatsApp',
       notes:'Ask whether the products arrived well and how they are working. No message is sent automatically.',
-      completedAt:''
+      completedAt:'',
+      source:'Delivery'
     });
+  }
+  return result;
+}
+
+/** Keep replenishment reminders aligned with real repurchases and new deliveries. */
+export function applyRetentionIntelligence(previous:State,next:State):State {
+  const result=structuredClone(next);
+  for(const task of result.tasks){
+    if(task.done||task.source!=='Replenishment'||!task.productId)continue;
+    const sourceOrder=task.orderId?result.orders.find(o=>o.id===task.orderId):undefined;
+    if(sourceOrder&&['Returned','Cancelled'].includes(sourceOrder.status)){task.done=true;task.completedAt=today();continue}
+    const repurchase=result.orders.find(o=>o.customerId===task.customerId&&o.id!==task.orderId&&o.status==='Delivered'&&o.items.some(i=>i.productId===task.productId)&&(!sourceOrder||(o.delivered||o.created)>(sourceOrder.delivered||sourceOrder.created)));
+    if(repurchase){task.done=true;task.completedAt=today();}
+  }
+  const beforeById=new Map(previous.orders.map(o=>[o.id,o]));
+  for(const order of result.orders){
+    const before=beforeById.get(order.id);
+    if(!before||before.status==='Delivered'||order.status!=='Delivered')continue;
+    for(const productId of [...new Set(order.items.map(i=>i.productId))]){
+      const signal=replenishmentSignals(result,order.customerId).find(x=>x.productId===productId&&x.lastOrderId===order.id);
+      if(!signal||signal.hasOpenOrder)continue;
+      const existing=result.tasks.find(t=>!t.done&&t.kind==='Replenishment'&&t.customerId===order.customerId&&t.productId===productId);
+      if(existing)continue;
+      result.tasks.push(replenishmentTaskForSignal(signal));
+    }
   }
   return result;
 }
@@ -171,10 +254,15 @@ export function validateRelations(s:State,options:{skipOrderNumberUniqueness?:bo
   const reversalCounts=new Map<string,number>();for(const e of s.cashEntries)if(e.reversalOf){const source=s.cashEntries.find(x=>x.id===e.reversalOf);if(!source)throw new Error('Cash reversal refers to a missing source movement.');if(source.reversalOf)throw new Error('A reversal cannot reverse another reversal.');reversalCounts.set(e.reversalOf,(reversalCounts.get(e.reversalOf)||0)+1);}for(const count of reversalCounts.values())if(count>1)throw new Error('A cash movement can only be reversed once.');
   for(const t of s.tasks){
     if(t.customerId&&!s.customers.some(c=>c.id===t.customerId))throw new Error('Unknown follow-up customer.');
+    if(t.productId&&!s.products.some(p=>p.id===t.productId))throw new Error('Follow-up refers to an unknown product.');
+    if(t.kind!=='Replenishment'&&t.productId)throw new Error('Only replenishment reminders can link a product.');
+    if(t.source==='Delivery'&&t.kind!=='Follow-up')throw new Error('Delivery automation must create a follow-up reminder.');
+    if(t.source==='Replenishment'&&(t.kind!=='Replenishment'||!t.productId))throw new Error('Replenishment automation requires a linked product.');
     if(t.orderId){
       const order=s.orders.find(o=>o.id===t.orderId);
       if(!order)throw new Error('Follow-up refers to an unknown order.');
       if(t.customerId&&order.customerId!==t.customerId)throw new Error('Follow-up customer does not match the linked order.');
+      if(t.productId&&!order.items.some(i=>i.productId===t.productId))throw new Error('Follow-up product is not on the linked order.');
     }
     if(!t.done&&t.completedAt)throw new Error('Open follow-ups cannot have a completion date.');
     if(t.completedAt&&t.completedAt>today())throw new Error('Follow-up completion date cannot be in the future.');
