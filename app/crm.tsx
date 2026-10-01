@@ -234,14 +234,16 @@ async function restoreWorkspaceBackup(file:File){
     const validationRes=await fetch('/api/workspace/backup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'validate',backup})});
     const validation=await validationRes.json();
     if(!validationRes.ok)throw Error(validation.error||'Backup validation failed.');
-    const counts=validation.integrity?.counts||{};
+    const counts=validation.backupWorkspace?.counts||validation.integrity?.counts||{},currentCounts=validation.currentWorkspace?.counts||{};
     const summary=['orders','customers','products','batches','suppliers','tasks'].filter(key=>typeof counts[key]==='number').map(key=>counts[key]+' '+key).join(' · ');
-    const confirmation=window.prompt('Backup verified'+(summary?' · '+summary:'')+'. Restoring replaces the current operational workspace. Employee accounts and login access are not replaced. Type RESTORE ALOYRI to continue.');
+    const changed=['orders','customers','products','batches','suppliers','tasks'].filter(key=>typeof counts[key]==='number'&&typeof currentCounts[key]==='number'&&counts[key]!==currentCounts[key]).map(key=>key+': '+currentCounts[key]+' → '+counts[key]).join(' · ');
+    const warningCount=(validation.backupWorkspace?.warnings||validation.integrity?.warnings||[]).length;
+    const confirmation=window.prompt('Backup verified'+(summary?' · '+summary:'')+(changed?'\nChanges: '+changed:'')+(warningCount?'\nReview note: '+warningCount+' non-blocking integrity '+(warningCount===1?'warning':'warnings')+' detected in the backup.':'')+'\nA safety snapshot of your current workspace will be created automatically before restore. Employee accounts and login access are not replaced.\nType RESTORE ALOYRI to continue.');
     if(confirmation!=='RESTORE ALOYRI'){toast.error('Restore cancelled.');return}
     const res=await fetch('/api/workspace/backup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'restore',confirmation,backup})}),data=await res.json();
     if(!res.ok)throw Error(data.error||'Could not restore backup.');
     await loadLive(false);
-    toast.success('Verified workspace backup restored.');
+    toast.success(data.safetySnapshot?.id?'Verified backup restored. A pre-restore safety snapshot was saved.':'Verified workspace backup restored.');
   }catch(e){toast.error(e instanceof Error?e.message:'Could not validate or restore backup.')}
   finally{setBusy(false)}
 }
