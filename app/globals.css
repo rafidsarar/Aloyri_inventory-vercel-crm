@@ -569,13 +569,6 @@ html,body{max-width:100%;overflow-x:hidden}
 .global-search-empty{padding:18px;text-align:center;font-size:11px;color:#8a9b91}
 .notification-button{position:relative}
 .notification-count{position:absolute;right:-7px;top:-7px;min-width:18px;height:18px;padding:0 4px;border-radius:999px;display:grid;place-items:center;background:#9f5949;color:#fff;font-size:9px;font-weight:700;border:2px solid #fff}
-.ops-widget-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:-2px 0 18px}
-.ops-widget-grid>button{display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:13px 14px;text-align:left;border:1px solid #e3ebe5;border-radius:10px;background:#fff;transition:.16s ease}
-.ops-widget-grid>button:hover{transform:translateY(-1px);border-color:#bfd0c4;box-shadow:0 6px 18px rgba(43,72,55,.06)}
-.ops-widget-grid span{display:flex;align-items:center;gap:7px;color:#6d8475}
-.ops-widget-grid small{font-size:10px;text-transform:uppercase;letter-spacing:.55px}
-.ops-widget-grid strong{font-size:22px;font-weight:600;color:#3e5d48}
-.ops-widget-grid em{font-style:normal;font-size:10px;color:#95a39a}
 .alert-filter-strip{display:flex;gap:7px;overflow-x:auto;padding:0 20px 14px;scrollbar-width:none}
 .alert-filter-strip::-webkit-scrollbar{display:none}
 .alert-filter-strip button{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;padding:7px 10px;border:1px solid #e2eae4;border-radius:999px;background:#fbfcfb;color:#718678;font-size:11px}
