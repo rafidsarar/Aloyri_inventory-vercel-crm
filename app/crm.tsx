@@ -40,6 +40,7 @@ type GlobalResult={id:string;view:View;title:string;meta:string;query:string;sco
 type CustomerApiRecord=Customer&{recordVersion:number};
 type OrderApiRecord=Order&{recordVersion:number};
 const inventorySupplierKeys=['products','productCategories','suppliers','purchaseOrders','batches','stockAdjustments','inventoryHolds'] as const;
+const financeKeys=['expenses','cashEntries','accountOpenings','accountMatches','financeCloses'] as const;
 const modalCollection:Record<Modal['type'],string>={order:'orders',orderEdit:'orders',customer:'customers',task:'tasks',product:'products',category:'productCategories',batch:'batches',stockAdjust:'stockAdjustments',stockHold:'inventoryHolds',supplier:'suppliers',expense:'expenses',cashEntry:'cashEntries',settings:'businessName'};
 const titles:Record<View,string>={Overview:'Business overview',Reports:'Management reports',Alerts:'Alert center',Automation:'Automation center',Orders:'Orders',Inventory:'Inventory',Customers:'Customers',Suppliers:'Suppliers',Finances:'Finances', 'Follow-ups':'Follow-ups',Activity:'Activity log'};
 const descriptions:Record<View,string>={Overview:'Monitor sales, stock and actions that need attention.',Reports:'Review management performance, customer quality, channels, products and trends.',Alerts:'Automatic business alerts, prioritized for your role.',Automation:'Control safe internal automations and review the signals they are producing.',Orders:'Track fulfillment, delivery and payment from one workspace.',Inventory:'Monitor stock health, batches, expiry and purchasing from one workspace.',Customers:'View contact details, preferences and order history.',Suppliers:'Manage supplier relationships, purchase orders, receiving and sourcing performance.',Finances:'Review sales, expenses, cashflow and collections in BDT.', 'Follow-ups':'Track customer follow-ups and replenishment tasks.',Activity:'Review protected employee and administrator change history.'};
@@ -269,6 +270,12 @@ async function loadInventorySupplierRecords(nextRole:WorkspaceRole){
   if(!res.ok)throw Error(data.error||'Could not load Inventory and Supplier records.');
   setLive(current=>({...current,...data.data}));
 }
+async function loadFinanceRecords(nextRole:WorkspaceRole){
+  if(!visibleSections(nextRole).includes('Finances'))return;
+  const res=await fetch('/api/finances',{cache:'no-store'}),data:any=await res.json();
+  if(!res.ok)throw Error(data.error||'Could not load Finance records.');
+  setLive(current=>({...current,...data.data}));
+}
 async function loadLive(showErrors=true,manageBusy=true){
   if(manageBusy)setBusy(true);
   try{
@@ -281,6 +288,7 @@ async function loadLive(showErrors=true,manageBusy=true){
     try{await loadCustomerRecords(nextRole)}catch(customerError){if(showErrors)toast.error(customerError instanceof Error?customerError.message:'Could not load customer records.')}
     try{await loadOrderRecords(nextRole)}catch(orderError){if(showErrors)toast.error(orderError instanceof Error?orderError.message:'Could not load order records.')}
     try{await loadInventorySupplierRecords(nextRole)}catch(domainError){if(showErrors)toast.error(domainError instanceof Error?domainError.message:'Could not load Inventory and Supplier records.')}
+    try{await loadFinanceRecords(nextRole)}catch(financeError){if(showErrors)toast.error(financeError instanceof Error?financeError.message:'Could not load Finance records.')}
     return true;
   }catch(e){if(showErrors)setError(e instanceof Error?e.message:'Could not load your workspace.');return false;}
   finally{if(manageBusy)setBusy(false)}
@@ -311,6 +319,10 @@ useEffect(()=>{let active=true;(async()=>{try{
   if(visibleSections(nextRole).some(section=>section==='Inventory'||section==='Suppliers')){
     const domainRes=await fetch('/api/inventory-suppliers',{cache:'no-store'}),domainData:any=await domainRes.json();
     if(active&&domainRes.ok)setLive(current=>({...current,...domainData.data}));
+  }
+  if(visibleSections(nextRole).includes('Finances')){
+    const financeRes=await fetch('/api/finances',{cache:'no-store'}),financeData:any=await financeRes.json();
+    if(active&&financeRes.ok)setLive(current=>({...current,...financeData.data}));
   }
 }catch{}})();return()=>{active=false}},[]);
 async function save(next:State):Promise<boolean>{if(saving.current)return false;try{next=stateSchema.parse(next);if(role==='inventory')validateRoleRelations(next,role);else validateWorkspaceChange(s,next);}catch(e){toast.error(e instanceof Error?e.message:'Please check the values.');return false;}if(!loaded){toast.error('Load your workspace before saving.');return false;}if(Object.keys(s).some(key=>!roleCanEdit(role,key)&&!(role==='inventory'&&key==='orders')&&JSON.stringify(next[key as keyof State])!==JSON.stringify(s[key as keyof State]))){toast.error('Your role cannot change that section.');return false;}saving.current=true;setBusy(true);try{const res=await fetch('/api/workspace',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:next,version})});const d:any=await res.json();if(!res.ok)throw Error(d.error||'Could not save.');setLive(d.data?stateSchema.parse(d.data):next);setVersion(d.version);setError('');toast.success('Changes saved');return true;}catch(e){const message=e instanceof Error?e.message:'Could not save.';setError(message);toast.error(message);return false;}finally{saving.current=false;setBusy(false)}}
@@ -428,6 +440,24 @@ async function saveInventorySupplierDomain(next:State):Promise<boolean>{
   }catch(e){const message=e instanceof Error?e.message:'Could not save Inventory or Supplier records.';setError(message);toast.error(message);return false}
   finally{saving.current=false;setBusy(false)}
 }
+function financeOnlyMutation(next:State){
+  const changed=(Object.keys(s) as (keyof State)[]).filter(key=>JSON.stringify(s[key])!==JSON.stringify(next[key]));
+  return changed.length>0&&changed.every(key=>(financeKeys as readonly string[]).includes(String(key)));
+}
+async function saveFinanceDomain(next:State):Promise<boolean>{
+  if(!financeOnlyMutation(next))return save(next);
+  if(!loaded){toast.error('Load your workspace before saving.');return false}
+  if(!canFinance){toast.error('Only the owner or an admin can edit Finance.');return false}
+  if(saving.current)return false;saving.current=true;setBusy(true);
+  try{
+    const data=Object.fromEntries(financeKeys.map(key=>[key,next[key]]));
+    const res=await fetch('/api/finances',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({data,version})}),result:any=await res.json();
+    if(!res.ok){if(res.status===409)await loadLive(false,false);throw Error(result.error||'Could not save Finance.')}
+    const synced=await loadLive(false,false);if(!synced)throw Error('Finance saved, but the workspace could not be refreshed.');
+    setError('');toast.success('Finance changes saved');return true;
+  }catch(e){const message=e instanceof Error?e.message:'Could not save Finance.';setError(message);toast.error(message);return false}
+  finally{saving.current=false;setBusy(false)}
+}
 function newCustomerOrderMutation(next:State){
   const changedKeys=(Object.keys(s) as (keyof State)[]).filter(key=>JSON.stringify(s[key])!==JSON.stringify(next[key]));
   if(changedKeys.length!==2||!changedKeys.includes('customers')||!changedKeys.includes('orders'))return null;
@@ -451,6 +481,7 @@ async function saveNewCustomerOrder(next:State):Promise<boolean>{
 async function saveRecordAware(next:State):Promise<boolean>{
   if(newCustomerOrderMutation(next))return saveNewCustomerOrder(next);
   if(inventorySupplierOnlyMutation(next))return saveInventorySupplierDomain(next);
+  if(financeOnlyMutation(next))return saveFinanceDomain(next);
   if(customerOnlyMutation(next))return saveCustomerRecord(next);
   if(orderOnlyMutation(next))return saveOrderRecord(next);
   return save(next);
@@ -526,7 +557,7 @@ async function setPurchaseOrderStatus(id:string,status:State['purchaseOrders'][n
 function openPurchaseOrderReceipt(id:string){if(!canEdit('purchaseOrders')||!canEdit('batches')){toast.error('Your role cannot receive purchase orders into stock.');return}const po=s.purchaseOrders.find(p=>p.id===id);if(!po)return;if(!['Sent','Part received'].includes(po.status)){toast.error('Mark the purchase order sent before receiving stock.');return}const lines=po.items.filter(item=>item.qty>item.receivedQty).map(item=>({productId:item.productId,qty:item.qty-item.receivedQty,expiry:shiftDate(365)}));if(!lines.length){toast.error('Nothing remains to receive on this PO.');return}const supplier=s.suppliers.find(x=>x.id===po.supplierId);setPoReceiveId(id);setPoReceiveDate(today());setPoReceiveInvoice(po.number);setPoReceiveDue(shiftDate(supplier?.paymentTermsDays??30));setPoReceiveLines(lines)}
 async function submitPurchaseOrderReceipt(){if(!poReceiveId)return;if(!canEdit('purchaseOrders')||!canEdit('batches')){toast.error('Your role cannot receive purchase orders into stock.');return}setBusy(true);try{const received=poReceiveLines.reduce((n,line)=>n+line.qty,0);const res=await fetch('/api/purchase-orders/'+encodeURIComponent(poReceiveId)+'/receive',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({received:poReceiveDate,invoice:poReceiveInvoice,dueDate:poReceiveDue||undefined,lines:poReceiveLines,version})}),data:any=await res.json();if(!res.ok){if(res.status===409)await loadLive(false,false);throw Error(data.error||'Could not receive this purchase order.')}await loadLive(false,false);setPoReceiveId(null);toast.success(received+' units received into inventory.')}catch(e){toast.error(e instanceof Error?e.message:'Could not receive this purchase order.')}finally{setBusy(false)}}
 function openOwnerMoney(kind:'capital'|'drawing'){if(!canFinance){toast.error('Only the owner or an admin can post finance movements.');return}setOwnerMoneyKind(kind);setOwnerMoneyAmount('');setOwnerMoneyDate(today());setOwnerMoneyAccount('bank');setOwnerMoneyReference('');setOwnerMoneyOpen(true)}
-async function submitOwnerMoney(){if(!canFinance){toast.error('Only the owner or an admin can post finance movements.');return}const amount=Number(ownerMoneyAmount);if(!Number.isFinite(amount)||amount<=0){toast.error('Enter an amount above zero.');return}if(ownerMoneyDate>today()){toast.error('Date cannot be in the future.');return}const opening=s.accountOpenings.find(a=>a.account===ownerMoneyAccount);if(!opening){toast.error('Configure the '+accountNames[ownerMoneyAccount]+' account first.');return}if(ownerMoneyDate<opening.date){toast.error('Date cannot be before the account opening date.');return}const next=structuredClone(s),id=uid();next.cashEntries.push({id,date:ownerMoneyDate,kind:ownerMoneyKind==='capital'?'in':'out',category:ownerMoneyKind==='capital'?'Owner Capital':'Owner Drawings',description:ownerMoneyReference.trim()||(ownerMoneyKind==='capital'?'Owner capital contribution':'Owner withdrawal'),amount});next.accountMatches.push({entryId:'manual-'+id,account:ownerMoneyAccount,matched:true,reference:ownerMoneyReference.trim()||(ownerMoneyKind==='capital'?'Owner capital':'Owner drawings')});if(await save(next)){setOwnerMoneyOpen(false);toast.success((ownerMoneyKind==='capital'?'Owner capital':'Owner drawing')+' posted and reconciled.')}}
+async function submitOwnerMoney(){if(!canFinance){toast.error('Only the owner or an admin can post finance movements.');return}const amount=Number(ownerMoneyAmount);if(!Number.isFinite(amount)||amount<=0){toast.error('Enter an amount above zero.');return}if(ownerMoneyDate>today()){toast.error('Date cannot be in the future.');return}const opening=s.accountOpenings.find(a=>a.account===ownerMoneyAccount);if(!opening){toast.error('Configure the '+accountNames[ownerMoneyAccount]+' account first.');return}if(ownerMoneyDate<opening.date){toast.error('Date cannot be before the account opening date.');return}const next=structuredClone(s),id=uid();next.cashEntries.push({id,date:ownerMoneyDate,kind:ownerMoneyKind==='capital'?'in':'out',category:ownerMoneyKind==='capital'?'Owner Capital':'Owner Drawings',description:ownerMoneyReference.trim()||(ownerMoneyKind==='capital'?'Owner capital contribution':'Owner withdrawal'),amount});next.accountMatches.push({entryId:'manual-'+id,account:ownerMoneyAccount,matched:true,reference:ownerMoneyReference.trim()||(ownerMoneyKind==='capital'?'Owner capital':'Owner drawings')});if(await saveFinanceDomain(next)){setOwnerMoneyOpen(false);toast.success((ownerMoneyKind==='capital'?'Owner capital':'Owner drawing')+' posted and reconciled.')}}
 function openPaymentDialog(kind:'collection'|'supplier',id:string,max:number,label:string){if(!canFinance){toast.error('Only the owner or an admin can post finance payments.');return}setPaymentDialog({kind,id,max,label});setPaymentAmount(String(Math.round(max)));setPaymentDate(today());setPaymentAccount(kind==='collection'?'bkash':'bank');setPaymentReference('')}
 async function submitPayment(){
  if(!paymentDialog)return;if(!canFinance){toast.error('Only the owner or an admin can post finance payments.');return}const amount=Number(paymentAmount);
@@ -554,7 +585,7 @@ function reverseCashEntry(id:string){
   if(!reason?.trim()){toast.error('A reversal reason is required.');return;}
   const next=structuredClone(s),rid=uid();next.cashEntries.push({id:rid,date:today(),kind:entry.kind==='in'?'out':'in',category:'Reversal · '+entry.category,description:'Reversal of '+entry.category+' · '+reason.trim(),amount:entry.amount,reversalOf:entry.id,reversalReason:reason.trim()});
   const originalMatch=s.accountMatches.find(m=>m.entryId==='manual-'+entry.id);if(originalMatch)next.accountMatches.push({entryId:'manual-'+rid,account:originalMatch.account,matched:true,reference:'Reversal · '+reason.trim()});
-  void save(next);
+  void saveFinanceDomain(next);
 }
 function requestDeleteCategory(name:string){
   if(!canEdit('productCategories')){toast.error('Your role cannot delete categories.');return;}
