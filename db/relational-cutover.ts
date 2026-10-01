@@ -46,8 +46,8 @@ export async function verifyRelationalParity(ownerId:string){
   const counts=Object.fromEntries(relationalCoreKeys.map(key=>[key,{json:(json[key] as any[]).length,relational:(rel[key] as any[]).length,match:(json[key] as any[]).length===(rel[key] as any[]).length}]));
   const jsonOrderTotal=sum(json.orders.map(o=>o.items.reduce((n,i)=>n+i.price*i.qty,0)-o.discount+o.deliveryCharge));
   const relOrderTotal=sum(rel.orders.map(o=>o.items.reduce((n,i)=>n+i.price*i.qty,0)-o.discount+o.deliveryCharge));
-  const jsonInventoryQty=sum(json.batches.map(b=>b.qty)+json.stockAdjustments.map(a=>a.delta));
-  const relInventoryQty=sum(rel.batches.map(b=>b.qty)+rel.stockAdjustments.map(a=>a.delta));
+  const jsonInventoryQty=sum([...json.batches.map(b=>b.qty),...json.stockAdjustments.map(a=>a.delta)]);
+  const relInventoryQty=sum([...rel.batches.map(b=>b.qty),...rel.stockAdjustments.map(a=>a.delta)]);
   const jsonExpenses=sum(json.expenses.map(e=>e.amount)),relExpenses=sum(rel.expenses.map(e=>e.amount));
   const jsonReceivables=sum(json.orders.map(orderBalance)),relReceivables=sum(rel.orders.map(orderBalance));
   const payable=(state:State)=>sum(state.batches.map(b=>{const total=b.qty*b.unitCost,legacy=b.paid&&b.payments.length===0?total:0;return Math.max(0,total-legacy-b.payments.reduce((n,p)=>n+p.amount,0))}));
