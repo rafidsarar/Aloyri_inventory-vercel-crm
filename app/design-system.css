@@ -224,3 +224,35 @@
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Stage 2 / Step 3 — workspace layout contracts */
+.crm-workspace-section {
+  width: 100%;
+  min-width: 0;
+}
+
+.crm-workspace-section > :first-child {
+  scroll-margin-top: calc(var(--crm-page-y) + 4.5rem);
+}
+
+.crm-action-bar.table-toolbar,
+.crm-action-bar.order-toolbar-pro,
+.crm-action-bar.activity-toolbar-pro {
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .crm-action-bar.table-toolbar,
+  .crm-action-bar.order-toolbar-pro,
+  .crm-action-bar.activity-toolbar-pro {
+    flex-direction: column;
+  }
+
+  .crm-action-bar.table-toolbar > *,
+  .crm-action-bar.order-toolbar-pro > *,
+  .crm-action-bar.activity-toolbar-pro > * {
+    width: 100%;
+    min-width: 0;
+  }
+}
