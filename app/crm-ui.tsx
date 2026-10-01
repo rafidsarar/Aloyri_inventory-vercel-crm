@@ -75,6 +75,36 @@ export function ProductIcon({category}:{category:string}){
   </span>;
 }
 
+
+export function PageHeader({eyebrow,title,description,actions}:{eyebrow?:string;title:string;description?:string;actions?:ReactNode}){
+  return <div className="crm-page-header page-heading">
+    <div className="crm-page-header-copy">
+      {eyebrow&&<div className="eyebrow">{eyebrow}</div>}
+      <h1>{title}</h1>
+      {description&&<p>{description}</p>}
+    </div>
+    {actions&&<div className="crm-page-header-actions heading-actions">{actions}</div>}
+  </div>;
+}
+
+export function SectionPanel({children,className='',heading,description,actions}:{children:ReactNode;className?:string;heading?:string;description?:string;actions?:ReactNode}){
+  return <section className={'crm-section-panel panel '+className}>
+    {(heading||description||actions)&&<div className="crm-section-panel-header panel-heading">
+      <div>{heading&&<h2>{heading}</h2>}{description&&<p>{description}</p>}</div>
+      {actions&&<div className="crm-section-panel-actions">{actions}</div>}
+    </div>}
+    {children}
+  </section>;
+}
+
+export function ActionBar({children,className=''}:{children:ReactNode;className?:string}){
+  return <div className={'crm-action-bar '+className}>{children}</div>;
+}
+
+export function ResponsiveGrid({children,className=''}:{children:ReactNode;className?:string}){
+  return <div className={'crm-responsive-grid '+className}>{children}</div>;
+}
+
 export function Empty({title,text,action}:{title:string;text:string;action?:ReactNode}){
   return <div className="empty-state">
     <Box size={28}/><h3>{title}</h3><p>{text}</p>{action}

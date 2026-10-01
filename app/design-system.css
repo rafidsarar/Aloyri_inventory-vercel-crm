@@ -1,0 +1,226 @@
+/*
+ * ALOYRI CRM Design System — Stage 2
+ * Semantic tokens and shared component foundations.
+ * This layer intentionally preserves existing behavior and visual values while
+ * giving the CRM one stable vocabulary for future section-by-section cleanup.
+ */
+
+:root {
+  /* Surfaces */
+  --crm-canvas: var(--background);
+  --crm-surface: var(--card);
+  --crm-surface-subtle: var(--muted);
+  --crm-surface-accent: var(--accent);
+  --crm-surface-elevated: var(--popover);
+
+  /* Content */
+  --crm-text: var(--foreground);
+  --crm-text-muted: var(--muted-foreground);
+  --crm-text-accent: var(--accent-foreground);
+  --crm-text-on-brand: var(--primary-foreground);
+
+  /* Brand / feedback */
+  --crm-brand: var(--primary);
+  --crm-brand-soft: var(--accent);
+  --crm-danger: var(--destructive);
+  --crm-focus: var(--ring);
+
+  /* Borders / controls */
+  --crm-border: var(--border);
+  --crm-control-border: var(--input);
+
+  /* Spacing */
+  --crm-space-1: 0.25rem;
+  --crm-space-2: 0.5rem;
+  --crm-space-3: 0.75rem;
+  --crm-space-4: 1rem;
+  --crm-space-5: 1.25rem;
+  --crm-space-6: 1.5rem;
+  --crm-space-8: 2rem;
+  --crm-space-10: 2.5rem;
+
+  /* Radius */
+  --crm-radius-sm: 0.375rem;
+  --crm-radius-md: 0.5rem;
+  --crm-radius-lg: 0.625rem;
+  --crm-radius-xl: 0.75rem;
+  --crm-radius-2xl: 1rem;
+
+  /* Type */
+  --crm-text-xs: 0.6875rem;
+  --crm-text-sm: 0.75rem;
+  --crm-text-md: 0.8125rem;
+  --crm-text-base: 0.875rem;
+  --crm-text-lg: 1rem;
+  --crm-heading-xl: 1.8125rem;
+
+  /* Elevation */
+  --crm-shadow-xs: 0 1px 2px rgb(36 64 46 / 0.03);
+  --crm-shadow-sm: 0 2px 3px rgb(40 67 48 / 0.03);
+  --crm-shadow-md: 0 8px 24px rgb(36 64 46 / 0.06);
+
+  /* Motion */
+  --crm-motion-fast: 150ms;
+  --crm-motion-standard: 200ms;
+
+  /* Layout */
+  --crm-content-max: 1640px;
+  --crm-page-x: 34px;
+  --crm-page-y: 32px;
+  --crm-control-height: 40px;
+  --crm-control-height-sm: 34px;
+}
+
+/* Shared component contracts. Existing class names remain supported. */
+.btn {
+  min-height: var(--crm-control-height);
+  border-radius: var(--crm-radius-sm);
+  transition:
+    background var(--crm-motion-fast),
+    border-color var(--crm-motion-fast),
+    color var(--crm-motion-fast),
+    transform var(--crm-motion-fast);
+}
+
+.btn.small {
+  min-height: var(--crm-control-height-sm);
+}
+
+.panel {
+  background: var(--crm-surface);
+  border-color: var(--crm-border);
+  border-radius: var(--crm-radius-lg);
+  box-shadow: var(--crm-shadow-sm);
+}
+
+.page-content {
+  max-width: var(--crm-content-max);
+}
+
+.search-input input,
+.choice {
+  border-color: var(--crm-control-border);
+}
+
+[data-slot="table-head"] {
+  color: var(--crm-text-muted);
+}
+
+.empty-state {
+  color: var(--crm-text-muted);
+}
+
+@media (max-width: 900px) {
+  :root {
+    --crm-page-x: 20px;
+    --crm-page-y: 24px;
+  }
+}
+
+@media (max-width: 640px) {
+  :root {
+    --crm-page-x: 16px;
+    --crm-page-y: 20px;
+  }
+}
+
+
+/* Reusable CRM layout primitives */
+.crm-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--crm-space-5);
+  margin-bottom: 27px;
+}
+
+.crm-page-header-copy {
+  min-width: 0;
+}
+
+.crm-page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--crm-space-2);
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.crm-section-panel {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.crm-section-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--crm-space-4);
+}
+
+.crm-section-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--crm-space-2);
+  flex-wrap: wrap;
+}
+
+.crm-action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--crm-space-3);
+  flex-wrap: wrap;
+}
+
+.crm-responsive-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--crm-space-4);
+}
+
+.crm-card {
+  background: var(--crm-surface);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-lg);
+  box-shadow: var(--crm-shadow-xs);
+}
+
+.crm-control {
+  min-height: var(--crm-control-height);
+  border: 1px solid var(--crm-control-border);
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-surface);
+  color: var(--crm-text);
+}
+
+.crm-muted {
+  color: var(--crm-text-muted);
+}
+
+.crm-divider {
+  border-color: var(--crm-border);
+}
+
+@media (max-width: 768px) {
+  .crm-page-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .crm-page-header-actions {
+    width: 100%;
+  }
+
+  .crm-page-header-actions > .btn {
+    flex: 1 1 auto;
+  }
+
+  .crm-action-bar {
+    align-items: stretch;
+  }
+
+  .crm-responsive-grid {
+    grid-template-columns: 1fr;
+  }
+}
