@@ -924,7 +924,7 @@ return <SidebarProvider style={{'--sidebar-width':'clamp(196px, 20vw, 240px)'} a
   overduePayables,payableAging,previousRevenue,productById,projected30,receivableAging,recentNet,
   reconciledAccounts,reportCogs,reportDeliveryIncome,reportExpenses,reportFulfillment,reportGross,
   reportMargin,reportMonth,reportMonths,reportOpex,reportOrders,reportProfit,reportReturns,
-  reportRevenue,reverseCashEntry,save,setCashRange,setCloseMonth,setDetail,setFinanceTab,
+  reportRevenue,reverseCashEntry,save:saveFinanceDomain,setCashRange,setCloseMonth,setDetail,setFinanceTab,
   setReportMonth,signedTaka,supplierById,trendMax,unassignedMovements,visibleCash,cashIn,cashOut,
   flow,integrityIssues,isCollectible
 }}/>}
