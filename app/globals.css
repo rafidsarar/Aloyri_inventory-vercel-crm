@@ -879,21 +879,3 @@ html,body{max-width:100%;overflow-x:hidden}
 .alert-row-action{justify-self:end}
 @media(max-width:700px){.alert-focus-card{grid-template-columns:auto minmax(0,1fr);align-items:flex-start}.alert-focus-action{grid-column:2;margin-top:-2px}.alert-action-row{grid-template-columns:1fr auto}.alert-action-row>.alert-level{grid-column:1/-1;justify-self:start}.alert-action-copy{grid-column:1}.alert-row-action{grid-column:2;grid-row:2;align-self:center}.alert-action-list{padding:0 12px 12px}}
 @media(max-width:480px){.alert-focus-card{padding:13px}.alert-focus-icon{width:34px;height:34px}.alert-focus-copy>strong{font-size:13px}.alert-focus-action{font-size:9px}.alert-row-action{font-size:0}.alert-row-action svg{width:18px;height:18px}}
-
-
-/* Final operational polish · Shared views */
-.shared-views-bar{display:flex;align-items:center;gap:14px;margin:-8px 0 18px;padding:10px 12px;border:1px solid #e1e9e3;border-radius:11px;background:#fbfcfb}
-.shared-views-label{flex:0 0 auto;display:flex;flex-direction:column;gap:1px;padding-right:12px;border-right:1px solid #e7ede8}
-.shared-views-label>span{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:700;color:#58705f;text-transform:uppercase;letter-spacing:.5px}
-.shared-views-label small{font-size:9px;color:#8b9990}
-.shared-views-list{min-width:0;display:flex;align-items:center;gap:7px;overflow-x:auto;scrollbar-width:none}
-.shared-views-list::-webkit-scrollbar{display:none}
-.shared-view-chip{display:inline-flex;align-items:center;flex:0 0 auto;border:1px solid #dbe5de;border-radius:999px;background:#fff;overflow:hidden}
-.shared-view-chip>button:first-child{padding:6px 9px;font-size:10px;font-weight:600;color:#526b5a;white-space:nowrap}
-.shared-view-chip:hover{border-color:#bdcec2;background:#f6faf7}
-.shared-view-delete{display:grid;place-items:center;padding:6px 7px;border-left:1px solid #e5ece7;color:#92a098}
-.shared-view-delete:hover{background:#f9eeee;color:#a45d51}
-.shared-view-add{display:inline-flex;align-items:center;gap:5px;flex:0 0 auto;padding:6px 9px;border:1px dashed #bfcfc4;border-radius:999px;color:#607868;font-size:10px;font-weight:700;white-space:nowrap}
-.shared-view-add:hover{background:#eef5f0;border-style:solid}
-.shared-views-empty{font-size:10px;color:#92a098;white-space:nowrap}
-@media(max-width:700px){.shared-views-bar{align-items:flex-start;flex-direction:column;gap:8px;margin-top:-4px}.shared-views-label{width:100%;padding:0 0 7px;border-right:0;border-bottom:1px solid #e7ede8}.shared-views-list{width:100%}}
