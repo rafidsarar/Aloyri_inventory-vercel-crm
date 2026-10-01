@@ -3,7 +3,7 @@
 import { AlertTriangle, ArrowRight, Bell, CalendarCheck, CheckCircle2, ChevronRight, Clock, Mail, Package, Receipt, ShieldCheck, ShoppingBag, Truck, Users, Wallet, Zap } from 'lucide-react';
 import type { AutomationSettings, AutomationSignal } from '@/lib/crm';
 import { Choice } from '../forms';
-import { Empty, type View } from '../crm-ui';
+import { Empty, WorkspaceSection, type View } from '../crm-ui';
 
 type Props={
   settings:AutomationSettings;
@@ -23,7 +23,7 @@ export default function AutomationSection({
   settings,busy,automationActiveRules,automationCritical,automationAction,automationUpcoming,
   automationLive,automationRuleNames,updateAutomationRule,changeView,setFinanceTab
 }:Props){
-  return <>
+  return <WorkspaceSection>
     <section className="automation-hero">
       <div><span className="orders-eyebrow"><Zap size={15}/>Safe operations automation</span><h2>Automation Center</h2><p>Let Aloyri surface work automatically while keeping payments, stock receiving, order status changes and customer messaging under staff control.</p></div>
       <span className="automation-live-badge"><i/>Live from CRM data</span>
@@ -86,5 +86,5 @@ export default function AutomationSection({
         ? <div className="automation-list">{automationLive.map(signal=><button key={signal.key} className="automation-alert" onClick={()=>{changeView(signal.view);if(signal.view==='Finances'&&signal.rule==='customerCollections')setFinanceTab('Collections');if(signal.view==='Finances'&&signal.rule==='supplierPayments')setFinanceTab('Payables')}}><span className={'alert-level '+signal.level.toLowerCase().replace(' ','-')}>{signal.level}</span><span><strong>{signal.title}</strong><small>{automationRuleNames[signal.rule]} · {signal.detail}</small></span><ChevronRight size={17}/></button>)}</div>
         : <Empty title="No automation signals" text="All enabled rules are clear right now."/>}
     </section>
-  </>;
+  </WorkspaceSection>;
 }
