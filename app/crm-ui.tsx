@@ -50,7 +50,7 @@ export const sections=[
 
 export type View=typeof sections[number];
 
-const navIcons:LucideIcon[]=[
+export const navIcons:LucideIcon[]=[
   LayoutDashboard,TrendingUp,Bell,Zap,ShoppingBag,Package,
   Users,Truck,Wallet,CalendarCheck,ShieldCheck
 ];
