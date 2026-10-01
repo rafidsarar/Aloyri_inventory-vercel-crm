@@ -9,7 +9,7 @@ const str = z.string().trim().max(2000), id = z.string().min(1).max(100);
 const money = z.number().finite().min(0).max(10000000), qty = z.number().int().min(1).max(100000);
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(v=>!isNaN(Date.parse(v)) && new Date(v).toISOString().slice(0,10)===v);
 export const productSchema = z.object({id,name:str.min(1),brand:str,size:str,category:z.string().trim().min(1).max(50),price:money,cost:money,targetQty:z.number().int().min(0).max(100000),reorderAt:z.number().int().min(0).max(100000),active:z.boolean()});
-const customerSchema = z.object({id,name:str.min(1),phone:str,address:str,city:str,preference:str,notes:str,consent:z.boolean(),created:date});
+export const customerSchema = z.object({id,name:str.min(1),phone:str,address:str,city:str,preference:str,notes:str,consent:z.boolean(),created:date});
 const supplierSchema = z.object({
   id,
   name:str.min(1),
