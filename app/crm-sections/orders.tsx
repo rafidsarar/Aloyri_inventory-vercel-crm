@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import type { Order } from '@/lib/crm';
 import { statuses, taka } from '@/lib/crm';
 import { Choice } from '../forms';
+import { ActionBar, SectionPanel } from '../crm-ui';
 
 type Props={
   openOrderCount:number;
@@ -56,7 +57,7 @@ export default function OrdersSection({
       <button className={filter==='Out for delivery'?'active':''} onClick={()=>setFilter('Out for delivery')}><span className="order-kpi-icon"><Truck size={18}/></span><span><small>Out for delivery</small><strong>{outForDeliveryOrders}</strong><em>With courier</em></span><ChevronRight size={16}/></button>
       <button className={filter==='Delivered'?'active':''} onClick={()=>setFilter('Delivered')}><span className="order-kpi-icon"><CheckCircle2 size={18}/></span><span><small>Delivered</small><strong>{deliveredCount}</strong><em>{returnRate}% return rate</em></span><ChevronRight size={16}/></button>
     </div>
-    <section className="panel order-workspace order-workspace-pro">
+    <SectionPanel className="order-workspace order-workspace-pro">
       <div className="panel-heading order-workspace-heading">
         <div><span className="orders-section-label">FULFILLMENT QUEUE</span><h2>Order pipeline</h2><p>Select a stage, search an order, or move it to the next step directly from the queue.</p></div>
         <div className="order-workspace-count"><strong>{filteredOrders.length}</strong><span>shown</span></div>
@@ -69,12 +70,12 @@ export default function OrdersSection({
         </div>
       </div>
       {selectedOrderIds.length>0&&<div className="bulk-action-bar"><span><strong>{selectedOrderIds.length}</strong> orders selected</span><div><button className="btn secondary" onClick={()=>setSelectedOrderIds([])}>Clear</button><button className="btn primary" disabled={busy} onClick={()=>void bulkAdvanceSelectedOrders()}><ArrowRight size={15}/>Advance one step</button></div></div>}
-      <div className="order-toolbar-pro">
+      <ActionBar className="order-toolbar-pro">
         <div className="search-input order-search"><Search size={17}/><Input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Search order, customer, phone, tracking or payment…" aria-label="Search orders"/>{query&&<button className="search-clear" aria-label="Clear search" onClick={()=>setQuery('')}><X size={15}/></button>}</div>
         <div className="order-toolbar-right"><Choice value={filter} onChange={setFilter} options={['All',...statuses]} label="Order status filter"/><span className="order-result-note">{filteredOrders.length} of {orders.length} orders</span></div>
-      </div>
+      </ActionBar>
       {orderTable(filteredOrders)}
       <div className="table-footer order-footer-pro"><span>Oldest active orders appear first inside each stage.</span><span>Use Next Step to advance fulfillment.</span></div>
-    </section>
+    </SectionPanel>
   </>;
 }
