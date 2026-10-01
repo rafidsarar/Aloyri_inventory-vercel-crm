@@ -122,6 +122,12 @@ const reportProductMax=Math.max(1,...reportProductRows.map(row=>row.revenue));
 const reportRevenueDelta=previousRevenue?Math.round((reportRevenue-previousRevenue)/previousRevenue*100):null;
 const reportPulse=reportProfit<0?'Needs attention':reportReturnRate>12?'Watch returns':reportRepeatRate>=35?'Healthy retention':'Building momentum';
 const reportPulseTone=reportProfit<0||reportReturnRate>12?'warning':reportRepeatRate>=35?'positive':'neutral';
+const reportTopChannel=reportChannelRows[0]??null,reportTopProduct=reportProductRows[0]??null,reportWorkingCapital=m.pending-m.unpaidStock;
+const reportInsightTone={
+  revenue:reportRevenueDelta===null?'neutral':reportRevenueDelta>=0?'positive':'warning',
+  retention:reportRepeatRate>=35?'positive':reportRepeatRate>=20?'neutral':'warning',
+  operations:reportReturnRate>12||inventoryOut.length>0?'warning':'positive'
+};
 const reportPurchaseOrders=s.purchaseOrders.filter(po=>po.created.slice(0,7)===reportMonth&&po.status!=='Cancelled'),reportPurchasingValue=reportPurchaseOrders.reduce((n,po)=>n+purchaseOrderValue(po),0);
 const reportMonths=Array.from(new Set([...s.orders.map(o=>(o.delivered||o.created).slice(0,7)),...s.expenses.map(e=>e.date.slice(0,7)),today().slice(0,7)])).sort().reverse();
 const closeEnd=closeMonth+'-31',closeMovements=flow.entries.filter(e=>e.date.slice(0,7)===closeMonth),closeUnassigned=closeMovements.filter(e=>!s.accountMatches.some(m=>m.entryId===e.id)).length,closeMissingAccounts=4-s.accountOpenings.length,closeReceivables=s.orders.filter(o=>o.status==='Delivered'&&(o.delivered||o.created).slice(0,7)<=closeMonth).reduce((n,o)=>{const due=receivable(o),legacy=o.settled&&o.collections.length===0?due:0;return n+Math.max(0,due-o.collections.filter(p=>p.date<=closeEnd).reduce((x,p)=>x+p.amount,0)-legacy)},0),closePayables=s.batches.filter(b=>b.received.slice(0,7)<=closeMonth).reduce((n,b)=>{const amount=b.qty*b.unitCost,legacy=b.paid&&b.payments.length===0?amount:0;return n+Math.max(0,amount-b.payments.filter(p=>p.date<=closeEnd).reduce((x,p)=>x+p.amount,0)-legacy)},0),closeRecord=s.financeCloses.find(x=>x.month===closeMonth),closeBlockers=closeUnassigned+closeMissingAccounts+flow.undated;
@@ -461,71 +467,94 @@ return <SidebarProvider style={{'--sidebar-width':'clamp(196px, 20vw, 240px)'} a
   <div className="management-report-period">
     <small>Reporting period</small>
     <Choice value={reportMonth} onChange={setReportMonth} label="Report month" options={reportMonths.map(v=>({value:v,label:new Date(v+'-01T12:00:00Z').toLocaleDateString('en-GB',{month:'long',year:'numeric'})}))}/>
-    <button className="management-finance-link" onClick={()=>changeView('Finances')}><Wallet size={15}/>Open detailed finances<ChevronRight size={14}/></button>
+    <div className="management-report-quick-actions">
+      <button onClick={()=>changeView('Orders')}><ShoppingBag size={14}/>Orders</button>
+      <button onClick={()=>changeView('Customers')}><Users size={14}/>Customers</button>
+      <button onClick={()=>changeView('Finances')}><Wallet size={14}/>Finances</button>
+    </div>
   </div>
 </section>
 
-<section className="management-kpi-grid" aria-label="Management key performance indicators">
-  <article className="management-kpi-card primary">
-    <div className="management-kpi-head"><span className="management-kpi-icon"><ArrowUpRight size={17}/></span><small>Revenue</small></div>
+<nav className="management-report-nav" aria-label="Management report sections">
+  <button onClick={()=>document.getElementById('management-overview')?.scrollIntoView({behavior:'smooth',block:'start'})}>Overview</button>
+  <button onClick={()=>document.getElementById('management-trend')?.scrollIntoView({behavior:'smooth',block:'start'})}>Trend</button>
+  <button onClick={()=>document.getElementById('management-products')?.scrollIntoView({behavior:'smooth',block:'start'})}>Products</button>
+  <button onClick={()=>document.getElementById('management-signals')?.scrollIntoView({behavior:'smooth',block:'start'})}>Signals</button>
+</nav>
+
+<section id="management-overview" className="management-kpi-grid" aria-label="Management key performance indicators">
+  <button className="management-kpi-card primary" onClick={()=>changeView('Finances')}>
+    <div className="management-kpi-head"><span className="management-kpi-icon"><ArrowUpRight size={17}/></span><small>Revenue</small><ChevronRight size={14}/></div>
     <strong>{taka(reportRevenue)}</strong>
     <div className="management-kpi-foot"><span className={reportRevenueDelta===null?'neutral':reportRevenueDelta>=0?'positive':'negative'}>{reportRevenueDelta===null?'No prior-month baseline':(reportRevenueDelta>=0?'+':'')+reportRevenueDelta+'% vs previous month'}</span></div>
-  </article>
-  <article className="management-kpi-card">
-    <div className="management-kpi-head"><span className="management-kpi-icon"><Wallet size={17}/></span><small>Operating profit</small></div>
+  </button>
+  <button className="management-kpi-card" onClick={()=>changeView('Finances')}>
+    <div className="management-kpi-head"><span className="management-kpi-icon"><Wallet size={17}/></span><small>Operating profit</small><ChevronRight size={14}/></div>
     <strong className={reportProfit<0?'money-negative':'money-positive'}>{signedTaka(reportProfit)}</strong>
     <div className="management-kpi-foot"><span>{reportMargin.toFixed(1)}% operating margin</span></div>
-  </article>
-  <article className="management-kpi-card">
-    <div className="management-kpi-head"><span className="management-kpi-icon"><ShoppingBag size={17}/></span><small>Average order</small></div>
+  </button>
+  <button className="management-kpi-card" onClick={()=>changeView('Orders')}>
+    <div className="management-kpi-head"><span className="management-kpi-icon"><ShoppingBag size={17}/></span><small>Average order</small><ChevronRight size={14}/></div>
     <strong>{taka(reportAov)}</strong>
     <div className="management-kpi-foot"><span>{reportOrders.length} delivered orders</span></div>
-  </article>
-  <article className="management-kpi-card">
-    <div className="management-kpi-head"><span className="management-kpi-icon"><Users size={17}/></span><small>Repeat customers</small></div>
+  </button>
+  <button className="management-kpi-card" onClick={()=>changeView('Customers')}>
+    <div className="management-kpi-head"><span className="management-kpi-icon"><Users size={17}/></span><small>Repeat customers</small><ChevronRight size={14}/></div>
     <strong>{reportRepeatRate.toFixed(0)}%</strong>
     <div className="management-kpi-foot"><span>{reportRepeatCustomers} repeat of {reportCustomerIds.length} buyers</span></div>
-  </article>
-  <article className="management-kpi-card">
-    <div className="management-kpi-head"><span className="management-kpi-icon"><RefreshCw size={17}/></span><small>Return rate</small></div>
+  </button>
+  <button className="management-kpi-card" onClick={()=>changeView('Orders')}>
+    <div className="management-kpi-head"><span className="management-kpi-icon"><RefreshCw size={17}/></span><small>Return rate</small><ChevronRight size={14}/></div>
     <strong>{reportReturnRate.toFixed(1)}%</strong>
     <div className="management-kpi-foot"><span>{reportReturnedOrders.length} returned orders</span></div>
-  </article>
-  <article className="management-kpi-card">
-    <div className="management-kpi-head"><span className="management-kpi-icon"><Plus size={17}/></span><small>New customers</small></div>
+  </button>
+  <button className="management-kpi-card" onClick={()=>changeView('Customers')}>
+    <div className="management-kpi-head"><span className="management-kpi-icon"><Plus size={17}/></span><small>New customers</small><ChevronRight size={14}/></div>
     <strong>{reportNewCustomers}</strong>
     <div className="management-kpi-foot"><span>Profiles created this month</span></div>
-  </article>
+  </button>
 </section>
 
-<div className="management-report-grid main">
+<section className="management-executive-strip" aria-label="Executive insights">
+  <div className={'management-insight '+reportInsightTone.revenue}><span>Revenue direction</span><strong>{reportRevenueDelta===null?'Baseline building':reportRevenueDelta>=0?'Growing':'Below prior month'}</strong><small>{reportRevenueDelta===null?'More history will improve month-on-month context.':Math.abs(reportRevenueDelta)+'% '+(reportRevenueDelta>=0?'above':'below')+' previous month.'}</small></div>
+  <div className={'management-insight '+reportInsightTone.retention}><span>Customer quality</span><strong>{reportRepeatRate>=35?'Strong repeat mix':reportRepeatRate>=20?'Developing retention':'Retention opportunity'}</strong><small>{reportRepeatCustomers} repeat buyers from {reportCustomerIds.length} purchasing customers.</small></div>
+  <div className={'management-insight '+reportInsightTone.operations}><span>Operational exposure</span><strong>{reportReturnRate>12?'Returns need review':inventoryOut.length?'Stock-outs need action':'Controls look stable'}</strong><small>{reportReturnRate.toFixed(1)}% returns · {inventoryOut.length} out of stock · {inventoryLow.length} low stock.</small></div>
+</section>
+
+<div id="management-trend" className="management-report-grid main">
   <section className="panel management-trend-panel">
     <div className="panel-heading management-panel-heading">
       <div><span className="management-section-kicker">Performance trend</span><h2>Six-month business trend</h2><p>Revenue, operating profit and net cash movement across the latest six months.</p></div>
       <div className="management-chart-legend"><span>Revenue</span><span>Profit</span><span>Net cash</span></div>
     </div>
     <div className="management-chart"><ResponsiveContainer width="100%" height={280}><AreaChart data={monthlyTrend} margin={{top:10,right:8,left:0,bottom:0}}><defs/><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="label" tickLine={false} axisLine={false}/><YAxis width={58} tickFormatter={value=>'৳'+Math.round(Number(value)/1000)+'k'} tickLine={false} axisLine={false}/><Tooltip formatter={(value)=>taka(Number(value))}/><Area type="monotone" dataKey="revenue" name="Revenue" fillOpacity={0.14} strokeWidth={2}/><Area type="monotone" dataKey="profit" name="Operating profit" fillOpacity={0.07} strokeWidth={2}/><Area type="monotone" dataKey="cash" name="Net cash" fillOpacity={0.03} strokeWidth={2}/></AreaChart></ResponsiveContainer></div>
+    <div className="management-trend-summary"><span><small>Current revenue</small><strong>{taka(reportRevenue)}</strong></span><span><small>Current profit</small><strong>{signedTaka(reportProfit)}</strong></span><span><small>Working capital gap</small><strong>{signedTaka(reportWorkingCapital)}</strong></span></div>
   </section>
 
   <section className="panel management-channel-panel">
-    <div className="panel-heading management-panel-heading"><div><span className="management-section-kicker">Sales mix</span><h2>Channel performance</h2><p>Delivered revenue by channel.</p></div></div>
-    {reportChannelRows.length?<div className="management-ranked-list">{reportChannelRows.map((row,index)=><div key={row.channel} className="management-ranked-row"><span className="management-rank">{index+1}</span><span className="management-ranked-copy"><strong>{row.channel}</strong><small>{row.orders} orders · {reportRevenue?Math.round(row.revenue/reportRevenue*100):0}% of revenue</small></span><strong className="management-ranked-value">{taka(row.revenue)}</strong></div>)}</div>:<Empty title="No delivered sales" text="Channel performance will appear after delivered orders are recorded for this month."/>}
+    <div className="panel-heading management-panel-heading"><div><span className="management-section-kicker">Sales mix</span><h2>Channel performance</h2><p>Delivered revenue by channel.</p></div><button className="management-text-action" onClick={()=>changeView('Orders')}>View orders<ChevronRight size={14}/></button></div>
+    {reportChannelRows.length?<div className="management-ranked-list">{reportChannelRows.map((row,index)=><button key={row.channel} className="management-ranked-row" onClick={()=>changeView('Orders')}><span className="management-rank">{index+1}</span><span className="management-ranked-copy"><strong>{row.channel}</strong><small>{row.orders} orders · {reportRevenue?Math.round(row.revenue/reportRevenue*100):0}% of revenue</small><i aria-hidden="true"><b style={{width:Math.max(4,row.revenue/(reportTopChannel?.revenue||1)*100)+'%'}}/></i></span><strong className="management-ranked-value">{taka(row.revenue)}</strong><ChevronRight size={14}/></button>)}</div>:<Empty title="No delivered sales" text="Channel performance will appear after delivered orders are recorded for this month."/>}
   </section>
 </div>
 
 <div className="management-report-grid secondary">
-  <section className="panel">
+  <section id="management-products" className="panel">
     <div className="panel-heading management-panel-heading"><div><span className="management-section-kicker">Product momentum</span><h2>Top products</h2><p>Ranked by delivered sales value during the selected month.</p></div><button className="management-text-action" onClick={()=>changeView('Inventory')}>Open inventory<ChevronRight size={14}/></button></div>
-    {reportProductRows.length?<div className="management-product-list">{reportProductRows.map((row,index)=><div key={row.product.id} className="management-product-row"><span className="management-rank">{index+1}</span><span className="management-product-copy"><strong>{row.product.brand} {row.product.name}</strong><small>{row.units} units sold · {taka(row.revenue)}</small><i aria-hidden="true"><b style={{width:Math.max(5,row.revenue/reportProductMax*100)+'%'}}/></i></span></div>)}</div>:<Empty title="No product sales yet" text="Top products will appear when delivered orders exist for this month."/>}
+    {reportProductRows.length?<div className="management-product-list">{reportProductRows.map((row,index)=><button key={row.product.id} className="management-product-row" onClick={()=>changeView('Inventory')}><span className="management-rank">{index+1}</span><span className="management-product-copy"><strong>{row.product.brand} {row.product.name}</strong><small>{row.units} units sold · {taka(row.revenue)}</small><i aria-hidden="true"><b style={{width:Math.max(5,row.revenue/reportProductMax*100)+'%'}}/></i></span><span className="management-product-share">{reportRevenue?Math.round(row.revenue/reportRevenue*100):0}%</span><ChevronRight size={14}/></button>)}</div>:<Empty title="No product sales yet" text="Top products will appear when delivered orders exist for this month."/>}
   </section>
 
-  <section className="panel">
+  <section id="management-signals" className="panel">
     <div className="panel-heading management-panel-heading"><div><span className="management-section-kicker">Decision support</span><h2>Management signals</h2><p>Current operational context behind the selected month’s result.</p></div></div>
     <div className="management-signal-list">
       <button onClick={()=>changeView('Customers')}><span className="management-signal-icon"><Users size={17}/></span><span><strong>Customer base</strong><small>{reportCustomerIds.length} purchasing · {reportRepeatCustomers} repeat · {reportNewCustomers} new</small></span><span className="management-signal-value">{reportRepeatRate.toFixed(0)}% repeat</span><ChevronRight size={16}/></button>
       <button onClick={()=>changeView('Inventory')}><span className="management-signal-icon"><Package size={17}/></span><span><strong>Inventory exposure</strong><small>{inventoryLow.length} low-stock · {inventoryOut.length} out of stock</small></span><span className="management-signal-value">{taka(m.stockValue)}</span><ChevronRight size={16}/></button>
       <button onClick={()=>changeView('Suppliers')}><span className="management-signal-icon"><Truck size={17}/></span><span><strong>Purchasing activity</strong><small>{reportPurchaseOrders.length} purchase orders created</small></span><span className="management-signal-value">{taka(reportPurchasingValue)}</span><ChevronRight size={16}/></button>
-      <button onClick={()=>changeView('Finances')}><span className="management-signal-icon"><Wallet size={17}/></span><span><strong>Working capital</strong><small>{taka(m.pending)} receivables · {taka(m.unpaidStock)} payables</small></span><span className="management-signal-value">{signedTaka(m.pending-m.unpaidStock)}</span><ChevronRight size={16}/></button>
+      <button onClick={()=>changeView('Finances')}><span className="management-signal-icon"><Wallet size={17}/></span><span><strong>Working capital</strong><small>{taka(m.pending)} receivables · {taka(m.unpaidStock)} payables</small></span><span className="management-signal-value">{signedTaka(reportWorkingCapital)}</span><ChevronRight size={16}/></button>
+    </div>
+    <div className="management-focus-card">
+      <span>Executive focus</span>
+      <strong>{reportProfit<0?'Restore profitability before scaling spend.':reportReturnRate>12?'Reduce return leakage and review fulfillment quality.':inventoryOut.length?'Resolve stock-outs on active demand.':reportRepeatRate<20?'Strengthen repeat purchase and replenishment follow-up.':'Protect profitable growth and retention.'}</strong>
+      <small>{reportTopProduct?'Top product: '+reportTopProduct.product.brand+' '+reportTopProduct.product.name+' · '+taka(reportTopProduct.revenue):'Product ranking will appear after delivered sales.'}</small>
     </div>
   </section>
 </div>
