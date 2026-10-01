@@ -20,7 +20,7 @@ export async function PUT(request:Request){
   if(error instanceof AccessDenied)return response({error:error.message},403);
   const message=error instanceof Error?error.message:'Could not save Finance.';
   if(message==='FINANCE_FORBIDDEN')return response({error:'Only the owner or an admin can edit Finance.'},403);
-  if(message==='DOMAIN_VERSION_CONFLICT')return response({error:'Finance changed in another window. Refresh and try again.'},409);
+  if(message==='DOMAIN_VERSION_CONFLICT'||message==='WORKSPACE_VERSION_CONFLICT')return response({error:'Finance changed in another window. Refresh and try again.'},409);
   if(message==='DOMAIN_VERSION_REQUIRED'||message==='INVALID_FINANCE_DATA')return response({error:'Check the Finance values.'},400);
   console.error('Finance save failed',error);return response({error:message},500)
  }
