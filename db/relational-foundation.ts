@@ -271,7 +271,7 @@ export const relationalFoundationSql = [
   `CREATE TABLE IF NOT EXISTS crm_rel_finance_closes (
     owner_id TEXT NOT NULL,month TEXT NOT NULL,closed_at DATE NOT NULL,closed_by TEXT NOT NULL,notes TEXT NOT NULL DEFAULT '',
     record_version INTEGER NOT NULL DEFAULT 0,updated_at TEXT NOT NULL,PRIMARY KEY(owner_id,month)
-  )`
+  )`,
   `CREATE TABLE IF NOT EXISTS crm_domain_versions (
     owner_id TEXT NOT NULL,
     domain TEXT NOT NULL,
