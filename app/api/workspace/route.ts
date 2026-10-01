@@ -10,7 +10,7 @@ import { migrateInventorySupplierShadow } from '@/db/inventory-supplier-shadow';
 import { financeSectionsChanged,markFinanceShadowStale } from '@/db/finance-records';
 import { migrateFinanceShadow } from '@/db/finance-shadow';
 import { initialState, stateSchema, fixedBusinessName, validateRelations, nextStatuses, applyCancellationQuarantine, applyDeliveryFollowUps, type State } from '@/lib/crm';
-import { getCutoverState, relationalCoreKeys, relationalCoreState } from '@/db/relational-cutover';
+import { ensureRelationalCutover, relationalCoreKeys, relationalCoreState } from '@/db/relational-cutover';
 
 export const dynamic='force-dynamic';
 const response=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
@@ -37,7 +37,7 @@ export async function GET(){
     const row=await db.prepare('SELECT data,version,updated_at FROM crm_workspaces WHERE owner_id = ?').bind(ownerId).first<{data:string;version:number;updated_at:string}>();
     if(!row)return response({error:'The shared workspace is not ready. Ask the owner to sign in first.'},404);
     const compatibility=fixedBusinessName(stateSchema.parse(JSON.parse(row.data)));validateRelations(compatibility,{skipOrderNumberUniqueness:true});
-    const cutover=await getCutoverState(ownerId);
+    const cutover=await ensureRelationalCutover(ownerId);
     const workspace=cutover.enabled?(await relationalCoreState(ownerId)).state:compatibility;
     return response({data:visibleState(workspace,role),version:row.version,role,userName:user.displayName,relationalCutover:cutover.enabled});
   }catch(e){
@@ -65,7 +65,7 @@ export async function PUT(request:Request){
     const existing=await db.prepare('SELECT data,version FROM crm_workspaces WHERE owner_id = ?').bind(ownerId).first<{data:string;version:number}>();
     if(!existing||existing.version!==body.version)return response({error:'This workspace changed in another window. Refresh records, then try again.'},409);
     const previous=fixedBusinessName(stateSchema.parse(JSON.parse(existing.data)));
-    const cutover=await getCutoverState(ownerId);
+    const cutover=await ensureRelationalCutover(ownerId);
     if(!canManageBusinessSettings(role)&&(['businessName','businessProfile'] as const).some(key=>JSON.stringify(parsed.data[key])!==JSON.stringify(visibleState(previous,role)[key])))
       return response({error:'Only the owner or an admin can edit Business settings.'},403);
     if(cutover.enabled){
