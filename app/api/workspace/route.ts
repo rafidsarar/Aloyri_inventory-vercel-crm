@@ -4,6 +4,7 @@ import { visibleState, applyRoleChanges, validateWorkspaceChange } from '@/lib/r
 import { canManageBusinessSettings } from '@/lib/roles';
 import { database } from '@/db/raw';
 import { ensureRelationalFoundation } from '@/db/relational-foundation';
+import { customerOrderSectionsChanged, markCustomersOrdersShadowStale, migrateCustomersOrdersShadow } from '@/db/customer-order-shadow';
 import { initialState, stateSchema, fixedBusinessName, validateRelations, nextStatuses, applyCancellationQuarantine, applyDeliveryFollowUps, type State } from '@/lib/crm';
 
 export const dynamic='force-dynamic';
@@ -70,7 +71,19 @@ export async function PUT(request:Request){
     const result=await db.prepare('UPDATE crm_workspaces SET data = ?, version = version + 1, updated_at = ? WHERE owner_id = ? AND version = ?').bind(JSON.stringify(merged),now,ownerId,body.version).run();
     if(!result.meta.changes)return response({error:'This workspace changed in another window. Refresh records, then try again.'},409);
     if(changedSections.length)await db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)').bind(crypto.randomUUID(),ownerId,user.userId,user.displayName||user.email,role,'Updated '+changedSections.join(', '),JSON.stringify(changedSections),now).run();
-    return response({version:body.version+1,data:visibleState(merged,role)});
+    let shadowSync:'not-needed'|'verified'|'stale'='not-needed';
+    if(customerOrderSectionsChanged(previous,merged)){
+      const nextVersion=body.version+1;
+      try{
+        await migrateCustomersOrdersShadow(ownerId,merged,nextVersion);
+        shadowSync='verified';
+      }catch(error){
+        shadowSync='stale';
+        console.error('Customers/orders relational shadow sync failed after primary workspace save',error);
+        try{await markCustomersOrdersShadowStale(ownerId,nextVersion)}catch(markError){console.error('Could not mark customers/orders shadow stale',markError)}
+      }
+    }
+    return response({version:body.version+1,data:visibleState(merged,role),shadowSync});
   }catch(e){
     if(e instanceof AccessDenied)return response({error:e.message},403);
     console.error('Workspace save failed',e);
