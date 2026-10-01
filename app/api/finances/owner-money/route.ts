@@ -14,7 +14,7 @@ export async function POST(request:Request){
   if(error instanceof AccessDenied)return response({error:error.message},403);
   const message=error instanceof Error?error.message:'Could not post owner money.';
   if(message==='FINANCE_FORBIDDEN')return response({error:'Only the owner or an admin can post owner money.'},403);
-  if(message==='DOMAIN_VERSION_CONFLICT')return response({error:'Finance changed in another window. Refresh and try again.'},409);
+  if(message==='DOMAIN_VERSION_CONFLICT'||message==='WORKSPACE_VERSION_CONFLICT')return response({error:'Finance changed in another window. Refresh and try again.'},409);
   if(message.includes('Amount')||message.includes('date')||message.includes('account'))return response({error:message},400);
   console.error('Owner money workflow failed',error);return response({error:message},500)
  }
