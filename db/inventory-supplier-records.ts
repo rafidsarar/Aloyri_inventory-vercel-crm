@@ -23,8 +23,29 @@ async function ensureAudit(){
 }
 
 export async function getInventorySupplierDomain(ownerId:string){
-  const {row,state}=await ensureInventorySupplierApiReady(ownerId);
-  return {data:inventorySupplierData(state),version:row.version};
+  const {row}=await ensureInventorySupplierApiReady(ownerId),db=database();
+  const [categories,products,suppliers,pos,poItems,batches,payments,adjustments,holds]=await Promise.all([
+    db.prepare('SELECT name FROM crm_rel_product_categories WHERE owner_id=? ORDER BY sort_order,name').bind(ownerId).all<any>(),
+    db.prepare('SELECT id,name,brand,size,category,price,cost,target_qty,reorder_at,active FROM crm_rel_products WHERE owner_id=? ORDER BY name,id').bind(ownerId).all<any>(),
+    db.prepare('SELECT id,name,contact,phone,email,address,lead_days,payment_terms_days,notes,verified FROM crm_rel_suppliers WHERE owner_id=? ORDER BY name,id').bind(ownerId).all<any>(),
+    db.prepare('SELECT id,number,supplier_id,created,expected,status,notes FROM crm_rel_purchase_orders WHERE owner_id=? ORDER BY created DESC,id').bind(ownerId).all<any>(),
+    db.prepare('SELECT purchase_order_id,line_no,product_id,qty,unit_cost,received_qty FROM crm_rel_purchase_order_items WHERE owner_id=? ORDER BY purchase_order_id,line_no').bind(ownerId).all<any>(),
+    db.prepare('SELECT id,product_id,qty,unit_cost,expiry,received,supplier_id,invoice,due_date,paid,paid_at FROM crm_rel_batches WHERE owner_id=? ORDER BY received DESC,id').bind(ownerId).all<any>(),
+    db.prepare('SELECT batch_id,id,date,amount,note FROM crm_rel_batch_payments WHERE owner_id=? ORDER BY batch_id,date,id').bind(ownerId).all<any>(),
+    db.prepare('SELECT id,batch_id,delta,date,reason FROM crm_rel_stock_adjustments WHERE owner_id=? ORDER BY date DESC,id').bind(ownerId).all<any>(),
+    db.prepare('SELECT id,batch_id,qty,date,type,reason,source,source_order_id,released_at FROM crm_rel_inventory_holds WHERE owner_id=? ORDER BY date DESC,id').bind(ownerId).all<any>()
+  ]);
+  const data={
+    productCategories:categories.results.map((x:any)=>x.name),
+    products:products.results.map((x:any)=>({id:x.id,name:x.name,brand:x.brand,size:x.size,category:x.category,price:Number(x.price),cost:Number(x.cost),targetQty:Number(x.target_qty),reorderAt:Number(x.reorder_at),active:Boolean(x.active)})),
+    suppliers:suppliers.results.map((x:any)=>({id:x.id,name:x.name,contact:x.contact,phone:x.phone,email:x.email,address:x.address,leadDays:Number(x.lead_days),paymentTermsDays:Number(x.payment_terms_days),notes:x.notes,verified:Boolean(x.verified)})),
+    purchaseOrders:pos.results.map((x:any)=>({id:x.id,number:x.number,supplierId:x.supplier_id,created:String(x.created),expected:String(x.expected),status:x.status,notes:x.notes,items:poItems.results.filter((i:any)=>i.purchase_order_id===x.id).map((i:any)=>({productId:i.product_id,qty:Number(i.qty),unitCost:Number(i.unit_cost),receivedQty:Number(i.received_qty)}))})),
+    batches:batches.results.map((x:any)=>({id:x.id,productId:x.product_id,qty:Number(x.qty),unitCost:Number(x.unit_cost),expiry:String(x.expiry),received:String(x.received),supplierId:x.supplier_id,invoice:x.invoice,dueDate:x.due_date?String(x.due_date):undefined,paid:Boolean(x.paid),paidAt:x.paid_at?String(x.paid_at):undefined,payments:payments.results.filter((p:any)=>p.batch_id===x.id).map((p:any)=>({id:p.id,date:String(p.date),amount:Number(p.amount),note:p.note}))})),
+    stockAdjustments:adjustments.results.map((x:any)=>({id:x.id,batchId:x.batch_id,delta:Number(x.delta),date:String(x.date),reason:x.reason})),
+    inventoryHolds:holds.results.map((x:any)=>({id:x.id,batchId:x.batch_id,qty:Number(x.qty),date:String(x.date),type:x.type,reason:x.reason,source:x.source,sourceOrderId:x.source_order_id||undefined,releasedAt:x.released_at?String(x.released_at):undefined}))
+  };
+  const parsed=stateSchema.pick({products:true,productCategories:true,suppliers:true,purchaseOrders:true,batches:true,stockAdjustments:true,inventoryHolds:true}).parse(data);
+  return {data:parsed,version:row.version};
 }
 
 export async function saveInventorySupplierDomain(ownerId:string,input:unknown,expectedVersion:number,actor:Actor){
