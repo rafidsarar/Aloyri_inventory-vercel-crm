@@ -39,6 +39,7 @@ import FinancesSection from './crm-sections/finances';
 type GlobalResult={id:string;view:View;title:string;meta:string;query:string;score:number;detail?:{type:'order'|'customer'|'supplier';id:string}};
 type CustomerApiRecord=Customer&{recordVersion:number};
 type OrderApiRecord=Order&{recordVersion:number};
+const inventorySupplierKeys=['products','productCategories','suppliers','purchaseOrders','batches','stockAdjustments','inventoryHolds'] as const;
 const modalCollection:Record<Modal['type'],string>={order:'orders',orderEdit:'orders',customer:'customers',task:'tasks',product:'products',category:'productCategories',batch:'batches',stockAdjust:'stockAdjustments',stockHold:'inventoryHolds',supplier:'suppliers',expense:'expenses',cashEntry:'cashEntries',settings:'businessName'};
 const titles:Record<View,string>={Overview:'Business overview',Reports:'Management reports',Alerts:'Alert center',Automation:'Automation center',Orders:'Orders',Inventory:'Inventory',Customers:'Customers',Suppliers:'Suppliers',Finances:'Finances', 'Follow-ups':'Follow-ups',Activity:'Activity log'};
 const descriptions:Record<View,string>={Overview:'Monitor sales, stock and actions that need attention.',Reports:'Review management performance, customer quality, channels, products and trends.',Alerts:'Automatic business alerts, prioritized for your role.',Automation:'Control safe internal automations and review the signals they are producing.',Orders:'Track fulfillment, delivery and payment from one workspace.',Inventory:'Monitor stock health, batches, expiry and purchasing from one workspace.',Customers:'View contact details, preferences and order history.',Suppliers:'Manage supplier relationships, purchase orders, receiving and sourcing performance.',Finances:'Review sales, expenses, cashflow and collections in BDT.', 'Follow-ups':'Track customer follow-ups and replenishment tasks.',Activity:'Review protected employee and administrator change history.'};
@@ -262,6 +263,12 @@ async function loadOrderRecords(nextRole:WorkspaceRole){
   setOrderRecordVersions(Object.fromEntries(records.map(order=>[order.id,order.recordVersion])));
   setLive(current=>({...current,orders:records.map(({recordVersion:_,...order})=>order)}));
 }
+async function loadInventorySupplierRecords(nextRole:WorkspaceRole){
+  if(!visibleSections(nextRole).some(section=>section==='Inventory'||section==='Suppliers'))return;
+  const res=await fetch('/api/inventory-suppliers',{cache:'no-store'}),data:any=await res.json();
+  if(!res.ok)throw Error(data.error||'Could not load Inventory and Supplier records.');
+  setLive(current=>({...current,...data.data}));
+}
 async function loadLive(showErrors=true,manageBusy=true){
   if(manageBusy)setBusy(true);
   try{
@@ -273,6 +280,7 @@ async function loadLive(showErrors=true,manageBusy=true){
     setMemberName(d.userName||'Team member');setLoaded(true);setError('');setAuthRequired(false);
     try{await loadCustomerRecords(nextRole)}catch(customerError){if(showErrors)toast.error(customerError instanceof Error?customerError.message:'Could not load customer records.')}
     try{await loadOrderRecords(nextRole)}catch(orderError){if(showErrors)toast.error(orderError instanceof Error?orderError.message:'Could not load order records.')}
+    try{await loadInventorySupplierRecords(nextRole)}catch(domainError){if(showErrors)toast.error(domainError instanceof Error?domainError.message:'Could not load Inventory and Supplier records.')}
     return true;
   }catch(e){if(showErrors)setError(e instanceof Error?e.message:'Could not load your workspace.');return false;}
   finally{if(manageBusy)setBusy(false)}
@@ -299,6 +307,10 @@ useEffect(()=>{let active=true;(async()=>{try{
       setOrderRecordVersions(Object.fromEntries(records.map(order=>[order.id,order.recordVersion])));
       setLive(current=>({...current,orders:records.map(({recordVersion:_,...order})=>order)}));
     }
+  }
+  if(visibleSections(nextRole).some(section=>section==='Inventory'||section==='Suppliers')){
+    const domainRes=await fetch('/api/inventory-suppliers',{cache:'no-store'}),domainData:any=await domainRes.json();
+    if(active&&domainRes.ok)setLive(current=>({...current,...domainData.data}));
   }
 }catch{}})();return()=>{active=false}},[]);
 async function save(next:State):Promise<boolean>{if(saving.current)return false;try{next=stateSchema.parse(next);if(role==='inventory')validateRoleRelations(next,role);else validateWorkspaceChange(s,next);}catch(e){toast.error(e instanceof Error?e.message:'Please check the values.');return false;}if(!loaded){toast.error('Load your workspace before saving.');return false;}if(Object.keys(s).some(key=>!roleCanEdit(role,key)&&!(role==='inventory'&&key==='orders')&&JSON.stringify(next[key as keyof State])!==JSON.stringify(s[key as keyof State]))){toast.error('Your role cannot change that section.');return false;}saving.current=true;setBusy(true);try{const res=await fetch('/api/workspace',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:next,version})});const d:any=await res.json();if(!res.ok)throw Error(d.error||'Could not save.');setLive(d.data?stateSchema.parse(d.data):next);setVersion(d.version);setError('');toast.success('Changes saved');return true;}catch(e){const message=e instanceof Error?e.message:'Could not save.';setError(message);toast.error(message);return false;}finally{saving.current=false;setBusy(false)}}
@@ -398,6 +410,24 @@ async function saveOrderRecord(next:State):Promise<boolean>{
     setError(message);toast.error(message);return false;
   }finally{saving.current=false;setBusy(false)}
 }
+function inventorySupplierOnlyMutation(next:State){
+  const changed=(Object.keys(s) as (keyof State)[]).filter(key=>JSON.stringify(s[key])!==JSON.stringify(next[key]));
+  return changed.length>0&&changed.every(key=>(inventorySupplierKeys as readonly string[]).includes(String(key)));
+}
+async function saveInventorySupplierDomain(next:State):Promise<boolean>{
+  if(!inventorySupplierOnlyMutation(next))return save(next);
+  if(!loaded){toast.error('Load your workspace before saving.');return false}
+  if(saving.current)return false;
+  saving.current=true;setBusy(true);
+  try{
+    const data=Object.fromEntries(inventorySupplierKeys.map(key=>[key,next[key]]));
+    const res=await fetch('/api/inventory-suppliers',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({data,version})}),result:any=await res.json();
+    if(!res.ok){if(res.status===409)await loadLive(false,false);throw Error(result.error||'Could not save Inventory or Supplier records.')}
+    const synced=await loadLive(false,false);if(!synced)throw Error('Changes saved, but the workspace could not be refreshed.');
+    setError('');toast.success('Changes saved');return true;
+  }catch(e){const message=e instanceof Error?e.message:'Could not save Inventory or Supplier records.';setError(message);toast.error(message);return false}
+  finally{saving.current=false;setBusy(false)}
+}
 function newCustomerOrderMutation(next:State){
   const changedKeys=(Object.keys(s) as (keyof State)[]).filter(key=>JSON.stringify(s[key])!==JSON.stringify(next[key]));
   if(changedKeys.length!==2||!changedKeys.includes('customers')||!changedKeys.includes('orders'))return null;
@@ -420,6 +450,7 @@ async function saveNewCustomerOrder(next:State):Promise<boolean>{
 }
 async function saveRecordAware(next:State):Promise<boolean>{
   if(newCustomerOrderMutation(next))return saveNewCustomerOrder(next);
+  if(inventorySupplierOnlyMutation(next))return saveInventorySupplierDomain(next);
   if(customerOnlyMutation(next))return saveCustomerRecord(next);
   if(orderOnlyMutation(next))return saveOrderRecord(next);
   return save(next);
@@ -490,8 +521,8 @@ function exportFinance(kind:'pnl'|'cashflow'|'expenses'|'receivables'|'payables'
 function openPurchaseOrder(supplierId?:string){if(!canEdit('purchaseOrders')){toast.error('Your role cannot create purchase orders.');return;}if(!s.suppliers.length){toast.error('Add a supplier before creating a purchase order.');return}if(!s.products.length){toast.error('Add a product before creating a purchase order.');return}const supplier=s.suppliers.find(x=>x.id===supplierId)||s.suppliers[0],first=s.products[0];setPoSupplier(supplier.id);setPoExpected(shiftDate(supplier.leadDays??14));setPoNotes('');setPoLines([{productId:first.id,qty:1,unitCost:first.cost||0}]);setPoOpen(true)}
 function setPurchaseOrderProduct(index:number,productId:string){if(poLines.some((line,i)=>i!==index&&line.productId===productId)){toast.error('That product is already on this purchase order.');return}const product=s.products.find(p=>p.id===productId);setPoLines(lines=>lines.map((line,i)=>i===index?{...line,productId,unitCost:product?.cost||line.unitCost}:line))}
 function addPurchaseOrderItem(){const used=new Set(poLines.map(line=>line.productId));const product=s.products.find(p=>!used.has(p.id));if(!product){toast.error('All products are already on this purchase order.');return}setPoLines(lines=>[...lines,{productId:product.id,qty:1,unitCost:product.cost||0}])}
-async function createPurchaseOrder(){if(!canEdit('purchaseOrders')){toast.error('Your role cannot create purchase orders.');return}if(!poSupplier){toast.error('Choose a supplier.');return}if(poExpected<today()){toast.error('Expected delivery cannot be before today.');return}if(!poLines.length||poLines.some(l=>!l.productId||!Number.isInteger(l.qty)||l.qty<1||!Number.isFinite(l.unitCost)||l.unitCost<0)){toast.error('Check the purchase order items.');return}if(new Set(poLines.map(l=>l.productId)).size!==poLines.length){toast.error('Add each product only once on a purchase order.');return}const next=structuredClone(s),seq=next.purchaseOrders.length+1;next.purchaseOrders.push({id:uid(),number:'PO-'+today().replaceAll('-','')+'-'+String(seq).padStart(3,'0'),supplierId:poSupplier,created:today(),expected:poExpected,status:'Draft',notes:poNotes.trim(),items:poLines.map(l=>({...l,receivedQty:0}))});if(await save(next))setPoOpen(false)}
-async function setPurchaseOrderStatus(id:string,status:State['purchaseOrders'][number]['status']){if(!canEdit('purchaseOrders')){toast.error('Your role cannot update purchase orders.');return}const next=structuredClone(s),po=next.purchaseOrders.find(p=>p.id===id);if(!po)return;po.status=status;await save(next)}
+async function createPurchaseOrder(){if(!canEdit('purchaseOrders')){toast.error('Your role cannot create purchase orders.');return}if(!poSupplier){toast.error('Choose a supplier.');return}if(poExpected<today()){toast.error('Expected delivery cannot be before today.');return}if(!poLines.length||poLines.some(l=>!l.productId||!Number.isInteger(l.qty)||l.qty<1||!Number.isFinite(l.unitCost)||l.unitCost<0)){toast.error('Check the purchase order items.');return}if(new Set(poLines.map(l=>l.productId)).size!==poLines.length){toast.error('Add each product only once on a purchase order.');return}const next=structuredClone(s),seq=next.purchaseOrders.length+1;next.purchaseOrders.push({id:uid(),number:'PO-'+today().replaceAll('-','')+'-'+String(seq).padStart(3,'0'),supplierId:poSupplier,created:today(),expected:poExpected,status:'Draft',notes:poNotes.trim(),items:poLines.map(l=>({...l,receivedQty:0}))});if(await saveInventorySupplierDomain(next))setPoOpen(false)}
+async function setPurchaseOrderStatus(id:string,status:State['purchaseOrders'][number]['status']){if(!canEdit('purchaseOrders')){toast.error('Your role cannot update purchase orders.');return}const next=structuredClone(s),po=next.purchaseOrders.find(p=>p.id===id);if(!po)return;po.status=status;await saveInventorySupplierDomain(next)}
 function openPurchaseOrderReceipt(id:string){if(!canEdit('purchaseOrders')||!canEdit('batches')){toast.error('Your role cannot receive purchase orders into stock.');return}const po=s.purchaseOrders.find(p=>p.id===id);if(!po)return;if(!['Sent','Part received'].includes(po.status)){toast.error('Mark the purchase order sent before receiving stock.');return}const lines=po.items.filter(item=>item.qty>item.receivedQty).map(item=>({productId:item.productId,qty:item.qty-item.receivedQty,expiry:shiftDate(365)}));if(!lines.length){toast.error('Nothing remains to receive on this PO.');return}const supplier=s.suppliers.find(x=>x.id===po.supplierId);setPoReceiveId(id);setPoReceiveDate(today());setPoReceiveInvoice(po.number);setPoReceiveDue(shiftDate(supplier?.paymentTermsDays??30));setPoReceiveLines(lines)}
 async function submitPurchaseOrderReceipt(){if(!poReceiveId)return;if(!canEdit('purchaseOrders')||!canEdit('batches')){toast.error('Your role cannot receive purchase orders into stock.');return}try{const next=applyPurchaseOrderReceipt(s,{purchaseOrderId:poReceiveId,received:poReceiveDate,invoice:poReceiveInvoice,dueDate:poReceiveDue||undefined,lines:poReceiveLines});const received=poReceiveLines.reduce((n,line)=>n+line.qty,0);if(await save(next)){setPoReceiveId(null);toast.success(received+' units received into inventory.')}}catch(e){toast.error(e instanceof Error?e.message:'Could not receive this purchase order.')}}
 function openOwnerMoney(kind:'capital'|'drawing'){if(!canFinance){toast.error('Only the owner or an admin can post finance movements.');return}setOwnerMoneyKind(kind);setOwnerMoneyAmount('');setOwnerMoneyDate(today());setOwnerMoneyAccount('bank');setOwnerMoneyReference('');setOwnerMoneyOpen(true)}
@@ -531,7 +562,7 @@ function requestDeleteCategory(name:string){
   if(s.productCategories.length<=1){toast.error('Keep at least one category for your products.');return;}
   if(s.products.some(p=>p.category===name)){toast.error('Move products to another category before deleting this one.');return;}
   setConfirm({title:'Delete category?',text:`Remove ${name} from your category list? This cannot be undone.`,confirmLabel:'Delete',action:()=>{
-    const next=structuredClone(s);next.productCategories=next.productCategories.filter(c=>c!==name);void save(next);
+    const next=structuredClone(s);next.productCategories=next.productCategories.filter(c=>c!==name);void saveInventorySupplierDomain(next);
   }});
 }
 function requestDelete(kind:'products'|'customers'|'suppliers',id:string,name:string){
@@ -545,14 +576,14 @@ function requestDelete(kind:'products'|'customers'|'suppliers',id:string,name:st
     if(kind==='products')next.products=next.products.filter(p=>p.id!==id);
     if(kind==='customers')next.customers=next.customers.filter(c=>c.id!==id);
     if(kind==='suppliers')next.suppliers=next.suppliers.filter(p=>p.id!==id);
-    void saveCustomerRecord(next).then(ok=>{if(ok)setDetail(null)});
+    const saver=kind==='customers'?saveCustomerRecord:saveInventorySupplierDomain;void saver(next).then(ok=>{if(ok)setDetail(null)});
   }});
 }
 async function updateOrder(o:Order,patch:Partial<Order>){if(!canEdit('orders')&&!canInspectReturns){toast.error('Your role cannot update orders.');return}const next=structuredClone(s);next.orders=next.orders.map(x=>x.id===o.id?{...x,...patch}:x);if(canEdit('orders'))await saveOrderRecord(next);else await save(next)}
-async function releaseInventoryHold(id:string){if(!canInspectReturns||!canEdit('inventoryHolds')){toast.error('Your role cannot inspect held stock.');return}const next=structuredClone(s);const hold=next.inventoryHolds.find(h=>h.id===id);if(!hold||hold.releasedAt)return;hold.releasedAt=today();await save(next)}
-async function markInventoryHoldDamaged(id:string){if(!canInspectReturns||!canEdit('inventoryHolds')){toast.error('Your role cannot inspect held stock.');return}const next=structuredClone(s);const hold=next.inventoryHolds.find(h=>h.id===id);if(!hold||hold.releasedAt)return;hold.type='Damaged';hold.reason=hold.source==='Cancelled'?'Cancelled stock inspected as damaged':hold.source==='Return'?'Returned stock inspected as damaged':hold.reason;await save(next)}
-async function releaseCancelledInspection(orderId:string){if(!canInspectReturns||!canEdit('inventoryHolds')){toast.error('Your role cannot inspect cancelled stock.');return}const next=structuredClone(s);const holds=next.inventoryHolds.filter(h=>h.source==='Cancelled'&&h.sourceOrderId===orderId&&!h.releasedAt&&h.type==='Quarantine');if(!holds.length)return;holds.forEach(h=>{h.releasedAt=today();h.reason='Cancelled stock inspected and cleared for sale'});await save(next)}
-async function markCancelledInspectionDamaged(orderId:string){if(!canInspectReturns||!canEdit('inventoryHolds')){toast.error('Your role cannot inspect cancelled stock.');return}const next=structuredClone(s);const holds=next.inventoryHolds.filter(h=>h.source==='Cancelled'&&h.sourceOrderId===orderId&&!h.releasedAt&&h.type==='Quarantine');if(!holds.length)return;holds.forEach(h=>{h.type='Damaged';h.reason='Cancelled stock inspected as damaged'});await save(next)}
+async function releaseInventoryHold(id:string){if(!canInspectReturns||!canEdit('inventoryHolds')){toast.error('Your role cannot inspect held stock.');return}const next=structuredClone(s);const hold=next.inventoryHolds.find(h=>h.id===id);if(!hold||hold.releasedAt)return;hold.releasedAt=today();await saveInventorySupplierDomain(next)}
+async function markInventoryHoldDamaged(id:string){if(!canInspectReturns||!canEdit('inventoryHolds')){toast.error('Your role cannot inspect held stock.');return}const next=structuredClone(s);const hold=next.inventoryHolds.find(h=>h.id===id);if(!hold||hold.releasedAt)return;hold.type='Damaged';hold.reason=hold.source==='Cancelled'?'Cancelled stock inspected as damaged':hold.source==='Return'?'Returned stock inspected as damaged':hold.reason;await saveInventorySupplierDomain(next)}
+async function releaseCancelledInspection(orderId:string){if(!canInspectReturns||!canEdit('inventoryHolds')){toast.error('Your role cannot inspect cancelled stock.');return}const next=structuredClone(s);const holds=next.inventoryHolds.filter(h=>h.source==='Cancelled'&&h.sourceOrderId===orderId&&!h.releasedAt&&h.type==='Quarantine');if(!holds.length)return;holds.forEach(h=>{h.releasedAt=today();h.reason='Cancelled stock inspected and cleared for sale'});await saveInventorySupplierDomain(next)}
+async function markCancelledInspectionDamaged(orderId:string){if(!canInspectReturns||!canEdit('inventoryHolds')){toast.error('Your role cannot inspect cancelled stock.');return}const next=structuredClone(s);const holds=next.inventoryHolds.filter(h=>h.source==='Cancelled'&&h.sourceOrderId===orderId&&!h.releasedAt&&h.type==='Quarantine');if(!holds.length)return;holds.forEach(h=>{h.type='Damaged';h.reason='Cancelled stock inspected as damaged'});await saveInventorySupplierDomain(next)}
 async function inspectReturnedOrder(o:Order,outcome:'Sellable'|'Quarantine'|'Damaged'){
   if(!canInspectReturns){toast.error('Your role cannot complete return inspection.');return}
   const recordVersion=orderRecordVersions[o.id];if(!Number.isInteger(recordVersion)){toast.error('Order changed. Refreshing records.');await loadLive(false);return}
@@ -697,7 +728,7 @@ async function bulkAdvanceSelectedOrders(){
  })()}})
 }
 async function bulkCreateCustomerFollowUps(){if(!canEdit('tasks')||!selectedCustomerIds.length)return;const next=structuredClone(s);let created=0;for(const id of selectedCustomerIds){const customer=next.customers.find(c=>c.id===id);if(!customer||next.tasks.some(t=>t.customerId===id&&!t.done))continue;next.tasks.push({id:uid(),customerId:id,orderId:'',title:'Customer follow-up · '+customer.name,due:shiftDate(7),done:false,kind:'Follow-up',priority:'Normal',channel:'WhatsApp',notes:'Created from bulk customer action.',completedAt:''});created++;}if(!created){toast.error('Every selected customer already has an open follow-up.');return}if(await save(next)){setSelectedCustomerIds([]);toast.success(created+' follow-ups created.');}}
-async function bulkSendPurchaseOrders(){if(!canEdit('purchaseOrders')||!selectedPurchaseOrderIds.length)return;const next=structuredClone(s);const eligible=next.purchaseOrders.filter(po=>selectedPurchaseOrderIds.includes(po.id)&&po.status==='Draft');if(!eligible.length){toast.error('Only draft purchase orders can be marked sent in bulk.');return}setConfirm({title:'Mark '+eligible.length+' purchase orders sent?',text:'Only selected Draft purchase orders will move to Sent. Receiving and cancellation still require individual review.',confirmLabel:'Mark sent',action:()=>{eligible.forEach(po=>{po.status='Sent'});void save(next).then(ok=>{if(ok)setSelectedPurchaseOrderIds([])})}})}
+async function bulkSendPurchaseOrders(){if(!canEdit('purchaseOrders')||!selectedPurchaseOrderIds.length)return;const next=structuredClone(s);const eligible=next.purchaseOrders.filter(po=>selectedPurchaseOrderIds.includes(po.id)&&po.status==='Draft');if(!eligible.length){toast.error('Only draft purchase orders can be marked sent in bulk.');return}setConfirm({title:'Mark '+eligible.length+' purchase orders sent?',text:'Only selected Draft purchase orders will move to Sent. Receiving and cancellation still require individual review.',confirmLabel:'Mark sent',action:()=>{eligible.forEach(po=>{po.status='Sent'});void saveInventorySupplierDomain(next).then(ok=>{if(ok)setSelectedPurchaseOrderIds([])})}})}
 async function bulkCompleteFollowUps(){if(!canEdit('tasks')||!selectedTaskIds.length)return;const next=structuredClone(s);const eligible=next.tasks.filter(task=>selectedTaskIds.includes(task.id)&&!task.done);if(!eligible.length){toast.error('The selected follow-ups are already completed.');return}setConfirm({title:'Complete '+eligible.length+' follow-ups?',text:'Selected open reminders will be marked complete today. No customer message will be sent.',confirmLabel:'Complete follow-ups',action:()=>{eligible.forEach(task=>{task.done=true;task.completedAt=today()});void save(next).then(ok=>{if(ok)setSelectedTaskIds([])})}})}
 const order=s.orders.find(o=>detail?.type==='order'&&o.id===detail.id);const customer=s.customers.find(c=>detail?.type==='customer'&&c.id===detail.id);const supplier=s.suppliers.find(x=>detail?.type==='supplier'&&x.id===detail.id);const supplierDetail=supplier?supplierInsight(s,supplier.id):null;const receivingPurchaseOrder=s.purchaseOrders.find(po=>po.id===poReceiveId);
 function orderTable(list:Order[]){if(!list.length)return <Empty title={query||filter!=='All'?"No matching orders":"No orders yet"} text={query||filter!=='All'?"Clear the search or choose another status to see more orders.":"Add a customer and receive stock to create your first order."} action={query||filter!=='All'?<button className="btn secondary" onClick={()=>{setQuery('');setFilter('All')}}>Clear filters</button>:undefined}/>;
