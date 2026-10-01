@@ -4,7 +4,7 @@ import { listCustomerRecords } from './customer-records.ts';
 import { listOrderRecords } from './order-records.ts';
 import { getInventorySupplierDomain } from './inventory-supplier-records.ts';
 import { getFinanceDomain } from './finance-records.ts';
-import { fixedBusinessName,stateSchema,validateRelations,type State } from '../lib/crm.ts';
+import { accountBalance,accountIds,cashflow,fixedBusinessName,orderBalance,stateSchema,validateRelations,type State } from '../lib/crm.ts';
 
 type WorkspaceRow={data:string;version:number};
 type CutoverRow={enabled:boolean;enabled_at:string|null;enabled_by:string|null;last_verified_at:string|null;last_verification:string;updated_at:string};
@@ -49,7 +49,23 @@ export async function verifyRelationalParity(ownerId:string){
   const jsonInventoryQty=sum(json.batches.map(b=>b.qty)+json.stockAdjustments.map(a=>a.delta));
   const relInventoryQty=sum(rel.batches.map(b=>b.qty)+rel.stockAdjustments.map(a=>a.delta));
   const jsonExpenses=sum(json.expenses.map(e=>e.amount)),relExpenses=sum(rel.expenses.map(e=>e.amount));
-  const keyTotals={orderTotal:{json:jsonOrderTotal,relational:relOrderTotal,match:jsonOrderTotal===relOrderTotal},inventoryUnits:{json:jsonInventoryQty,relational:relInventoryQty,match:jsonInventoryQty===relInventoryQty},expenses:{json:jsonExpenses,relational:relExpenses,match:jsonExpenses===relExpenses}};
+  const jsonReceivables=sum(json.orders.map(orderBalance)),relReceivables=sum(rel.orders.map(orderBalance));
+  const payable=(state:State)=>sum(state.batches.map(b=>{const total=b.qty*b.unitCost,legacy=b.paid&&b.payments.length===0?total:0;return Math.max(0,total-legacy-b.payments.reduce((n,p)=>n+p.amount,0))}));
+  const jsonPayables=payable(json),relPayables=payable(rel);
+  const flowTotal=(state:State)=>{const entries=cashflow(state).entries;return {in:sum(entries.filter(e=>e.kind==='in').map(e=>e.amount)),out:sum(entries.filter(e=>e.kind==='out').map(e=>e.amount))}};
+  const jsonFlow=flowTotal(json),relFlow=flowTotal(rel);
+  const jsonAccountBalances=Object.fromEntries(accountIds.map(account=>[account,accountBalance(json,account)]));
+  const relAccountBalances=Object.fromEntries(accountIds.map(account=>[account,accountBalance(rel,account)]));
+  const keyTotals={
+    orderTotal:{json:jsonOrderTotal,relational:relOrderTotal,match:jsonOrderTotal===relOrderTotal},
+    receivables:{json:jsonReceivables,relational:relReceivables,match:jsonReceivables===relReceivables},
+    payables:{json:jsonPayables,relational:relPayables,match:jsonPayables===relPayables},
+    inventoryUnits:{json:jsonInventoryQty,relational:relInventoryQty,match:jsonInventoryQty===relInventoryQty},
+    expenses:{json:jsonExpenses,relational:relExpenses,match:jsonExpenses===relExpenses},
+    cashIn:{json:jsonFlow.in,relational:relFlow.in,match:jsonFlow.in===relFlow.in},
+    cashOut:{json:jsonFlow.out,relational:relFlow.out,match:jsonFlow.out===relFlow.out},
+    accountBalances:{json:jsonAccountBalances,relational:relAccountBalances,match:JSON.stringify(jsonAccountBalances)===JSON.stringify(relAccountBalances)}
+  };
   const ids=Object.fromEntries(relationalCoreKeys.filter(k=>Array.isArray(json[k])&&k!=='productCategories'&&k!=='accountOpenings'&&k!=='accountMatches'&&k!=='financeCloses').map(key=>{
     const j=(json[key] as any[]).map(x=>x.id).sort(),r=(rel[key] as any[]).map(x=>x.id).sort();return [key,{match:JSON.stringify(j)===JSON.stringify(r)}];
   }));
