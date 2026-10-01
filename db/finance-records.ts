@@ -1,4 +1,5 @@
 import { database } from './raw.ts';
+import { getDomainVersion,bumpDomainVersion } from './domain-version.ts';
 import { applyRoleChanges,validateWorkspaceChange } from '../lib/role-data.ts';
 import { fixedBusinessName,stateSchema,validateRelations,type State } from '../lib/crm.ts';
 import type { WorkspaceRole } from '../lib/roles.ts';
@@ -33,14 +34,15 @@ export async function getFinanceDomain(ownerId:string){
   financeCloses:closes.results.map((x:any)=>({month:x.month,closedAt:String(x.closed_at),closedBy:x.closed_by,notes:x.notes}))
  };
  const parsed=stateSchema.pick({expenses:true,cashEntries:true,accountOpenings:true,accountMatches:true,financeCloses:true}).parse(data);
- return {data:parsed,version:row.version};
+ return {data:parsed,version:row.version,domainVersion:await getDomainVersion(ownerId,FINANCE_DOMAIN)};
 }
-export async function saveFinanceDomain(ownerId:string,input:unknown,expectedVersion:number,actor:Actor){
+export async function saveFinanceDomain(ownerId:string,input:unknown,expectedDomainVersion:number,actor:Actor){
  if(!['owner','admin'].includes(actor.role))throw new Error('FINANCE_FORBIDDEN');
- if(!Number.isInteger(expectedVersion)||expectedVersion<0)throw new Error('WORKSPACE_VERSION_REQUIRED');
+ if(!Number.isInteger(expectedDomainVersion)||expectedDomainVersion<0)throw new Error('DOMAIN_VERSION_REQUIRED');
  const parsed=stateSchema.pick({expenses:true,cashEntries:true,accountOpenings:true,accountMatches:true,financeCloses:true}).safeParse(input);
  if(!parsed.success)throw new Error('INVALID_FINANCE_DATA');
- const {row,state}=await ensureFinanceApiReady(ownerId);if(row.version!==expectedVersion)throw new Error('WORKSPACE_VERSION_CONFLICT');
+ const {row,state}=await ensureFinanceApiReady(ownerId);
+ const currentDomainVersion=await getDomainVersion(ownerId,FINANCE_DOMAIN);if(currentDomainVersion!==expectedDomainVersion)throw new Error('DOMAIN_VERSION_CONFLICT');
  const candidate=structuredClone(state);for(const key of financeKeys)(candidate[key] as any)=parsed.data[key] as any;
  const next=fixedBusinessName(applyRoleChanges(state,candidate,actor.role));validateWorkspaceChange(state,next);validateRelations(next,{skipOrderNumberUniqueness:true});
  const changed=financeKeys.filter(k=>JSON.stringify(state[k])!==JSON.stringify(next[k]));if(!changed.length)return {data:financeData(state),version:row.version};
@@ -48,9 +50,10 @@ export async function saveFinanceDomain(ownerId:string,input:unknown,expectedVer
  const result=await db.prepare('UPDATE crm_workspaces SET data=?,version=version+1,updated_at=? WHERE owner_id=? AND version=?').bind(JSON.stringify(next),now,ownerId,row.version).run();
  if(!result.meta.changes)throw new Error('WORKSPACE_VERSION_CONFLICT');
  await migrateFinanceShadow(ownerId,next,nextVersion);
+ const domainVersion=await bumpDomainVersion(ownerId,FINANCE_DOMAIN,expectedDomainVersion);
  await db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)')
    .bind(crypto.randomUUID(),ownerId,actor.userId,actor.name,actor.role,'Updated '+changed.join(', '),JSON.stringify(changed),now).run();
- return {data:financeData(next),version:nextVersion};
+ return {data:financeData(next),version:nextVersion,domainVersion};
 }
 export async function markFinanceShadowStale(ownerId:string,sourceVersion:number){
  const now=new Date().toISOString();

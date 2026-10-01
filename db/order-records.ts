@@ -4,6 +4,8 @@ import { CUSTOMER_ORDER_DOMAIN } from './customer-order-shadow.ts';
 import { applyRoleChanges, validateWorkspaceChange, visibleState } from '../lib/role-data.ts';
 import type { WorkspaceRole } from '../lib/roles.ts';
 import { applyCancellationQuarantine, applyDeliveryFollowUps, nextStatuses, orderSchema, type Order, type State } from '../lib/crm.ts';
+import { migrateInventorySupplierShadow,INVENTORY_SUPPLIER_DOMAIN } from './inventory-supplier-shadow.ts';
+import { bumpDomainVersion } from './domain-version.ts';
 
 export type OrderRecord=Order&{recordVersion:number};
 export type OrderActor={userId:string;name:string;role:WorkspaceRole};
@@ -118,6 +120,10 @@ export async function createOrderRecord(ownerId:string,input:unknown,actor:Order
     db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)').bind(auditId,ownerId,actor.userId,actor.name,actor.role,'Created order '+order.number,JSON.stringify(['orders']),now)
   ];
   await db.batch(statements);
+  if(JSON.stringify(state.inventoryHolds)!==JSON.stringify(merged.inventoryHolds)){
+    await migrateInventorySupplierShadow(ownerId,merged,nextWorkspaceVersion);
+    await bumpDomainVersion(ownerId,INVENTORY_SUPPLIER_DOMAIN);
+  }
   return {order:{...order,recordVersion:0} satisfies OrderRecord,workspaceVersion:nextWorkspaceVersion};
 }
 
@@ -147,6 +153,10 @@ export async function updateOrderRecord(ownerId:string,id:string,input:unknown,e
     db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)').bind(auditId,ownerId,actor.userId,actor.name,actor.role,'Updated order '+order.number,JSON.stringify(['orders']),now)
   ];
   await db.batch(statements);
+  if(JSON.stringify(state.inventoryHolds)!==JSON.stringify(merged.inventoryHolds)){
+    await migrateInventorySupplierShadow(ownerId,merged,nextWorkspaceVersion);
+    await bumpDomainVersion(ownerId,INVENTORY_SUPPLIER_DOMAIN);
+  }
   return {order:{...order,recordVersion:nextRecordVersion} satisfies OrderRecord,workspaceVersion:nextWorkspaceVersion};
 }
 
