@@ -110,10 +110,10 @@ export async function createOrderRecord(ownerId:string,input:unknown,actor:Order
   const statements=[
     db.prepare('INSERT INTO crm_rel_orders (owner_id,id,number,customer_id,created,delivered,returned_at,settled_at,channel,payment,status,discount,delivery_charge,courier_cost,packaging,payment_fee,return_fee,settled,restocked,tracking,notes,record_version,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING')
       .bind(ownerId,order.id,order.number,order.customerId,order.created,order.delivered||null,order.returnedAt||null,order.settledAt||null,order.channel,order.payment,order.status,order.discount,order.deliveryCharge,order.courierCost,order.packaging,order.paymentFee,order.returnFee,order.settled,order.restocked,order.tracking,order.notes,0,now,now),
-    db.prepare("SELECT CASE WHEN EXISTS (SELECT 1 FROM crm_rel_orders WHERE owner_id=? AND id=? AND created_at=? AND record_version=0) THEN 1 ELSE 1/0 END").bind(ownerId,order.id,now),
+    db.prepare("SELECT 1 / CASE WHEN EXISTS (SELECT 1 FROM crm_rel_orders WHERE owner_id=? AND id=? AND created_at=? AND record_version=0) THEN 1 ELSE 0 END").bind(ownerId,order.id,now),
     ...orderStatements(ownerId,order,false),
     db.prepare('UPDATE crm_workspaces SET data=?,version=version+1,updated_at=? WHERE owner_id=? AND version=?').bind(JSON.stringify(merged),now,ownerId,row.version),
-    db.prepare("SELECT CASE WHEN EXISTS (SELECT 1 FROM crm_workspaces WHERE owner_id=? AND version=? AND updated_at=?) THEN 1 ELSE 1/0 END").bind(ownerId,nextWorkspaceVersion,now),
+    db.prepare("SELECT 1 / CASE WHEN EXISTS (SELECT 1 FROM crm_workspaces WHERE owner_id=? AND version=? AND updated_at=?) THEN 1 ELSE 0 END").bind(ownerId,nextWorkspaceVersion,now),
     db.prepare('UPDATE crm_relational_migrations SET status=?,source_version=?,verified_at=?,updated_at=? WHERE owner_id=? AND domain=?').bind('verified',nextWorkspaceVersion,now,now,ownerId,CUSTOMER_ORDER_DOMAIN),
     db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)').bind(auditId,ownerId,actor.userId,actor.name,actor.role,'Created order '+order.number,JSON.stringify(['orders']),now)
   ];
@@ -139,10 +139,10 @@ export async function updateOrderRecord(ownerId:string,id:string,input:unknown,e
   const statements=[
     db.prepare('UPDATE crm_rel_orders SET number=?,customer_id=?,created=?,delivered=?,returned_at=?,settled_at=?,channel=?,payment=?,status=?,discount=?,delivery_charge=?,courier_cost=?,packaging=?,payment_fee=?,return_fee=?,settled=?,restocked=?,tracking=?,notes=?,record_version=record_version+1,updated_at=? WHERE owner_id=? AND id=? AND record_version=?')
       .bind(order.number,order.customerId,order.created,order.delivered||null,order.returnedAt||null,order.settledAt||null,order.channel,order.payment,order.status,order.discount,order.deliveryCharge,order.courierCost,order.packaging,order.paymentFee,order.returnFee,order.settled,order.restocked,order.tracking,order.notes,now,ownerId,id,expectedVersion),
-    db.prepare("SELECT CASE WHEN EXISTS (SELECT 1 FROM crm_rel_orders WHERE owner_id=? AND id=? AND record_version=? AND updated_at=?) THEN 1 ELSE 1/0 END").bind(ownerId,id,nextRecordVersion,now),
+    db.prepare("SELECT 1 / CASE WHEN EXISTS (SELECT 1 FROM crm_rel_orders WHERE owner_id=? AND id=? AND record_version=? AND updated_at=?) THEN 1 ELSE 0 END").bind(ownerId,id,nextRecordVersion,now),
     ...orderStatements(ownerId,order,true),
     db.prepare('UPDATE crm_workspaces SET data=?,version=version+1,updated_at=? WHERE owner_id=? AND version=?').bind(JSON.stringify(merged),now,ownerId,row.version),
-    db.prepare("SELECT CASE WHEN EXISTS (SELECT 1 FROM crm_workspaces WHERE owner_id=? AND version=? AND updated_at=?) THEN 1 ELSE 1/0 END").bind(ownerId,nextWorkspaceVersion,now),
+    db.prepare("SELECT 1 / CASE WHEN EXISTS (SELECT 1 FROM crm_workspaces WHERE owner_id=? AND version=? AND updated_at=?) THEN 1 ELSE 0 END").bind(ownerId,nextWorkspaceVersion,now),
     db.prepare('UPDATE crm_relational_migrations SET status=?,source_version=?,verified_at=?,updated_at=? WHERE owner_id=? AND domain=?').bind('verified',nextWorkspaceVersion,now,now,ownerId,CUSTOMER_ORDER_DOMAIN),
     db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)').bind(auditId,ownerId,actor.userId,actor.name,actor.role,'Updated order '+order.number,JSON.stringify(['orders']),now)
   ];
@@ -164,9 +164,9 @@ export async function deleteOrderRecord(ownerId:string,id:string,expectedVersion
   const db=database();
   await db.batch([
     db.prepare('DELETE FROM crm_rel_orders WHERE owner_id=? AND id=? AND record_version=?').bind(ownerId,id,expectedVersion),
-    db.prepare("SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM crm_rel_orders WHERE owner_id=? AND id=?) THEN 1 ELSE 1/0 END").bind(ownerId,id),
+    db.prepare("SELECT 1 / CASE WHEN NOT EXISTS (SELECT 1 FROM crm_rel_orders WHERE owner_id=? AND id=?) THEN 1 ELSE 0 END").bind(ownerId,id),
     db.prepare('UPDATE crm_workspaces SET data=?,version=version+1,updated_at=? WHERE owner_id=? AND version=?').bind(JSON.stringify(merged),now,ownerId,row.version),
-    db.prepare("SELECT CASE WHEN EXISTS (SELECT 1 FROM crm_workspaces WHERE owner_id=? AND version=? AND updated_at=?) THEN 1 ELSE 1/0 END").bind(ownerId,nextWorkspaceVersion,now),
+    db.prepare("SELECT 1 / CASE WHEN EXISTS (SELECT 1 FROM crm_workspaces WHERE owner_id=? AND version=? AND updated_at=?) THEN 1 ELSE 0 END").bind(ownerId,nextWorkspaceVersion,now),
     db.prepare('UPDATE crm_relational_migrations SET status=?,source_version=?,verified_at=?,updated_at=? WHERE owner_id=? AND domain=?').bind('verified',nextWorkspaceVersion,now,now,ownerId,CUSTOMER_ORDER_DOMAIN),
     db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)').bind(auditId,ownerId,actor.userId,actor.name,actor.role,'Deleted order '+before.number,JSON.stringify(['orders']),now)
   ]);

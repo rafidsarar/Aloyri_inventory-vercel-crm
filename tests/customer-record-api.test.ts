@@ -37,7 +37,8 @@ test('customer persistence keeps relational and JSON compatibility writes in one
   assert.match(persistence,/UPDATE crm_workspaces SET data=\?,version=version\+1/);
   assert.match(persistence,/crm_relational_migrations/);
   assert.match(persistence,/crm_audit_log/);
-  assert.match(persistence,/1\/0/);
+  assert.doesNotMatch(persistence,/ELSE 1\/0/);
+  assert.match(persistence,/SELECT 1 \/ CASE WHEN/);
 });
 
 test('customer deletion protects referenced records',()=>{

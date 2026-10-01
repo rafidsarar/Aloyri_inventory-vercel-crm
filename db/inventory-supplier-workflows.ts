@@ -1,4 +1,5 @@
 import { database } from './raw.ts';
+import { migrateFinanceShadow } from './finance-shadow.ts';
 import { applyPurchaseOrderReceipt, accountIds, fixedBusinessName, stateSchema, today, uid, validateRelations, type State } from '../lib/crm.ts';
 import { validateWorkspaceChange } from '../lib/role-data.ts';
 import type { WorkspaceRole } from '../lib/roles.ts';
@@ -20,6 +21,7 @@ async function commit(ownerId:string,before:State,next:State,version:number,acto
     .bind(JSON.stringify(fixedBusinessName(next)),now,ownerId,version).run();
   if(!result.meta.changes)throw new Error('WORKSPACE_VERSION_CONFLICT');
   await migrateInventorySupplierShadow(ownerId,next,nextVersion);
+  if(sections.includes('accountMatches'))try{await migrateFinanceShadow(ownerId,next,nextVersion)}catch(error){console.error('Finance shadow sync failed after supplier workflow',error)}
   await db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)')
     .bind(crypto.randomUUID(),ownerId,actor.userId,actor.name,actor.role,summary,JSON.stringify(sections),now).run();
   return {version:nextVersion};

@@ -31,10 +31,10 @@ const allocationSchema = z.object({batchId:id,qty,unitCost:money});
 const collectionSchema=z.object({id,date,amount:money.refine(n=>n>0),reference:str.default('')});
 const orderStatusSchema=z.preprocess(value=>value==='Processing'?'Ready to pack':value==='Ready to Ship'?'Packed':value,z.enum(statuses));
 export const orderSchema = z.object({id,number:str,customerId:id,created:date,delivered:date.optional(),returnedAt:date.optional(),settledAt:date.optional(),collections:z.array(collectionSchema).max(100).default([]),channel:z.enum(channels),payment:z.enum(['COD','bKash','Nagad','Bank']),status:orderStatusSchema,items:z.array(z.object({productId:id,qty,price:money,allocations:z.array(allocationSchema).min(1)})).min(1).max(50),discount:money,deliveryCharge:money,courierCost:money,packaging:money,paymentFee:money,returnFee:money,settled:z.boolean(),restocked:z.boolean(),tracking:str,notes:str});
-const expenseSchema = z.object({id,category:z.enum(expenseCategories),amount:money,date,notes:str,vendor:str.default(''),reference:str.default(''),recurring:z.enum(['none','monthly']).default('none'),account:z.enum(accountIds).optional()});
-const cashEntrySchema = z.object({id,date,kind:z.enum(['in','out']),category:z.string().trim().min(1).max(100),description:str,amount:money.refine(n=>n>0),transferId:id.optional(),reversalOf:id.optional(),reversalReason:z.string().trim().max(300).optional()});
-const accountOpeningSchema=z.object({account:z.enum(accountIds),date,balance:money,statementDate:date.optional(),statementBalance:money.optional()});
-const accountMatchSchema=z.object({entryId:id,account:z.enum(accountIds),matched:z.boolean(),reference:z.string().trim().max(200)});
+export const expenseSchema = z.object({id,category:z.enum(expenseCategories),amount:money,date,notes:str,vendor:str.default(''),reference:str.default(''),recurring:z.enum(['none','monthly']).default('none'),account:z.enum(accountIds).optional()});
+export const cashEntrySchema = z.object({id,date,kind:z.enum(['in','out']),category:z.string().trim().min(1).max(100),description:str,amount:money.refine(n=>n>0),transferId:id.optional(),reversalOf:id.optional(),reversalReason:z.string().trim().max(300).optional()});
+export const accountOpeningSchema=z.object({account:z.enum(accountIds),date,balance:money,statementDate:date.optional(),statementBalance:money.optional()});
+export const accountMatchSchema=z.object({entryId:id,account:z.enum(accountIds),matched:z.boolean(),reference:z.string().trim().max(200)});
 const businessProfileSchema=z.object({phone:z.string().trim().max(40),email:z.union([z.literal(''),z.string().trim().email().max(200)]),address:z.string().trim().max(500),bin:z.string().trim().max(60),logoDataUrl:z.union([z.literal(''),z.string().regex(/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/).max(150000)]),invoiceFooter:z.string().trim().max(500),returnPolicy:z.string().trim().max(500),appearanceMode:z.enum(['light','dark']).default('light')});
 export const emptyBusinessProfile=()=>({phone:'',email:'',address:'',bin:'',logoDataUrl:'',invoiceFooter:'',returnPolicy:'',appearanceMode:'light' as const});
 const taskSchema = z.object({
@@ -50,7 +50,7 @@ const taskSchema = z.object({
   notes:z.string().trim().max(1000).default(''),
   completedAt:z.union([date,z.literal('')]).default('')
 });
-const financeCloseSchema=z.object({month:z.string().regex(/^\d{4}-\d{2}$/),closedAt:date,closedBy:str,notes:str.default('')});
+export const financeCloseSchema=z.object({month:z.string().regex(/^\d{4}-\d{2}$/),closedAt:date,closedBy:str,notes:str.default('')});
 export const defaultAutomationSettings=()=>({
   deliveryFollowUp:{enabled:true,delayDays:7},
   lowStock:{enabled:true},

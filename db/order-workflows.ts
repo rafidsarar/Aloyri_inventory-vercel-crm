@@ -1,4 +1,5 @@
 import { database } from './raw.ts';
+import { migrateFinanceShadow } from './finance-shadow.ts';
 import { ensureCustomerRecordApiReady } from './customer-records.ts';
 import { CUSTOMER_ORDER_DOMAIN } from './customer-order-shadow.ts';
 import { validateWorkspaceChange } from '../lib/role-data.ts';
@@ -18,7 +19,7 @@ function orderReplaceStatements(ownerId:string,order:Order,expectedVersion:numbe
   const db=database(),statements:any[]=[];
   statements.push(db.prepare('UPDATE crm_rel_orders SET number=?,customer_id=?,created=?,delivered=?,returned_at=?,settled_at=?,channel=?,payment=?,status=?,discount=?,delivery_charge=?,courier_cost=?,packaging=?,payment_fee=?,return_fee=?,settled=?,restocked=?,tracking=?,notes=?,record_version=record_version+1,updated_at=? WHERE owner_id=? AND id=? AND record_version=?')
     .bind(order.number,order.customerId,order.created,order.delivered||null,order.returnedAt||null,order.settledAt||null,order.channel,order.payment,order.status,order.discount,order.deliveryCharge,order.courierCost,order.packaging,order.paymentFee,order.returnFee,order.settled,order.restocked,order.tracking,order.notes,now,ownerId,order.id,expectedVersion));
-  statements.push(db.prepare("SELECT CASE WHEN EXISTS (SELECT 1 FROM crm_rel_orders WHERE owner_id=? AND id=? AND record_version=? AND updated_at=?) THEN 1 ELSE 1/0 END").bind(ownerId,order.id,nextVersion,now));
+  statements.push(db.prepare("SELECT 1 / CASE WHEN EXISTS (SELECT 1 FROM crm_rel_orders WHERE owner_id=? AND id=? AND record_version=? AND updated_at=?) THEN 1 ELSE 0 END").bind(ownerId,order.id,nextVersion,now));
   statements.push(db.prepare('DELETE FROM crm_rel_order_allocations WHERE owner_id=? AND order_id=?').bind(ownerId,order.id));
   statements.push(db.prepare('DELETE FROM crm_rel_order_collections WHERE owner_id=? AND order_id=?').bind(ownerId,order.id));
   statements.push(db.prepare('DELETE FROM crm_rel_order_items WHERE owner_id=? AND order_id=?').bind(ownerId,order.id));
@@ -41,10 +42,11 @@ async function commitWorkflow(ownerId:string,before:State,next:State,rowVersion:
   const statements:any[]=[];
   for(const change of changed)statements.push(...orderReplaceStatements(ownerId,change.order,change.expectedVersion,change.expectedVersion+1,now));
   statements.push(db.prepare('UPDATE crm_workspaces SET data=?,version=version+1,updated_at=? WHERE owner_id=? AND version=?').bind(JSON.stringify(next),now,ownerId,rowVersion));
-  statements.push(db.prepare("SELECT CASE WHEN EXISTS (SELECT 1 FROM crm_workspaces WHERE owner_id=? AND version=? AND updated_at=?) THEN 1 ELSE 1/0 END").bind(ownerId,nextWorkspaceVersion,now));
+  statements.push(db.prepare("SELECT 1 / CASE WHEN EXISTS (SELECT 1 FROM crm_workspaces WHERE owner_id=? AND version=? AND updated_at=?) THEN 1 ELSE 0 END").bind(ownerId,nextWorkspaceVersion,now));
   statements.push(db.prepare('UPDATE crm_relational_migrations SET status=?,source_version=?,verified_at=?,updated_at=? WHERE owner_id=? AND domain=?').bind('verified',nextWorkspaceVersion,now,now,ownerId,CUSTOMER_ORDER_DOMAIN));
   statements.push(db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)').bind(crypto.randomUUID(),ownerId,actor.userId,actor.name,actor.role,summary,JSON.stringify(sections),now));
   await db.batch(statements);
+  if(sections.includes('accountMatches'))try{await migrateFinanceShadow(ownerId,next,nextWorkspaceVersion)}catch(error){console.error('Finance shadow sync failed after order workflow',error)}
   return {workspaceVersion:nextWorkspaceVersion,recordVersions:Object.fromEntries(changed.map(c=>[c.order.id,c.expectedVersion+1]))};
 }
 
@@ -142,7 +144,7 @@ export async function createOrderWithCustomerWorkflow(ownerId:string,input:{cust
     item.allocations.forEach((a,allocationNo)=>statements.push(db.prepare('INSERT INTO crm_rel_order_allocations (owner_id,order_id,line_no,allocation_no,batch_id,qty,unit_cost) VALUES (?,?,?,?,?,?,?)').bind(ownerId,order.id,lineNo,allocationNo,a.batchId,a.qty,a.unitCost)));
   });
   statements.push(db.prepare('UPDATE crm_workspaces SET data=?,version=version+1,updated_at=? WHERE owner_id=? AND version=?').bind(JSON.stringify(next),now,ownerId,row.version));
-  statements.push(db.prepare("SELECT CASE WHEN EXISTS (SELECT 1 FROM crm_workspaces WHERE owner_id=? AND version=? AND updated_at=?) THEN 1 ELSE 1/0 END").bind(ownerId,nextWorkspaceVersion,now));
+  statements.push(db.prepare("SELECT 1 / CASE WHEN EXISTS (SELECT 1 FROM crm_workspaces WHERE owner_id=? AND version=? AND updated_at=?) THEN 1 ELSE 0 END").bind(ownerId,nextWorkspaceVersion,now));
   statements.push(db.prepare('UPDATE crm_relational_migrations SET status=?,source_version=?,verified_at=?,updated_at=? WHERE owner_id=? AND domain=?').bind('verified',nextWorkspaceVersion,now,now,ownerId,CUSTOMER_ORDER_DOMAIN));
   statements.push(db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)').bind(crypto.randomUUID(),ownerId,actor.userId,actor.name,actor.role,'Created order '+order.number+' with new customer '+customer.name,JSON.stringify(['customers','orders']),now));
   await db.batch(statements);
