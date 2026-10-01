@@ -46,11 +46,11 @@ export async function listCustomerRecords(ownerId:string){
 }
 
 export async function getCustomerRecord(ownerId:string,id:string){
-  const {row}=await ensureCustomerRecordApiReady(ownerId);
-  const row=await database().prepare(
+  const {row:workspaceRow}=await ensureCustomerRecordApiReady(ownerId);
+  const customerRow=await database().prepare(
     'SELECT id,name,phone,address,city,preference,notes,consent,created,record_version FROM crm_rel_customers WHERE owner_id=? AND id=?'
   ).bind(ownerId,id).first<CustomerRow>();
-  return {customer:row?mapCustomer(row):null,workspaceVersion:(await loadWorkspace(ownerId)).row.version};
+  return {customer:customerRow?mapCustomer(customerRow):null,workspaceVersion:workspaceRow.version};
 }
 
 async function ensureAuditTable(){
