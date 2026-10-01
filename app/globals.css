@@ -1295,6 +1295,11 @@ html,body{max-width:100%;overflow-x:hidden}
 [data-crm-theme="dark"] .purchasing-kpi-icon{background:#302722;color:#d8a28f}
 [data-crm-theme="dark"] .mobile-section-nav button{color:#c3b2aa}
 [data-crm-theme="dark"] .mobile-section-nav button[aria-current=page]{background:#3a2923;color:#efb7a3}
+[data-crm-theme="dark"] .recharts-cartesian-grid line{stroke:#453730}
+[data-crm-theme="dark"] .recharts-text{fill:#b8a9a2}
+[data-crm-theme="dark"] .recharts-default-tooltip{background:#241d1a!important;border:1px solid #493a34!important;border-radius:10px!important;color:#eee4df!important}
+[data-crm-theme="dark"] .recharts-tooltip-label,
+[data-crm-theme="dark"] .recharts-tooltip-item{color:#eee4df!important}
 [data-crm-theme="dark"] .appearance-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:17px 0}
 [data-crm-theme="dark"] .appearance-option{background:#251e1b;border-color:#43342f;color:#eee1db}
 [data-crm-theme="dark"] .appearance-option.selected{border-color:#c98773;box-shadow:0 0 0 2px #c9877330}
