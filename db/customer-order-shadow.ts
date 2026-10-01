@@ -142,3 +142,17 @@ export async function getCustomersOrdersMigrationStatus(ownerId:string){
     .bind(ownerId,CUSTOMER_ORDER_DOMAIN)
     .first<{domain:string;status:string;source_version:number;migrated_at:string|null;verified_at:string|null;updated_at:string}|null>();
 }
+
+
+export function customerOrderSectionsChanged(previous:Pick<State,'customers'|'orders'>,next:Pick<State,'customers'|'orders'>){
+  return JSON.stringify(previous.customers)!==JSON.stringify(next.customers)
+    || JSON.stringify(previous.orders)!==JSON.stringify(next.orders);
+}
+
+export async function markCustomersOrdersShadowStale(ownerId:string,sourceVersion:number){
+  await ensureRelationalFoundation();
+  const now=new Date().toISOString();
+  await database().prepare(
+    'INSERT INTO crm_relational_migrations (owner_id,domain,status,source_version,migrated_at,verified_at,updated_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT (owner_id,domain) DO UPDATE SET status=EXCLUDED.status,source_version=EXCLUDED.source_version,verified_at=EXCLUDED.verified_at,updated_at=EXCLUDED.updated_at'
+  ).bind(ownerId,CUSTOMER_ORDER_DOMAIN,'stale',sourceVersion,null,null,now).run();
+}
