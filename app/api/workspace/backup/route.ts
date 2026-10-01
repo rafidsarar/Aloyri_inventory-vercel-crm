@@ -3,7 +3,7 @@ import { AccessDenied, resolveWorkspace } from '@/app/team-access';
 import { database } from '@/db/raw';
 import { fixedBusinessName, stateSchema, validateRelations, workspaceIntegrityWarnings, type State } from '@/lib/crm';
 import { roleCanBackup } from '@/lib/roles';
-import { relationalCoreState,setRelationalCutover,verifyRelationalParity } from '@/db/relational-cutover';
+import { getCutoverState,relationalCoreState,setRelationalCutover,verifyRelationalParity } from '@/db/relational-cutover';
 import { migrateCustomersOrdersShadow,CUSTOMER_ORDER_DOMAIN } from '@/db/customer-order-shadow';
 import { migrateInventorySupplierShadow,INVENTORY_SUPPLIER_DOMAIN } from '@/db/inventory-supplier-shadow';
 import { migrateFinanceShadow,FINANCE_DOMAIN } from '@/db/finance-shadow';
@@ -121,9 +121,10 @@ export async function POST(request:Request){
     await db.prepare('CREATE INDEX IF NOT EXISTS crm_restore_snapshots_owner_created_idx ON crm_restore_snapshots(owner_id,created_at DESC)').run();
     await db.prepare('INSERT INTO crm_restore_snapshots (id,owner_id,workspace_version,workspace_updated_at,checksum,data,created_at) VALUES (?,?,?,?,?,?,?)').bind(snapshotId,ownerId,row.version,row.updated_at,currentChecksum,JSON.stringify(currentData),now).run();
     await db.prepare('DELETE FROM crm_restore_snapshots WHERE owner_id=? AND id NOT IN (SELECT id FROM crm_restore_snapshots WHERE owner_id=? ORDER BY created_at DESC LIMIT 5)').bind(ownerId,ownerId).run();
+    const priorCutover=await getCutoverState(ownerId);
     await setRelationalCutover(ownerId,false,user.displayName||user.email);
     const result=await db.prepare('UPDATE crm_workspaces SET data=?,version=version+1,updated_at=? WHERE owner_id=? AND version=?').bind(JSON.stringify(restored),now,ownerId,row.version).run();
-    if(!result.meta.changes)return response({error:'Workspace changed while restoring. Try again.'},409);
+    if(!result.meta.changes){if(priorCutover.enabled)await setRelationalCutover(ownerId,true,user.displayName||user.email);return response({error:'Workspace changed while restoring. Try again.'},409);}
     const restoredVersion=row.version+1;
     await migrateCustomersOrdersShadow(ownerId,restored,restoredVersion);
     await migrateInventorySupplierShadow(ownerId,restored,restoredVersion);
