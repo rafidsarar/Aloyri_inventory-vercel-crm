@@ -1,7 +1,7 @@
 'use client';
 
 import { AlertTriangle, ArrowRight, Bell, CheckCircle2, ChevronRight, Clock, ShieldCheck } from 'lucide-react';
-import { Empty, Stat, type View } from '../crm-ui';
+import { Empty, Stat, WorkspaceSection, type View } from '../crm-ui';
 
 export type AutoAlert={
   id:string;
@@ -39,7 +39,7 @@ export default function AlertsSection({
   openAlert,
   alertActionLabel,
 }:Props){
-  return <>
+  return <WorkspaceSection>
     <section className="panel alert-brief alert-brief-pro">
       <div className="panel-heading">
         <div>
@@ -126,5 +126,5 @@ export default function AlertsSection({
               : undefined}
           />}
     </section>
-  </>;
+  </WorkspaceSection>;
 }
