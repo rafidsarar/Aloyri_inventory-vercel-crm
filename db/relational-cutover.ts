@@ -25,9 +25,10 @@ export async function getCutoverState(ownerId:string){
 }
 
 export async function relationalCoreState(ownerId:string){
-  const [{row,state},customers,orders,inventory,finance]=await Promise.all([
-    workspace(ownerId),listCustomerRecords(ownerId),listOrderRecords(ownerId),getInventorySupplierDomain(ownerId),getFinanceDomain(ownerId)
-  ]);
+  const {row,state}=await workspace(ownerId);
+  const customers=await listCustomerRecords(ownerId);
+  const orders=await listOrderRecords(ownerId);
+  const [inventory,finance]=await Promise.all([getInventorySupplierDomain(ownerId),getFinanceDomain(ownerId)]);
   const merged:State={...state,
     customers:customers.customers.map(({recordVersion:_,...x})=>x),
     orders:orders.orders.map(({recordVersion:_,...x})=>x),
@@ -65,7 +66,7 @@ export async function ensureRelationalCutover(ownerId:string){
   if(existing)return getCutoverState(ownerId);
   const verification=await verifyRelationalParity(ownerId);
   const now=new Date().toISOString(),enabled=verification.ok;
-  await database().prepare('INSERT INTO crm_relational_cutover (owner_id,enabled,enabled_at,enabled_by,last_verified_at,last_verification,updated_at) VALUES (?,?,?,?,?,?,?)')
+  await database().prepare('INSERT INTO crm_relational_cutover (owner_id,enabled,enabled_at,enabled_by,last_verified_at,last_verification,updated_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(owner_id) DO UPDATE SET enabled=EXCLUDED.enabled,enabled_at=EXCLUDED.enabled_at,enabled_by=EXCLUDED.enabled_by,last_verified_at=EXCLUDED.last_verified_at,last_verification=EXCLUDED.last_verification,updated_at=EXCLUDED.updated_at')
     .bind(ownerId,enabled,enabled?now:null,enabled?'stage-3-step-8-auto-cutover':null,now,JSON.stringify(verification),now).run();
   return getCutoverState(ownerId);
 }
