@@ -5,6 +5,8 @@ import { canManageBusinessSettings } from '@/lib/roles';
 import { database } from '@/db/raw';
 import { ensureRelationalFoundation } from '@/db/relational-foundation';
 import { customerOrderSectionsChanged, markCustomersOrdersShadowStale, migrateCustomersOrdersShadow } from '@/db/customer-order-shadow';
+import { inventorySupplierSectionsChanged, markInventorySupplierShadowStale } from '@/db/inventory-supplier-records';
+import { migrateInventorySupplierShadow } from '@/db/inventory-supplier-shadow';
 import { initialState, stateSchema, fixedBusinessName, validateRelations, nextStatuses, applyCancellationQuarantine, applyDeliveryFollowUps, type State } from '@/lib/crm';
 
 export const dynamic='force-dynamic';
@@ -83,7 +85,13 @@ export async function PUT(request:Request){
         try{await markCustomersOrdersShadowStale(ownerId,nextVersion)}catch(markError){console.error('Could not mark customers/orders shadow stale',markError)}
       }
     }
-    return response({version:body.version+1,data:visibleState(merged,role),shadowSync});
+    let inventorySupplierSync:'not-needed'|'verified'|'stale'='not-needed';
+    if(inventorySupplierSectionsChanged(previous,merged)){
+      const nextVersion=body.version+1;
+      try{await migrateInventorySupplierShadow(ownerId,merged,nextVersion);inventorySupplierSync='verified'}
+      catch(error){inventorySupplierSync='stale';console.error('Inventory/suppliers relational shadow sync failed after workspace save',error);try{await markInventorySupplierShadowStale(ownerId,nextVersion)}catch(markError){console.error('Could not mark inventory/suppliers shadow stale',markError)}}
+    }
+    return response({version:body.version+1,data:visibleState(merged,role),shadowSync,inventorySupplierSync});
   }catch(e){
     if(e instanceof AccessDenied)return response({error:e.message},403);
     console.error('Workspace save failed',e);
