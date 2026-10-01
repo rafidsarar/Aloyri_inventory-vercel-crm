@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import type { Order } from '@/lib/crm';
 import { statuses, taka } from '@/lib/crm';
 import { Choice } from '../forms';
-import { ActionBar, SectionPanel } from '../crm-ui';
+import { ActionBar, SectionPanel, WorkspaceSection } from '../crm-ui';
 
 type Props={
   openOrderCount:number;
@@ -39,7 +39,7 @@ export default function OrdersSection({
   filteredOrders,selectedOrderIds,setSelectedOrderIds,busy,bulkAdvanceSelectedOrders,query,
   setQuery,orderTable
 }:Props){
-  return <>
+  return <WorkspaceSection>
     <section className="orders-hero orders-hero-pro">
       <div className="orders-hero-copy">
         <span className="orders-eyebrow"><ShoppingBag size={15}/>Order workflow</span>
@@ -77,5 +77,5 @@ export default function OrdersSection({
       {orderTable(filteredOrders)}
       <div className="table-footer order-footer-pro"><span>Oldest active orders appear first inside each stage.</span><span>Use Next Step to advance fulfillment.</span></div>
     </SectionPanel>
-  </>;
+  </WorkspaceSection>;
 }
