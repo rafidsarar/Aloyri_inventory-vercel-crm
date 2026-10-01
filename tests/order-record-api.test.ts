@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { orderSchema, initialState, today, nextStatuses } from '../lib/crm.ts';
 import { roleCanEdit, roleCanViewSection } from '../lib/roles.ts';
-import { validateWorkspaceChange } from '../lib/role-data.ts';
+import { applyRoleChanges, validateWorkspaceChange, visibleState } from '../lib/role-data.ts';
 
 const persistence=readFileSync(new URL('../db/order-records.ts',import.meta.url),'utf8');
 const listRoute=readFileSync(new URL('../app/api/orders/route.ts',import.meta.url),'utf8');
@@ -80,5 +80,13 @@ test('mutation routes require origin checks and order edit permission',()=>{
   assert.match(listRoute,/roleCanEdit\(role,'orders'\)/);
   assert.match(detailRoute,/checkOrigin\(request\)/);
   assert.match(detailRoute,/roleCanEdit\(role,'orders'\)/);
-  assert.match(persistence,/Sales staff cannot delete existing orders/);
+  const state=initialState();
+  state.products=[{id:'p1',brand:'T',name:'P',size:'1',category:'Other',price:1000,cost:400,targetQty:1,reorderAt:0,active:true}];
+  state.productCategories=['Other'];
+  state.customers=[{id:'c1',name:'C',phone:'',address:'',city:'',preference:'',notes:'',consent:false,created:today()}];
+  state.batches=[{id:'b1',productId:'p1',qty:10,unitCost:400,expiry:'2099-12-31',received:today(),supplierId:'',invoice:'',payments:[],paid:false}];
+  state.orders=[sampleOrder()];
+  const proposed=structuredClone(visibleState(state,'sales'));
+  proposed.orders=[];
+  assert.throws(()=>applyRoleChanges(state,proposed,'sales'),/cannot delete existing orders/);
 });
