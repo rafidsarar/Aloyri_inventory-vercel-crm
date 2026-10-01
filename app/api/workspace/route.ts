@@ -3,6 +3,7 @@ import { AccessDenied, resolveWorkspace } from '@/app/team-access';
 import { visibleState, applyRoleChanges, validateWorkspaceChange } from '@/lib/role-data';
 import { canManageBusinessSettings } from '@/lib/roles';
 import { database } from '@/db/raw';
+import { ensureRelationalFoundation } from '@/db/relational-foundation';
 import { initialState, stateSchema, fixedBusinessName, validateRelations, nextStatuses, applyCancellationQuarantine, applyDeliveryFollowUps, type State } from '@/lib/crm';
 
 export const dynamic='force-dynamic';
@@ -24,6 +25,7 @@ export async function GET(){
     const user=await getAppUser();
     if(!user)return response({error:'Sign in to open the workspace.'},401);
     const {ownerId,role}=await resolveWorkspace(user);
+    await ensureRelationalFoundation();
     const db=database();
     if(role==='owner')await db.prepare('INSERT OR IGNORE INTO crm_workspaces (owner_id,data,version,updated_at) VALUES (?,?,0,?)').bind(ownerId,JSON.stringify(initialState()),new Date().toISOString()).run();
     const row=await db.prepare('SELECT data,version,updated_at FROM crm_workspaces WHERE owner_id = ?').bind(ownerId).first<{data:string;version:number;updated_at:string}>();
@@ -50,6 +52,7 @@ export async function PUT(request:Request){
     try{body=JSON.parse(text)}catch{return response({error:'Invalid request.'},400)}
     const parsed=stateSchema.safeParse(body.data);
     if(!parsed.success||!Number.isInteger(body.version)||body.version<0)return response({error:'Check the values in your form.'},400);
+    await ensureRelationalFoundation();
     const db=database();
     const existing=await db.prepare('SELECT data,version FROM crm_workspaces WHERE owner_id = ?').bind(ownerId).first<{data:string;version:number}>();
     if(!existing||existing.version!==body.version)return response({error:'This workspace changed in another window. Refresh records, then try again.'},409);
