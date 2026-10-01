@@ -1,4 +1,4 @@
-import { database } from './raw';
+import { database } from './raw.ts';
 
 export const relationalFoundationSql = [
   `CREATE TABLE IF NOT EXISTS crm_relational_migrations (
