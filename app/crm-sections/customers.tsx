@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Table,TableBody,TableCell,TableHead,TableHeader,TableRow } from '@/components/ui/table';
 import type { Customer, Order } from '@/lib/crm';
 import { subtotal, taka } from '@/lib/crm';
-import { Avatar, Empty, Status } from '../crm-ui';
+import { ActionBar, Avatar, Empty, SectionPanel, Status, WorkspaceSection } from '../crm-ui';
 
 type Detail={type:'order'|'customer'|'supplier';id:string};
 
@@ -29,11 +29,11 @@ export default function CustomersSection({
   query,setQuery,filteredCustomers,customerCount,selectedCustomerIds,setSelectedCustomerIds,
   canEdit,busy,bulkCreateCustomerFollowUps,orders,setDetail,requestDelete
 }:Props){
-  return <section className="panel customer-workspace">
-    <div className="table-toolbar">
+  return <WorkspaceSection><SectionPanel className="customer-workspace">
+    <ActionBar className="table-toolbar">
       <div className="search-input"><Search size={17}/><Input aria-label="Search customers" placeholder="Search name, phone or city…" value={query} onChange={e=>setQuery(e.target.value)}/></div>
       <span className="muted">{filteredCustomers.length} of {customerCount} customers</span>
-    </div>
+    </ActionBar>
     {selectedCustomerIds.length>0&&<div className="bulk-action-bar">
       <span><strong>{selectedCustomerIds.length}</strong> customers selected</span>
       <div><button className="btn secondary" onClick={()=>setSelectedCustomerIds([])}>Clear</button>{canEdit('tasks')&&<button className="btn primary" disabled={busy} onClick={()=>void bulkCreateCustomerFollowUps()}><CalendarCheck size={15}/>Create follow-ups</button>}</div>
@@ -68,5 +68,5 @@ export default function CustomersSection({
           })}</div>
         </>
       : <Empty title="No customers yet" text="Save their contact details and preferences, then create an order."/>}
-  </section>;
+  </SectionPanel></WorkspaceSection>;
 }

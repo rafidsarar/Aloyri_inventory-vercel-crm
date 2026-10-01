@@ -3,7 +3,7 @@
 import { Clock, Loader2, Search, ShieldCheck, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Table,TableBody,TableCell,TableHead,TableHeader,TableRow } from '@/components/ui/table';
-import { Avatar, Empty, Status } from '../crm-ui';
+import { ActionBar, Avatar, Empty, SectionPanel, Status, WorkspaceSection } from '../crm-ui';
 
 export type AuditEvent={
   id:string;
@@ -40,7 +40,7 @@ export default function ActivitySection({
   auditRoles,auditSections,auditHasMore,auditLoading,setAuditQuery,setAuditRole,setAuditSection,
   loadAudit,auditDate,auditTime,auditRelative
 }:Props){
-  return <>
+  return <WorkspaceSection>
     <section className="activity-hero">
       <div>
         <span className="orders-eyebrow"><ShieldCheck size={15}/>Protected history</span>
@@ -53,12 +53,12 @@ export default function ActivitySection({
         <span><strong>{auditLatest?auditRelative(auditLatest.created_at):'—'}</strong><small>latest change</small></span>
       </div>
     </section>
-    <section className="panel activity-panel activity-panel-pro">
+    <SectionPanel className="activity-panel activity-panel-pro">
       <div className="panel-heading">
         <div><h2>Change history</h2><p>Filter by team member role, changed section, or search the recorded summary.</p></div>
         <span className="status">{filteredAuditEvents.length} shown</span>
       </div>
-      <div className="activity-toolbar activity-toolbar-pro">
+      <ActionBar className="activity-toolbar activity-toolbar-pro">
         <div className="search-input">
           <Search size={16}/>
           <Input aria-label="Search activity history" value={auditQuery} onChange={e=>setAuditQuery(e.target.value)} placeholder="Search person, role, action or section…"/>
@@ -74,7 +74,7 @@ export default function ActivitySection({
             {auditSections.map(section=><button key={section} className={auditSection===section?'active':''} onClick={()=>setAuditSection(section)}>{section}</button>)}
           </div></div>
         </div>
-      </div>
+      </ActionBar>
       {filteredAuditEvents.length
         ? <>
             <div className="activity-desktop">
@@ -96,6 +96,6 @@ export default function ActivitySection({
             {auditHasMore&&<div className="activity-load-more"><button className="btn secondary" disabled={auditLoading} onClick={()=>void loadAudit(false)}>{auditLoading?<Loader2 className="spin" size={15}/>:<Clock size={15}/>}Load older activity</button></div>}
           </>
         : <Empty title={auditEvents.length?'No matching activity':'No activity recorded yet'} text={auditEvents.length?'Clear search, role, or section filters to see more history.':'New workspace changes will appear here automatically.'} action={auditEvents.length?<button className="btn secondary" onClick={()=>{setAuditQuery('');setAuditSection('All');setAuditRole('All')}}>Clear filters</button>:undefined}/>}
-    </section>
-  </>;
+    </SectionPanel>
+  </WorkspaceSection>;
 }
