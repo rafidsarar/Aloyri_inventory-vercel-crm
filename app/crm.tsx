@@ -391,7 +391,6 @@ const globalResults=useMemo<GlobalResult[]>(()=>{
   }
   return results.sort((a,b)=>b.score-a.score||a.view.localeCompare(b.view)||a.title.localeCompare(b.title)).slice(0,18);
 },[globalNeedle,role,s]);
-useEffect(()=>{setGlobalActiveIndex(0)},[globalNeedle]);
 useEffect(()=>{const onKey=(event:KeyboardEvent)=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='k'){event.preventDefault();globalSearchRef.current?.focus();globalSearchRef.current?.select();}};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey)},[]);
 const globalGroups=useMemo(()=>sections.map(section=>({section,items:globalResults.filter(result=>result.view===section)})).filter(group=>group.items.length),[globalResults]);
 function onGlobalSearchKeyDown(event:React.KeyboardEvent<HTMLInputElement>){
