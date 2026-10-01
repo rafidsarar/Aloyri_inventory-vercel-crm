@@ -10,6 +10,7 @@ import { migrateInventorySupplierShadow } from '@/db/inventory-supplier-shadow';
 import { financeSectionsChanged,markFinanceShadowStale } from '@/db/finance-records';
 import { migrateFinanceShadow } from '@/db/finance-shadow';
 import { initialState, stateSchema, fixedBusinessName, validateRelations, nextStatuses, applyCancellationQuarantine, applyDeliveryFollowUps, type State } from '@/lib/crm';
+import { getCutoverState, relationalCoreKeys, relationalCoreState } from '@/db/relational-cutover';
 
 export const dynamic='force-dynamic';
 const response=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
@@ -35,8 +36,10 @@ export async function GET(){
     if(role==='owner')await db.prepare('INSERT OR IGNORE INTO crm_workspaces (owner_id,data,version,updated_at) VALUES (?,?,0,?)').bind(ownerId,JSON.stringify(initialState()),new Date().toISOString()).run();
     const row=await db.prepare('SELECT data,version,updated_at FROM crm_workspaces WHERE owner_id = ?').bind(ownerId).first<{data:string;version:number;updated_at:string}>();
     if(!row)return response({error:'The shared workspace is not ready. Ask the owner to sign in first.'},404);
-    const workspace=fixedBusinessName(stateSchema.parse(JSON.parse(row.data)));validateRelations(workspace,{skipOrderNumberUniqueness:true});
-    return response({data:visibleState(workspace,role),version:row.version,role,userName:user.displayName});
+    const compatibility=fixedBusinessName(stateSchema.parse(JSON.parse(row.data)));validateRelations(compatibility,{skipOrderNumberUniqueness:true});
+    const cutover=await getCutoverState(ownerId);
+    const workspace=cutover.enabled?(await relationalCoreState(ownerId)).state:compatibility;
+    return response({data:visibleState(workspace,role),version:row.version,role,userName:user.displayName,relationalCutover:cutover.enabled});
   }catch(e){
     if(e instanceof AccessDenied)return response({error:e.message},403);
     console.error('Workspace read failed',e);
@@ -62,9 +65,14 @@ export async function PUT(request:Request){
     const existing=await db.prepare('SELECT data,version FROM crm_workspaces WHERE owner_id = ?').bind(ownerId).first<{data:string;version:number}>();
     if(!existing||existing.version!==body.version)return response({error:'This workspace changed in another window. Refresh records, then try again.'},409);
     const previous=fixedBusinessName(stateSchema.parse(JSON.parse(existing.data)));
+    const cutover=await getCutoverState(ownerId);
     if(!canManageBusinessSettings(role)&&(['businessName','businessProfile'] as const).some(key=>JSON.stringify(parsed.data[key])!==JSON.stringify(visibleState(previous,role)[key])))
       return response({error:'Only the owner or an admin can edit Business settings.'},403);
-    let merged:typeof previous;
+    if(cutover.enabled){
+      const protectedChange=relationalCoreKeys.find(key=>JSON.stringify(parsed.data[key])!==JSON.stringify(visibleState(previous,role)[key]));
+      if(protectedChange)return response({error:'This core domain is relationally authoritative. Use its dedicated CRM action instead of the legacy workspace save.'},409);
+    }
+        let merged:typeof previous;
     try{merged=applyRoleChanges(previous,parsed.data,role)}catch(e){return response({error:e instanceof Error?e.message:'You cannot change that section.'},403)}
     merged=applyDeliveryFollowUps(previous,applyCancellationQuarantine(previous,fixedBusinessName(merged)));
     try{validateTransitions(previous,merged);validateWorkspaceChange(previous,merged)}catch(e){return response({error:e instanceof Error?e.message:'Invalid records.'},400)}
