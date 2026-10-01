@@ -4,11 +4,34 @@ import { AlertTriangle, ArrowRight, Box, CalendarCheck, ChevronRight, Clock, Pac
 import { Input } from '@/components/ui/input';
 import { Table,TableBody,TableCell,TableHead,TableHeader,TableRow } from '@/components/ui/table';
 import { Tabs,TabsList,TabsTrigger } from '@/components/ui/tabs';
-import { batchRemaining,dateLabel,shiftDate,taka,today } from '@/lib/crm';
+import { batchRemaining,dateLabel,shiftDate,taka,today,type Batch,type Order,type Product,type PurchaseOrder,type State,type Supplier } from '@/lib/crm';
+import type { WorkspaceRole } from '@/lib/roles';
 import { Choice } from '../forms';
-import { Empty,ProductIcon,Status } from '../crm-ui';
+import { Empty,ProductIcon,Status,type View } from '../crm-ui';
 
-type Props={ctx:any};
+type AnyFn=(...args:any[])=>any;
+type InventoryProductRow={
+  product:Product; available:number; physical:number; reserved:number; returnedPending:number;
+  blocked:number; health:string; incoming:number; incomingExpected:string; earliestExpiry:string;
+  stockValue:number; movement30:number;
+};
+type CancelledInspectionGroup={order:Order|undefined;holds:State['inventoryHolds']};
+type Ctx={
+  stockedProducts:Product[]; inventoryUnits:number; s:State; canEdit:(key:string)=>boolean; openModal:AnyFn;
+  setInventoryTab:(value:string)=>void; setFilter:(value:string)=>void; setQuery:(value:string)=>void; m:any;
+  inventoryLow:Product[]; inventoryOut:Product[]; inventoryExpiring:Batch[]; openPurchaseOrders:PurchaseOrder[];
+  inventoryPhysicalUnits:number; inventoryReservedUnits:number; inventoryReturnPendingUnits:number; inventoryBlockedUnits:number;
+  receivedUnitsThisMonth:number; receivedThisMonth:Batch[]; fastestMoving:{product:Product;units:number}|null;
+  slowMovingCount:number; inventoryExpired:Batch[]; changeView:(view:View)=>void; inventoryTab:string;
+  pendingReturnOrders:Order[]; cancelledInspectionGroups:CancelledInspectionGroup[]; managedInventoryHolds:State['inventoryHolds'];
+  canInspectReturns:boolean; query:string; inventorySort:string; setInventorySort:(value:string)=>void; filter:string;
+  visibleInventoryProducts:InventoryProductRow[]; busy:boolean; setConfirm:AnyFn; inspectReturnedOrder:AnyFn;
+  releaseCancelledInspection:AnyFn; markCancelledInspectionDamaged:AnyFn; markInventoryHoldDamaged:AnyFn;
+  releaseInventoryHold:AnyFn; requestDeleteCategory:(name:string)=>void; currentInventoryMonth:string; match:AnyFn;
+  productById:Map<string,Product>; supplierById:Map<string,Supplier>; role:WorkspaceRole; canFinance:boolean;
+  setView:(view:View)=>void; setFinanceTab:(value:string)=>void;
+};
+type Props={ctx:Ctx};
 
 export default function InventorySection({ctx}:Props){
   const {
