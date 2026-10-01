@@ -17,7 +17,7 @@ test('customer-only form saves use record APIs while other form saves can fall b
   assert.match(crm,/function customerOnlyMutation/);
   assert.match(crm,/async function saveCustomerRecord/);
   assert.match(crm,/if\(!mutation\)return save\(next\)/);
-  assert.match(crm,/onSave=\{saveCustomerRecord\}/);
+  assert.match(crm,/onSave=\{saveRecordAware\}/);
 });
 
 test('customer create update and delete map to the expected HTTP methods',()=>{
