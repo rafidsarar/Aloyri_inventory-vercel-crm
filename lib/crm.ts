@@ -366,6 +366,22 @@ export function validateRelations(s:State,options:{skipOrderNumberUniqueness?:bo
     if(t.completedAt&&t.completedAt>today())throw new Error('Follow-up completion date cannot be in the future.');
   }
 }
+export function workspaceIntegrityWarnings(s:State){
+  const issues:{key:string;title:string;detail:string}[]=[];
+  const orderNumbers=new Map<string,number>();
+  for(const order of s.orders){const key=order.number.trim().toLowerCase();orderNumbers.set(key,(orderNumbers.get(key)||0)+1)}
+  const duplicateOrders=[...orderNumbers.entries()].filter(([,count])=>count>1);
+  if(duplicateOrders.length)issues.push({key:'duplicate-order-numbers',title:'Duplicate legacy order numbers',detail:duplicateOrders.length+' order '+(duplicateOrders.length===1?'number is':'numbers are')+' repeated. New or changed order numbers are still protected from collisions.'});
+  const completedWithoutDate=s.tasks.filter(t=>t.done&&!t.completedAt).length;
+  if(completedWithoutDate)issues.push({key:'task-completion-date',title:'Completed follow-ups missing completion dates',detail:completedWithoutDate+' completed '+(completedWithoutDate===1?'reminder has':'reminders have')+' no completion date.'});
+  const partiallyPaidMarkedPaid=s.batches.filter(b=>b.paid&&b.payments.length>0&&b.payments.reduce((n,p)=>n+p.amount,0)<b.qty*b.unitCost-.001).length;
+  if(partiallyPaidMarkedPaid)issues.push({key:'supplier-paid-flag',title:'Supplier payment status needs review',detail:partiallyPaidMarkedPaid+' received '+(partiallyPaidMarkedPaid===1?'batch is':'batches are')+' marked paid while recorded payments are below purchase value.'});
+  const partiallyCollectedSettled=s.orders.filter(o=>o.settled&&o.collections.length>0&&o.collections.reduce((n,p)=>n+p.amount,0)<receivable(o)-.001).length;
+  if(partiallyCollectedSettled)issues.push({key:'order-settled-flag',title:'Order settlement status needs review',detail:partiallyCollectedSettled+' '+(partiallyCollectedSettled===1?'order is':'orders are')+' marked settled while recorded collections are below the receivable.'});
+  const missingSupplier=s.batches.filter(b=>!b.supplierId).length;
+  if(missingSupplier)issues.push({key:'batch-supplier',title:'Stock receipts without supplier links',detail:missingSupplier+' '+(missingSupplier===1?'batch has':'batches have')+' no supplier linked. This can be valid for legacy/manual stock, but reduces purchasing traceability.'});
+  return issues;
+}
 export function metrics(s:State) {const delivered=s.orders.filter(o=>o.status==='Delivered');const returned=s.orders.filter(o=>o.status==='Returned');const sales=delivered.reduce((n,o)=>n+subtotal(o),0);const costs=s.expenses.reduce((n,e)=>n+e.amount,0);const returnLoss=returned.reduce((n,o)=>n+(o.restocked?0:costOfOrder(o))+o.courierCost+o.returnFee+o.packaging+o.paymentFee,0);const collectible=s.orders.filter(o=>o.status==='Delivered'||(o.payment!=='COD'&&!['Cancelled','Returned'].includes(o.status)));const profit=delivered.reduce((n,o)=>n+contribution(o),0)-returnLoss-costs;return {sales,profit,expenses:costs,delivered:delivered.length,open:s.orders.filter(o=>!['Delivered','Returned','Cancelled'].includes(o.status)).length,pending:collectible.reduce((n,o)=>{const due=receivable(o),legacy=o.settled&&o.collections.length===0?due:0;return n+Math.max(0,due-o.collections.reduce((x,p)=>x+p.amount,0)-legacy)},0),stockValue:s.batches.filter(b=>b.expiry>today()).reduce((n,b)=>n+batchRemaining(s,b)*b.unitCost,0),stockPurchases:s.batches.reduce((n,b)=>n+b.qty*b.unitCost,0),unpaidStock:s.batches.reduce((n,b)=>n+Math.max(0,b.qty*b.unitCost-b.payments.reduce((x,p)=>x+p.amount,0)-(b.paid&&b.payments.length===0?b.qty*b.unitCost:0)),0)};}
 export const accountBalance=(s:State,account:typeof accountIds[number])=>{const opening=s.accountOpenings.find(a=>a.account===account);if(!opening)return null;const links=new Map(s.accountMatches.map(m=>[m.entryId,m]));return opening.balance+cashflow(s).entries.filter(e=>e.date>=opening.date&&links.get(e.id)?.account===account).reduce((n,e)=>n+(e.kind==='in'?e.amount:-e.amount),0)};
 export function cashflow(s:State){
