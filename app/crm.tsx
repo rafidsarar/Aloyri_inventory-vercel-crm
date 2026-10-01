@@ -2,8 +2,8 @@
 /* Final operational polish complete */
 /* Production release: management intelligence */
 import React,{useDeferredValue,useEffect,useMemo,useRef,useState} from 'react';
-import { LayoutDashboard,ShoppingBag,Package,Users,Truck,Wallet,CalendarCheck,Settings,Plus,ArrowUpRight,ArrowRight,ChevronRight,ChevronDown,Download,Search,Bell,Check,CheckCircle2,Clock,AlertTriangle,Sun,Droplets,Leaf,RefreshCw,ShieldCheck,Receipt,ArrowDownLeft,Box,LogOut,Loader2,X,Mail,Phone,MapPin,ExternalLink,TrendingUp,Zap } from 'lucide-react';
-import { SidebarProvider,Sidebar,SidebarHeader,SidebarContent,SidebarFooter,SidebarGroup,SidebarGroupLabel,SidebarMenu,SidebarMenuItem,SidebarMenuButton,SidebarTrigger,useSidebar } from '@/components/ui/sidebar';
+import { LayoutDashboard,ShoppingBag,Package,Users,Truck,Wallet,CalendarCheck,Plus,ArrowUpRight,ArrowRight,ChevronRight,ChevronDown,Download,Search,Bell,Check,CheckCircle2,Clock,AlertTriangle,Leaf,RefreshCw,ShieldCheck,Receipt,ArrowDownLeft,Box,Loader2,X,Mail,Phone,MapPin,ExternalLink,TrendingUp,Zap } from 'lucide-react';
+import { SidebarProvider,SidebarTrigger } from '@/components/ui/sidebar';
 import { Table,TableHeader,TableHead,TableBody,TableRow,TableCell } from '@/components/ui/table';
 import { Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription,DialogFooter } from '@/components/ui/dialog';
 import { Sheet,SheetContent,SheetHeader,SheetTitle,SheetDescription } from '@/components/ui/sheet';
@@ -23,7 +23,7 @@ import Invoice from './invoice';
 import Team from './team';
 import ChangePassword from './change-password';
 import Reconciliation from './reconciliation';
-import { canManageBusinessSettings, roleCanBackup, roleCanEdit, roleCanViewSection, roleCanPrintInvoice, roleCanManageFinance, roleCanCloseFinance, roleCanExportData, roleCanImport, roleCanInspectReturns, roleCanManageTeam, roleCanReset, roleLabels, type WorkspaceRole } from '@/lib/roles';
+import { canManageBusinessSettings, roleCanBackup, roleCanEdit, roleCanPrintInvoice, roleCanManageFinance, roleCanCloseFinance, roleCanExportData, roleCanImport, roleCanInspectReturns, roleCanManageTeam, roleCanReset, type WorkspaceRole } from '@/lib/roles';\nimport { Avatar, Empty, Nav, OrderProgress, ProductIcon, Stat, Status, sections, visibleSections, type View } from './crm-ui';
 const sections=['Overview','Reports','Alerts','Automation','Orders','Inventory','Customers','Suppliers','Finances','Follow-ups','Activity'] as const;type View=typeof sections[number];
 type GlobalResult={id:string;view:View;title:string;meta:string;query:string;score:number;detail?:{type:'order'|'customer'|'supplier';id:string}};
 const navIcons=[LayoutDashboard,TrendingUp,Bell,Zap,ShoppingBag,Package,Users,Truck,Wallet,CalendarCheck,ShieldCheck];
