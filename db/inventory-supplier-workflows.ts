@@ -1,11 +1,10 @@
 import { database } from './raw.ts';
 import { getDomainVersion,bumpDomainVersion } from './domain-version.ts';
-import { migrateFinanceShadow } from './finance-shadow.ts';
+import { migrateFinanceShadow,FINANCE_DOMAIN } from './finance-shadow.ts';
 import { applyPurchaseOrderReceipt, accountIds, fixedBusinessName, stateSchema, today, uid, validateRelations, type State } from '../lib/crm.ts';
 import { validateWorkspaceChange } from '../lib/role-data.ts';
 import type { WorkspaceRole } from '../lib/roles.ts';
 import { ensureInventorySupplierApiReady, migrateInventorySupplierShadow, INVENTORY_SUPPLIER_DOMAIN } from './inventory-supplier-shadow.ts';
-import { FINANCE_DOMAIN } from './finance-shadow.ts';
 
 type Actor={userId:string;name:string;role:WorkspaceRole};
 
