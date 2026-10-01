@@ -12,7 +12,8 @@ export async function GET(){
     if(!user)return response({error:'Sign in to view orders.'},401);
     const {ownerId,role}=await resolveWorkspace(user);
     if(!roleCanViewSection(role,'Orders'))return response({error:'You do not have access to orders.'},403);
-    return response({orders:await listOrderRecords(ownerId)});
+    const result=await listOrderRecords(ownerId);
+    return response({orders:result.orders,version:result.workspaceVersion});
   }catch(error){
     if(error instanceof AccessDenied)return response({error:error.message},403);
     console.error('Order list failed',error);
@@ -29,8 +30,8 @@ export async function POST(request:Request){
     if(!roleCanEdit(role,'orders'))return response({error:'You do not have permission to create orders.'},403);
     let body:unknown;
     try{body=await request.json()}catch{return response({error:'Invalid request.'},400)}
-    const order=await createOrderRecord(ownerId,body,{userId:user.userId,name:user.displayName||user.email,role});
-    return response({order},201);
+    const result=await createOrderRecord(ownerId,body,{userId:user.userId,name:user.displayName||user.email,role});
+    return response({order:result.order,version:result.workspaceVersion},201);
   }catch(error){
     if(error instanceof AccessDenied)return response({error:error.message},403);
     const message=error instanceof Error?error.message:'Could not create order.';
