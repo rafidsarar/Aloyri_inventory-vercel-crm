@@ -272,6 +272,15 @@ export const relationalFoundationSql = [
     owner_id TEXT NOT NULL,month TEXT NOT NULL,closed_at DATE NOT NULL,closed_by TEXT NOT NULL,notes TEXT NOT NULL DEFAULT '',
     record_version INTEGER NOT NULL DEFAULT 0,updated_at TEXT NOT NULL,PRIMARY KEY(owner_id,month)
   )`
+  `CREATE TABLE IF NOT EXISTS crm_relational_cutover (
+    owner_id TEXT PRIMARY KEY,
+    enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    enabled_at TEXT,
+    enabled_by TEXT,
+    last_verified_at TEXT,
+    last_verification TEXT NOT NULL DEFAULT '{}',
+    updated_at TEXT NOT NULL
+  )`,
 ] as const;
 
 let ready: Promise<void> | null = null;
