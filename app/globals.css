@@ -963,3 +963,74 @@ html,body{max-width:100%;overflow-x:hidden}
 .activity-mobile-foot>small{flex:0 0 auto;font-size:9px;color:#89978f}
 @media(max-width:900px){.activity-hero{align-items:flex-start;flex-direction:column}.activity-hero-meta{width:100%}.activity-hero-meta>span{align-items:flex-start;border-left:0;border-top:1px solid #e5ebe7}.activity-filter-groups{grid-template-columns:1fr}}
 @media(max-width:560px){.activity-hero{padding:16px}.activity-hero h2{font-size:20px}.activity-hero-meta{grid-template-columns:1fr 1fr 1fr}.activity-hero-meta strong{font-size:13px}.activity-mobile-foot{align-items:flex-start;flex-direction:column}.activity-filter-groups{gap:10px}}
+
+
+/* Final operational polish · Mobile and tablet UX audit */
+@media(min-width:768px) and (max-width:1180px){
+  .page-content{padding-inline:22px}
+  .page-heading{align-items:flex-start}
+  .heading-actions{max-width:48%;justify-content:flex-end}
+  .purchasing-kpi-grid,.finance-kpi-grid,.order-kpi-grid-pro,.overview-priority-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .inventory-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .supplier-directory-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .followup-grid,.dashboard-middle,.overview-insight-grid{grid-template-columns:1fr}
+  .followup-guide{display:none}
+  .record-dialog,.team-dialog,.payment-dialog{max-width:min(820px,calc(100vw - 36px))!important}
+}
+@media(max-width:767px){
+  input,select,textarea,[data-slot=select-trigger]{font-size:16px!important}
+  .topbar{position:relative;z-index:31;padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right))}
+  .top-actions{min-width:0;flex:1;justify-content:flex-end}
+  .top-actions>.avatar{display:none}
+  .global-search-shell{min-width:0;max-width:100%}
+  .global-search-input input{min-width:0}
+  .mobile-section-nav{top:0;padding-left:max(10px,env(safe-area-inset-left));padding-right:max(10px,env(safe-area-inset-right));scroll-padding-inline:10px}
+  .mobile-section-nav button{min-height:46px}
+  .mode-banner{gap:8px;padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right))}
+  .mode-banner>div:first-child{min-width:0}
+  .mode-banner strong{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .page-content{padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right))}
+  .heading-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}
+  .heading-actions>.btn,.heading-actions>a{width:100%;min-width:0;justify-content:center}
+  .heading-actions>*:only-child{grid-column:1/-1}
+  .finance-nav-shell{top:58px;z-index:18;border-radius:10px;margin-inline:-2px;padding:5px}
+  .finance-tabs [role=tablist],.section-tabs [role=tablist]{width:max-content!important;min-width:100%}
+  .finance-tabs [role=tab],.section-tabs [role=tab]{min-height:44px}
+  .purchasing-tabs-shell{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .purchasing-tabs [role=tablist]{min-width:max-content}
+  .purchasing-tabs [role=tab]{min-height:44px}
+  .purchasing-filter-strip,.followup-filter-strip,.alert-filter-strip,.activity-section-filters{scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
+  .purchasing-filter-strip button,.followup-filter-strip button,.alert-filter-strip button,.activity-section-filters button{min-height:40px;scroll-snap-align:start}
+  .purchasing-toolbar,.followup-toolbar{align-items:stretch;flex-direction:column}
+  .purchasing-search,.followup-search{width:100%!important;min-width:0!important}
+  .purchasing-kpi-grid,.finance-kpi-grid,.followup-kpi-grid,.overview-priority-grid,.order-kpi-grid-pro,.inventory-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .supplier-directory-grid{grid-template-columns:1fr}
+  .purchase-mobile-actions,.order-mobile-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch}
+  .purchase-mobile-actions>* ,.order-mobile-actions>*{min-width:0;width:100%;justify-content:center}
+  .purchase-mobile-actions .mobile-select-control,.order-mobile-actions .mobile-select-control{min-height:40px;padding:0 10px;border:1px solid #e1e8e3;border-radius:8px;background:#fff}
+  .bulk-action-bar{bottom:max(8px,env(safe-area-inset-bottom))}
+  .bulk-action-bar>div{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .bulk-action-bar .btn{width:100%;justify-content:center}
+  .record-dialog,.payment-dialog,.team-dialog{overscroll-behavior:contain}
+  .form-actions{bottom:0;margin-left:-20px;margin-right:-20px;padding:12px 20px max(12px,env(safe-area-inset-bottom));background:#fff;box-shadow:0 -8px 24px rgba(60,43,35,.06)}
+  .form-actions .btn{min-height:46px}
+  .detail-sheet{padding-bottom:max(16px,env(safe-area-inset-bottom))}
+  .invoice-actions{padding-bottom:max(10px,env(safe-area-inset-bottom))}
+}
+@media(max-width:560px){
+  .heading-actions{grid-template-columns:1fr}
+  .purchasing-kpi-grid,.finance-kpi-grid,.followup-kpi-grid,.overview-priority-grid,.inventory-kpi-grid{grid-template-columns:1fr}
+  .order-kpi-grid-pro{grid-template-columns:1fr 1fr}
+  .purchase-mobile-actions .btn.primary,.order-mobile-actions .btn.primary{grid-column:1/-1}
+  .activity-hero-meta{grid-template-columns:1fr}
+  .management-report-hero{grid-template-columns:1fr}
+  .record-dialog,.payment-dialog,.team-dialog{padding-left:16px!important;padding-right:16px!important}
+  .form-actions{margin-left:-16px;margin-right:-16px;padding-left:16px;padding-right:16px}
+}
+@media(max-width:410px){
+  .order-kpi-grid-pro{grid-template-columns:1fr}
+  .purchase-mobile-actions,.order-mobile-actions{grid-template-columns:1fr}
+  .purchase-mobile-actions .btn.primary,.order-mobile-actions .btn.primary{grid-column:auto}
+  .global-search-shell{width:min(205px,61vw)!important}
+  .notification-button{min-width:40px;min-height:40px}
+}
