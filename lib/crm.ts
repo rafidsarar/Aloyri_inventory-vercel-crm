@@ -10,7 +10,7 @@ const money = z.number().finite().min(0).max(10000000), qty = z.number().int().m
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(v=>!isNaN(Date.parse(v)) && new Date(v).toISOString().slice(0,10)===v);
 export const productSchema = z.object({id,name:str.min(1),brand:str,size:str,category:z.string().trim().min(1).max(50),price:money,cost:money,targetQty:z.number().int().min(0).max(100000),reorderAt:z.number().int().min(0).max(100000),active:z.boolean()});
 export const customerSchema = z.object({id,name:str.min(1),phone:str,address:str,city:str,preference:str,notes:str,consent:z.boolean(),created:date});
-const supplierSchema = z.object({
+export const supplierSchema = z.object({
   id,
   name:str.min(1),
   contact:str,
@@ -22,11 +22,11 @@ const supplierSchema = z.object({
   notes:str,
   verified:z.boolean()
 });
-const purchaseOrderSchema=z.object({id,number:str.min(1),supplierId:id,created:date,expected:date,status:z.enum(['Draft','Sent','Part received','Received','Cancelled']),notes:str,items:z.array(z.object({productId:id,qty,unitCost:money,receivedQty:z.number().int().min(0).max(100000).default(0)})).min(1).max(100)});
+export const purchaseOrderSchema=z.object({id,number:str.min(1),supplierId:id,created:date,expected:date,status:z.enum(['Draft','Sent','Part received','Received','Cancelled']),notes:str,items:z.array(z.object({productId:id,qty,unitCost:money,receivedQty:z.number().int().min(0).max(100000).default(0)})).min(1).max(100)});
 const purchasePaymentSchema=z.object({id,date,amount:money.refine(n=>n>0),note:str.default('')});
-const batchSchema = z.object({id,productId:id,qty,unitCost:money,expiry:date,received:date,supplierId:str,invoice:str,dueDate:date.optional(),payments:z.array(purchasePaymentSchema).max(100).default([]),paid:z.boolean(),paidAt:date.optional()});
-const stockAdjustmentSchema = z.object({id,batchId:id,delta:z.number().int().min(-100000).max(100000).refine(v=>v!==0),date,reason:str.min(1)});
-const inventoryHoldSchema = z.object({id,batchId:id,qty:z.number().int().min(1).max(100000),date,type:z.enum(['Quarantine','Damaged']),reason:str.min(1),source:z.enum(['Manual','Cancelled','Return']).default('Manual'),sourceOrderId:id.optional(),releasedAt:date.optional()});
+export const batchSchema = z.object({id,productId:id,qty,unitCost:money,expiry:date,received:date,supplierId:str,invoice:str,dueDate:date.optional(),payments:z.array(purchasePaymentSchema).max(100).default([]),paid:z.boolean(),paidAt:date.optional()});
+export const stockAdjustmentSchema = z.object({id,batchId:id,delta:z.number().int().min(-100000).max(100000).refine(v=>v!==0),date,reason:str.min(1)});
+export const inventoryHoldSchema = z.object({id,batchId:id,qty:z.number().int().min(1).max(100000),date,type:z.enum(['Quarantine','Damaged']),reason:str.min(1),source:z.enum(['Manual','Cancelled','Return']).default('Manual'),sourceOrderId:id.optional(),releasedAt:date.optional()});
 const allocationSchema = z.object({batchId:id,qty,unitCost:money});
 const collectionSchema=z.object({id,date,amount:money.refine(n=>n>0),reference:str.default('')});
 const orderStatusSchema=z.preprocess(value=>value==='Processing'?'Ready to pack':value==='Ready to Ship'?'Packed':value,z.enum(statuses));
