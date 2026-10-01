@@ -85,11 +85,11 @@ export async function createCustomerRecord(ownerId:string,input:unknown,actor:Cu
   await db.batch([
     db.prepare('INSERT INTO crm_rel_customers (owner_id,id,name,phone,address,city,preference,notes,consent,created,record_version,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING')
       .bind(ownerId,customer.id,customer.name,customer.phone,customer.address,customer.city,customer.preference,customer.notes,customer.consent,customer.created,0,now,now),
-    db.prepare("SELECT CASE WHEN EXISTS (SELECT 1 FROM crm_rel_customers WHERE owner_id=? AND id=? AND created_at=? AND record_version=0) THEN 1 ELSE 1/0 END")
+    db.prepare("SELECT 1 / CASE WHEN EXISTS (SELECT 1 FROM crm_rel_customers WHERE owner_id=? AND id=? AND created_at=? AND record_version=0) THEN 1 ELSE 0 END")
       .bind(ownerId,customer.id,now),
     db.prepare('UPDATE crm_workspaces SET data=?,version=version+1,updated_at=? WHERE owner_id=? AND version=?')
       .bind(JSON.stringify(next),now,ownerId,row.version),
-    db.prepare("SELECT CASE WHEN EXISTS (SELECT 1 FROM crm_workspaces WHERE owner_id=? AND version=? AND updated_at=?) THEN 1 ELSE 1/0 END")
+    db.prepare("SELECT 1 / CASE WHEN EXISTS (SELECT 1 FROM crm_workspaces WHERE owner_id=? AND version=? AND updated_at=?) THEN 1 ELSE 0 END")
       .bind(ownerId,nextVersion,now),
     db.prepare('INSERT INTO crm_relational_migrations (owner_id,domain,status,source_version,migrated_at,verified_at,updated_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT (owner_id,domain) DO UPDATE SET status=EXCLUDED.status,source_version=EXCLUDED.source_version,verified_at=EXCLUDED.verified_at,updated_at=EXCLUDED.updated_at')
       .bind(ownerId,CUSTOMER_ORDER_DOMAIN,'verified',nextVersion,null,now,now),
@@ -114,11 +114,11 @@ export async function updateCustomerRecord(ownerId:string,id:string,input:unknow
   await db.batch([
     db.prepare('UPDATE crm_rel_customers SET name=?,phone=?,address=?,city=?,preference=?,notes=?,consent=?,created=?,record_version=record_version+1,updated_at=? WHERE owner_id=? AND id=? AND record_version=?')
       .bind(customer.name,customer.phone,customer.address,customer.city,customer.preference,customer.notes,customer.consent,customer.created,now,ownerId,id,expectedVersion),
-    db.prepare("SELECT CASE WHEN EXISTS (SELECT 1 FROM crm_rel_customers WHERE owner_id=? AND id=? AND record_version=? AND updated_at=?) THEN 1 ELSE 1/0 END")
+    db.prepare("SELECT 1 / CASE WHEN EXISTS (SELECT 1 FROM crm_rel_customers WHERE owner_id=? AND id=? AND record_version=? AND updated_at=?) THEN 1 ELSE 0 END")
       .bind(ownerId,id,nextRecordVersion,now),
     db.prepare('UPDATE crm_workspaces SET data=?,version=version+1,updated_at=? WHERE owner_id=? AND version=?')
       .bind(JSON.stringify(next),now,ownerId,row.version),
-    db.prepare("SELECT CASE WHEN EXISTS (SELECT 1 FROM crm_workspaces WHERE owner_id=? AND version=? AND updated_at=?) THEN 1 ELSE 1/0 END")
+    db.prepare("SELECT 1 / CASE WHEN EXISTS (SELECT 1 FROM crm_workspaces WHERE owner_id=? AND version=? AND updated_at=?) THEN 1 ELSE 0 END")
       .bind(ownerId,nextWorkspaceVersion,now),
     db.prepare('UPDATE crm_relational_migrations SET status=?,source_version=?,verified_at=?,updated_at=? WHERE owner_id=? AND domain=?')
       .bind('verified',nextWorkspaceVersion,now,now,ownerId,CUSTOMER_ORDER_DOMAIN),
@@ -144,10 +144,10 @@ export async function deleteCustomerRecord(ownerId:string,id:string,expectedVers
   const db=database();
   await db.batch([
     db.prepare('DELETE FROM crm_rel_customers WHERE owner_id=? AND id=? AND record_version=?').bind(ownerId,id,expectedVersion),
-    db.prepare("SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM crm_rel_customers WHERE owner_id=? AND id=?) THEN 1 ELSE 1/0 END").bind(ownerId,id),
+    db.prepare("SELECT 1 / CASE WHEN NOT EXISTS (SELECT 1 FROM crm_rel_customers WHERE owner_id=? AND id=?) THEN 1 ELSE 0 END").bind(ownerId,id),
     db.prepare('UPDATE crm_workspaces SET data=?,version=version+1,updated_at=? WHERE owner_id=? AND version=?')
       .bind(JSON.stringify(next),now,ownerId,row.version),
-    db.prepare("SELECT CASE WHEN EXISTS (SELECT 1 FROM crm_workspaces WHERE owner_id=? AND version=? AND updated_at=?) THEN 1 ELSE 1/0 END")
+    db.prepare("SELECT 1 / CASE WHEN EXISTS (SELECT 1 FROM crm_workspaces WHERE owner_id=? AND version=? AND updated_at=?) THEN 1 ELSE 0 END")
       .bind(ownerId,nextWorkspaceVersion,now),
     db.prepare('UPDATE crm_relational_migrations SET status=?,source_version=?,verified_at=?,updated_at=? WHERE owner_id=? AND domain=?')
       .bind('verified',nextWorkspaceVersion,now,now,ownerId,CUSTOMER_ORDER_DOMAIN),
