@@ -6,7 +6,7 @@ import { Area,AreaChart,CartesianGrid,ResponsiveContainer,Tooltip,XAxis,YAxis } 
 import type { Order } from '@/lib/crm';
 import { taka } from '@/lib/crm';
 import { Choice } from '../forms';
-import { SectionPanel, type View } from '../crm-ui';
+import { SectionPanel, WorkspaceSection, type View } from '../crm-ui';
 
 type Props={
   alertCritical:number;
@@ -54,7 +54,7 @@ export default function OverviewSection({
   profit,inventoryUnits,customerCount,unpaidStock,recentOrders,orderTable,changeView,setFilter,
   setFinanceTab,setInventoryTab,setPurchasingTab
 }:Props){
-  return <>
+  return <WorkspaceSection>
     <section className="overview-command-hero">
       <div className="overview-command-copy"><span className="orders-eyebrow"><LayoutDashboard size={15}/>Today&apos;s operations</span><h2>Run the business from what needs attention now.</h2><p>Orders, money, stock and customer work are prioritized here. Detailed analysis stays in the specialist sections.</p></div>
       <div className="overview-command-status"><span className={alertCritical?'needs-attention':'clear'}><i/>{alertCritical?alertCritical+' critical '+(alertCritical===1?'alert':'alerts'):'No critical alerts'}</span><button onClick={()=>changeView('Alerts')}>Open alert center<ArrowRight size={15}/></button></div>
@@ -91,5 +91,5 @@ export default function OverviewSection({
       </SectionPanel>
     </div>
     <div className="dashboard-bottom"><SectionPanel className="orders-panel"><div className="panel-heading"><div><h2>Recent orders</h2><p>Latest five records for a quick handoff check</p></div><button className="text-button" onClick={()=>changeView('Orders')}>Open order pipeline<ArrowRight size={15}/></button></div>{orderTable(recentOrders)}</SectionPanel></div>
-  </>;
+  </WorkspaceSection>;
 }
