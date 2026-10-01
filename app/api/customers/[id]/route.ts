@@ -13,8 +13,8 @@ export async function GET(_request:Request,{params}:{params:Promise<{id:string}>
     const {ownerId,role}=await resolveWorkspace(user);
     if(!roleCanViewSection(role,'Customers'))return response({error:'You do not have access to customers.'},403);
     const {id}=await params;
-    const customer=await getCustomerRecord(ownerId,id);
-    return customer?response({customer}):response({error:'Customer not found.'},404);
+    const result=await getCustomerRecord(ownerId,id);
+    return result.customer?response({customer:result.customer,version:result.workspaceVersion}):response({error:'Customer not found.'},404);
   }catch(error){
     if(error instanceof AccessDenied)return response({error:error.message},403);
     console.error('Customer read failed',error);
@@ -32,8 +32,8 @@ export async function PUT(request:Request,{params}:{params:Promise<{id:string}>}
     const {id}=await params;
     let body:{customer?:unknown;recordVersion?:number};
     try{body=await request.json()}catch{return response({error:'Invalid request.'},400)}
-    const customer=await updateCustomerRecord(ownerId,id,body.customer,Number(body.recordVersion),{userId:user.userId,name:user.displayName||user.email,role});
-    return response({customer});
+    const result=await updateCustomerRecord(ownerId,id,body.customer,Number(body.recordVersion),{userId:user.userId,name:user.displayName||user.email,role});
+    return response({customer:result.customer,version:result.workspaceVersion});
   }catch(error){
     if(error instanceof AccessDenied)return response({error:error.message},403);
     const message=error instanceof Error?error.message:'Could not update customer.';
@@ -55,8 +55,8 @@ export async function DELETE(request:Request,{params}:{params:Promise<{id:string
     const {id}=await params;
     let body:{recordVersion?:number};
     try{body=await request.json()}catch{return response({error:'Invalid request.'},400)}
-    await deleteCustomerRecord(ownerId,id,Number(body.recordVersion),{userId:user.userId,name:user.displayName||user.email,role});
-    return response({deleted:true,id});
+    const result=await deleteCustomerRecord(ownerId,id,Number(body.recordVersion),{userId:user.userId,name:user.displayName||user.email,role});
+    return response({deleted:true,id,version:result.workspaceVersion});
   }catch(error){
     if(error instanceof AccessDenied)return response({error:error.message},403);
     const message=error instanceof Error?error.message:'Could not delete customer.';
