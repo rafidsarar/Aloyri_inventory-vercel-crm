@@ -1,4 +1,5 @@
 import { database } from './raw.ts';
+import { getDomainVersion,bumpDomainVersion } from './domain-version.ts';
 import { applyRoleChanges, validateWorkspaceChange } from '../lib/role-data.ts';
 import { fixedBusinessName, stateSchema, validateRelations, type State } from '../lib/crm.ts';
 import type { WorkspaceRole } from '../lib/roles.ts';
@@ -45,33 +46,35 @@ export async function getInventorySupplierDomain(ownerId:string){
     inventoryHolds:holds.results.map((x:any)=>({id:x.id,batchId:x.batch_id,qty:Number(x.qty),date:String(x.date),type:x.type,reason:x.reason,source:x.source,sourceOrderId:x.source_order_id||undefined,releasedAt:x.released_at?String(x.released_at):undefined}))
   };
   const parsed=stateSchema.pick({products:true,productCategories:true,suppliers:true,purchaseOrders:true,batches:true,stockAdjustments:true,inventoryHolds:true}).parse(data);
-  return {data:parsed,version:row.version};
+  return {data:parsed,version:row.version,domainVersion:await getDomainVersion(ownerId,INVENTORY_SUPPLIER_DOMAIN)};
 }
 
-export async function saveInventorySupplierDomain(ownerId:string,input:unknown,expectedVersion:number,actor:Actor){
-  if(!Number.isInteger(expectedVersion)||expectedVersion<0)throw new Error('WORKSPACE_VERSION_REQUIRED');
+export async function saveInventorySupplierDomain(ownerId:string,input:unknown,expectedDomainVersion:number,actor:Actor){
+  if(!Number.isInteger(expectedDomainVersion)||expectedDomainVersion<0)throw new Error('DOMAIN_VERSION_REQUIRED');
   const parsed=stateSchema.pick({
     products:true,productCategories:true,suppliers:true,purchaseOrders:true,batches:true,stockAdjustments:true,inventoryHolds:true
   }).safeParse(input);
   if(!parsed.success)throw new Error('INVALID_INVENTORY_SUPPLIER_DATA');
   const {row,state}=await ensureInventorySupplierApiReady(ownerId);
-  if(row.version!==expectedVersion)throw new Error('WORKSPACE_VERSION_CONFLICT');
+  const currentDomainVersion=await getDomainVersion(ownerId,INVENTORY_SUPPLIER_DOMAIN);
+  if(currentDomainVersion!==expectedDomainVersion)throw new Error('DOMAIN_VERSION_CONFLICT');
   const candidate=structuredClone(state);
   for(const key of inventorySupplierKeys)(candidate[key] as any)=parsed.data[key] as any;
   let next:State;
   try{next=fixedBusinessName(applyRoleChanges(state,candidate,actor.role));}catch(error){throw new Error(error instanceof Error?error.message:'ROLE_FORBIDDEN')}
   validateWorkspaceChange(state,next);validateRelations(next,{skipOrderNumberUniqueness:true});
   const changed=inventorySupplierKeys.filter(key=>JSON.stringify(state[key])!==JSON.stringify(next[key]));
-  if(!changed.length)return {data:inventorySupplierData(state),version:row.version};
+  if(!changed.length)return {data:inventorySupplierData(state),version:row.version,domainVersion:currentDomainVersion};
   const now=new Date().toISOString(),db=database(),nextVersion=row.version+1;
   await ensureAudit();
   const result=await db.prepare('UPDATE crm_workspaces SET data=?,version=version+1,updated_at=? WHERE owner_id=? AND version=?')
     .bind(JSON.stringify(next),now,ownerId,row.version).run();
   if(!result.meta.changes)throw new Error('WORKSPACE_VERSION_CONFLICT');
   await migrateInventorySupplierShadow(ownerId,next,nextVersion);
+  const domainVersion=await bumpDomainVersion(ownerId,INVENTORY_SUPPLIER_DOMAIN,expectedDomainVersion);
   await db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)')
     .bind(crypto.randomUUID(),ownerId,actor.userId,actor.name,actor.role,'Updated '+changed.join(', '),JSON.stringify(changed),now).run();
-  return {data:inventorySupplierData(next),version:nextVersion};
+  return {data:inventorySupplierData(next),version:nextVersion,domainVersion};
 }
 
 export async function markInventorySupplierShadowStale(ownerId:string,sourceVersion:number){
