@@ -23,14 +23,14 @@ export async function PUT(request:Request){
     if(!checkOrigin(request))return response({error:'Invalid request origin.'},403);
     const {ownerId,role}=await resolveWorkspace(user);
     if(!['owner','admin','inventory'].includes(role))return response({error:'Your role cannot edit Inventory or Suppliers.'},403);
-    let body:{data?:unknown;version?:number};try{body=await request.json()}catch{return response({error:'Invalid request.'},400)}
-    const result=await saveInventorySupplierDomain(ownerId,body.data,Number(body.version),{userId:user.userId,name:user.displayName||user.email,role});
+    let body:{data?:unknown;domainVersion?:number};try{body=await request.json()}catch{return response({error:'Invalid request.'},400)}
+    const result=await saveInventorySupplierDomain(ownerId,body.data,Number(body.domainVersion),{userId:user.userId,name:user.displayName||user.email,role});
     return response(result);
   }catch(error){
     if(error instanceof AccessDenied)return response({error:error.message},403);
     const message=error instanceof Error?error.message:'Could not save Inventory and Supplier records.';
-    if(message==='WORKSPACE_VERSION_CONFLICT')return response({error:'Inventory or Supplier records changed in another window. Refresh and try again.'},409);
-    if(message==='WORKSPACE_VERSION_REQUIRED'||message==='INVALID_INVENTORY_SUPPLIER_DATA')return response({error:'Check the values in your form.'},400);
+    if(message==='DOMAIN_VERSION_CONFLICT')return response({error:'Inventory or Supplier records changed in another window. Refresh and try again.'},409);
+    if(message==='DOMAIN_VERSION_REQUIRED'||message==='INVALID_INVENTORY_SUPPLIER_DATA')return response({error:'Check the values in your form.'},400);
     if(message.includes('cannot')||message.includes('Only')||message.includes('role'))return response({error:message},403);
     console.error('Inventory supplier domain save failed',error);return response({error:message},500);
   }
