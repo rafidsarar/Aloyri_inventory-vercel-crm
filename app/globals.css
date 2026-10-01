@@ -1039,3 +1039,85 @@ html,body{max-width:100%;overflow-x:hidden}
 .settings-integrity-summary li{display:flex;flex-direction:column;gap:2px;padding-top:7px;border-top:1px solid rgba(115,139,122,.14)}
 .settings-integrity-summary li b{font-size:10px;color:#5a6e60}
 .settings-integrity-summary li span{font-size:9px;line-height:1.45;color:#849188}
+
+
+/* Management intelligence expansion */
+.management-section-title{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin:28px 0 14px}
+.management-section-title h2{margin:3px 0 4px;font-size:20px;font-weight:650;color:#304b39}
+.management-section-title p{margin:0;max-width:760px;font-size:11px;line-height:1.65;color:#7f9186}
+.management-intelligence-section{scroll-margin-top:110px}
+.management-intelligence-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.management-intelligence-card{min-width:0}
+.management-profit-list,.management-value-list,.management-supplier-list,.management-ageing-list{display:grid}
+.management-profit-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:center;padding:13px 0;border-top:1px solid #edf2ee}
+.management-profit-row:first-child{border-top:0}
+.management-profit-row>span{display:grid;gap:3px}
+.management-profit-row>span:last-child{text-align:right}
+.management-profit-row strong{font-size:11px;color:#405d49}
+.management-profit-row small{font-size:9px;color:#89988f}
+.management-value-list button,.management-supplier-list button{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:11px;align-items:center;width:100%;padding:12px 0;border:0;border-top:1px solid #edf2ee;background:transparent;text-align:left;color:inherit}
+.management-value-list button:first-child,.management-supplier-list button:first-child{border-top:0}
+.management-value-list button:hover,.management-supplier-list button:hover{background:#fbfdfb}
+.management-value-list button>span:nth-child(2),.management-supplier-list button>span:first-child,.management-supplier-list button>span:nth-child(2){display:grid;gap:3px}
+.management-value-list button>strong,.management-supplier-list button>span:nth-child(2){text-align:right}
+.management-value-list strong,.management-supplier-list strong{font-size:11px;color:#405d49}
+.management-value-list small,.management-supplier-list small{font-size:9px;color:#89988f}
+.management-ageing-list>div{display:grid;grid-template-columns:110px minmax(80px,1fr) 90px;gap:12px;align-items:center;padding:10px 0;border-top:1px solid #edf2ee}
+.management-ageing-list>div:first-child{border-top:0}
+.management-ageing-list>div>span{display:grid;gap:2px}
+.management-ageing-list strong{font-size:10px;color:#405d49}
+.management-ageing-list small{font-size:9px;color:#89988f}
+.management-ageing-list>div>strong{text-align:right}
+.management-ageing-bar{height:6px;border-radius:999px;background:#edf3ee;overflow:hidden}
+.management-ageing-bar i{display:block;height:100%;min-width:0;border-radius:999px;background:#738e7c}
+.management-mini-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid #e8efea}
+.management-mini-summary span{display:grid;gap:3px;padding:10px 11px;border:1px solid #e7eee9;border-radius:9px;background:#fbfdfb}
+.management-mini-summary small{font-size:9px;color:#89988f}
+.management-mini-summary strong{font-size:12px;color:#405d49}
+.management-controls-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(300px,.65fr);gap:14px;margin-top:14px;scroll-margin-top:110px}
+.management-action-count{min-width:28px;height:28px;padding:0 8px;border-radius:999px;display:grid;place-items:center;background:#eef4ef;color:#526c59;font-size:11px;font-weight:700}
+.management-action-list{display:grid}
+.management-action-list button{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;padding:13px 0;border:0;border-top:1px solid #edf2ee;background:transparent;text-align:left;color:inherit}
+.management-action-list button:first-child{border-top:0}
+.management-action-list button:hover{background:#fbfdfb}
+.management-action-list button>span:nth-child(2){display:grid;gap:3px}
+.management-action-list strong{font-size:11px;color:#405d49}
+.management-action-list small{font-size:9px;line-height:1.5;color:#89988f}
+.management-action-level{display:inline-flex;align-items:center;justify-content:center;min-width:72px;padding:5px 7px;border-radius:999px;font-size:8px;font-weight:750;letter-spacing:.35px;text-transform:uppercase}
+.management-action-level.critical{background:#f9ece8;color:#9b5949}
+.management-action-level.action{background:#fbf3e7;color:#96733f}
+.management-all-clear{display:flex;align-items:center;gap:12px;padding:18px 0;color:#587461}
+.management-all-clear span{display:grid;gap:3px}
+.management-all-clear strong{font-size:12px}
+.management-all-clear small{font-size:9px;color:#89988f}
+.management-control-score{display:flex;align-items:center;gap:14px;padding:14px;margin-bottom:6px;border:1px solid #dfe9e2;border-radius:11px;background:#f8fbf9}
+.management-control-score>span{display:flex;align-items:flex-end;gap:2px}
+.management-control-score>span strong{font-size:30px;line-height:1;color:#3f604a}
+.management-control-score>span small{font-size:10px;color:#87958c}
+.management-control-score>div{display:grid;gap:3px}
+.management-control-score>div strong{font-size:11px;color:#4f6756}
+.management-control-score>div small{font-size:9px;color:#89988f}
+.management-control-list{display:grid}
+.management-control-list button{display:flex;justify-content:space-between;gap:14px;align-items:center;width:100%;padding:10px 0;border:0;border-top:1px solid #edf2ee;background:transparent;text-align:left;color:#74867b;font-size:10px}
+.management-control-list button:first-child{border-top:0}
+.management-control-list button:hover{color:#405d49}
+.management-control-list button strong{color:#465f4d;font-size:10px;text-align:right}
+.management-data-button{width:100%;margin-top:12px;justify-content:center}
+.management-report-quick-actions{flex-wrap:wrap}
+@media(max-width:980px){
+  .management-intelligence-grid,.management-controls-grid{grid-template-columns:1fr}
+}
+@media(max-width:640px){
+  .management-section-title{margin-top:22px}
+  .management-section-title h2{font-size:17px}
+  .management-intelligence-grid{gap:10px}
+  .management-value-list button{grid-template-columns:auto minmax(0,1fr) auto}
+  .management-value-list button>svg{display:none}
+  .management-supplier-list button{grid-template-columns:minmax(0,1fr) auto}
+  .management-supplier-list button>svg{display:none}
+  .management-ageing-list>div{grid-template-columns:90px minmax(60px,1fr) 78px;gap:8px}
+  .management-action-list button{grid-template-columns:1fr auto;gap:7px}
+  .management-action-level{grid-column:1/-1;justify-self:start}
+  .management-action-list button>svg{grid-column:2;grid-row:2}
+  .management-mini-summary{grid-template-columns:1fr}
+}
