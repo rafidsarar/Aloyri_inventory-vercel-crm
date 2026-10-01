@@ -2,12 +2,29 @@
 
 import { ArrowUpRight, CalendarCheck, CheckCircle2, ChevronRight, Download, Package, Plus, Receipt, RefreshCw, ShieldCheck, ShoppingBag, TrendingUp, Truck, Users, Wallet } from 'lucide-react';
 import { Area,AreaChart,CartesianGrid,ResponsiveContainer,Tooltip,XAxis,YAxis } from 'recharts';
-import { dateLabel,taka } from '@/lib/crm';
+import { dateLabel,taka,type Batch,type Order,type Product } from '@/lib/crm';
+import type { WorkspaceRole } from '@/lib/roles';
 import { canManageBusinessSettings } from '@/lib/roles';
 import { Choice } from '../forms';
-import { Empty } from '../crm-ui';
+import { Empty,type View } from '../crm-ui';
 
-type Props={ctx:any};
+type AnyFn=(...args:any[])=>any;
+type Ctx={
+  reportMonth:string; reportPulseTone:string; reportPulse:string; reportOrders:Order[];
+  setReportMonth:(value:string)=>void; reportMonths:string[]; changeView:(view:View)=>void; canExport:boolean;
+  exportManagementReport:AnyFn; reportRevenue:number; reportRevenueDelta:number|null; reportProfit:number;
+  reportMargin:number; reportAov:number; reportRepeatRate:number; reportRepeatCustomers:number;
+  reportCustomerIds:string[]; reportReturnRate:number; reportReturnedOrders:Order[]; reportNewCustomers:number;
+  reportInsightTone:{revenue:string;retention:string;operations:string}; inventoryOut:Product[]; inventoryLow:Product[];
+  monthlyTrend:any[]; signedTaka:(amount:number)=>string; reportWorkingCapital:number; reportChannelRows:any[];
+  reportTopChannel:any|null; reportProductRows:any[]; reportProductMax:number; m:any; reportPurchaseOrders:any[];
+  reportPurchasingValue:number; reportTopProduct:any|null; reportProductProfitability:any[]; reportCustomerValue:any[];
+  setDetail:AnyFn; inventoryAgeing:any[]; inventoryAgeingTotal:number; supplierPerformance:any[];
+  managementActionQueue:any[]; managementControlScore:number; integrityIssues:any[]; unassignedMovements:number;
+  automationActiveRules:number; inventoryExpired:Batch[]; projected30:number; reportCollectionRate:number;
+  role:WorkspaceRole; openModal:AnyFn;
+};
+type Props={ctx:Ctx};
 
 export default function ReportsSection({ctx}:Props){
   const {
