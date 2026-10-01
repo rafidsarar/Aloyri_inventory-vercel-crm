@@ -5,7 +5,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import type { Customer, Order, Task } from '@/lib/crm';
 import { shiftDate, today } from '@/lib/crm';
-import { Empty,WorkspaceSection } from '../crm-ui';
+import { ActionBar,Empty,WorkspaceSection } from '../crm-ui';
 
 type Detail={type:'order'|'customer'|'supplier';id:string};
 
@@ -60,10 +60,10 @@ export default function FollowUpsSection({
     </div>
     <div className="followup-grid">
       <section className="panel followup-queue-panel">
-        <div className="followup-toolbar">
+        <ActionBar className="followup-toolbar">
           <div className="followup-toolbar-title"><h2>Follow-up queue</h2><p>{followUpRows.length} {followUpRows.length===1?'reminder':'reminders'} shown</p></div>
           <div className="followup-search"><Search size={16}/><Input aria-label="Search follow-ups" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search customer, phone, order or reminder"/></div>
-        </div>
+        </ActionBar>
         <div className="followup-filter-strip">
           {['All','Open','Overdue','Today','Next 7 days','High priority','Replenishment','Completed'].map(option=><button key={option} className={'followup-filter-chip '+(filter===option?'active':'')} onClick={()=>setFilter(option)}>{option}{option==='Overdue'&&followUpOverdue.length>0?<span>{followUpOverdue.length}</span>:option==='Today'&&followUpToday.length>0?<span>{followUpToday.length}</span>:option==='High priority'&&followUpHigh.length>0?<span>{followUpHigh.length}</span>:null}</button>)}
         </div>
