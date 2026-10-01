@@ -76,6 +76,10 @@ export function ProductIcon({category}:{category:string}){
 }
 
 
+export function WorkspaceSection({children,className=''}:{children:ReactNode;className?:string}){
+  return <div className={'crm-workspace-section '+className}>{children}</div>;
+}
+
 export function PageHeader({eyebrow,title,description,actions}:{eyebrow?:string;title:string;description?:string;actions?:ReactNode}){
   return <div className="crm-page-header page-heading">
     <div className="crm-page-header-copy">
