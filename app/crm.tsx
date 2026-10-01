@@ -398,7 +398,28 @@ async function saveOrderRecord(next:State):Promise<boolean>{
     setError(message);toast.error(message);return false;
   }finally{saving.current=false;setBusy(false)}
 }
+function newCustomerOrderMutation(next:State){
+  const changedKeys=(Object.keys(s) as (keyof State)[]).filter(key=>JSON.stringify(s[key])!==JSON.stringify(next[key]));
+  if(changedKeys.length!==2||!changedKeys.includes('customers')||!changedKeys.includes('orders'))return null;
+  const customer=next.customers.find(x=>!s.customers.some(current=>current.id===x.id));
+  const order=next.orders.find(x=>!s.orders.some(current=>current.id===x.id));
+  if(!customer||!order||order.customerId!==customer.id)return null;
+  if(next.customers.length!==s.customers.length+1||next.orders.length!==s.orders.length+1)return null;
+  return {customer,order};
+}
+async function saveNewCustomerOrder(next:State):Promise<boolean>{
+  const mutation=newCustomerOrderMutation(next);if(!mutation)return save(next);
+  if(saving.current)return false;saving.current=true;setBusy(true);
+  try{
+    const res=await fetch('/api/orders/with-customer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(mutation)}),data:any=await res.json();
+    if(!res.ok)throw Error(data.error||'Could not create order and customer.');
+    const synced=await loadLive(false,false);if(!synced)throw Error('Order saved, but the workspace could not be refreshed.');
+    setError('');toast.success('Order and customer saved');return true;
+  }catch(e){const message=e instanceof Error?e.message:'Could not create order and customer.';setError(message);toast.error(message);return false}
+  finally{saving.current=false;setBusy(false)}
+}
 async function saveRecordAware(next:State):Promise<boolean>{
+  if(newCustomerOrderMutation(next))return saveNewCustomerOrder(next);
   if(customerOnlyMutation(next))return saveCustomerRecord(next);
   if(orderOnlyMutation(next))return saveOrderRecord(next);
   return save(next);
@@ -482,10 +503,18 @@ async function submitPayment(){
  if(!/^\d{4}-\d{2}-\d{2}$/.test(paymentDate)||paymentDate>today()){toast.error('Choose a valid payment date that is not in the future.');return}
  const opening=s.accountOpenings.find(a=>a.account===paymentAccount);if(!opening){toast.error('Configure the '+accountNames[paymentAccount]+' opening balance before posting payments to it.');return}
  if(paymentDate<opening.date){toast.error('Payment date cannot be before the '+accountNames[paymentAccount]+' opening date.');return}
- const next=structuredClone(s);
- if(paymentDialog.kind==='collection'){const target=next.orders.find(x=>x.id===paymentDialog.id);if(!target)return;const pid=uid();target.collections.push({id:pid,date:paymentDate,amount,reference:paymentReference.trim()});const due=receivable(target),received=target.collections.reduce((n,p)=>n+p.amount,0);target.settled=received>=due-.001;target.settledAt=target.settled?paymentDate:undefined;next.accountMatches.push({entryId:'order-collection-'+target.id+'-'+pid,account:paymentAccount,matched:true,reference:paymentReference.trim()||'Customer collection'});}
- else{const purchase=next.batches.find(x=>x.id===paymentDialog.id);if(!purchase)return;const pid=uid();purchase.payments.push({id:pid,date:paymentDate,amount,note:paymentReference.trim()});const paidTotal=purchase.payments.reduce((n,p)=>n+p.amount,0);purchase.paid=paidTotal>=purchase.qty*purchase.unitCost-.001;purchase.paidAt=purchase.paid?paymentDate:undefined;next.accountMatches.push({entryId:'batch-payment-'+purchase.id+'-'+pid,account:paymentAccount,matched:true,reference:paymentReference.trim()||'Supplier payment'});}
- if(await save(next)){setPaymentDialog(null);toast.success((paymentDialog.kind==='collection'?'Collection':'Supplier payment')+' posted to '+accountNames[paymentAccount]+' and reconciled.')}
+ if(paymentDialog.kind==='collection'){
+   const recordVersion=orderRecordVersions[paymentDialog.id];if(!Number.isInteger(recordVersion)){toast.error('Order changed. Refreshing records.');await loadLive(false);return}
+   setBusy(true);
+   try{
+     const res=await fetch('/api/orders/'+encodeURIComponent(paymentDialog.id)+'/collection',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({recordVersion,date:paymentDate,amount,reference:paymentReference.trim(),account:paymentAccount})}),data:any=await res.json();
+     if(!res.ok){if(res.status===409)await loadLive(false,false);throw Error(data.error||'Could not post collection.')}
+     await loadLive(false,false);setPaymentDialog(null);toast.success('Collection posted to '+accountNames[paymentAccount]+' and reconciled.');
+   }catch(e){toast.error(e instanceof Error?e.message:'Could not post collection.')}finally{setBusy(false)}
+   return;
+ }
+ const next=structuredClone(s),purchase=next.batches.find(x=>x.id===paymentDialog.id);if(!purchase)return;const pid=uid();purchase.payments.push({id:pid,date:paymentDate,amount,note:paymentReference.trim()});const paidTotal=purchase.payments.reduce((n,p)=>n+p.amount,0);purchase.paid=paidTotal>=purchase.qty*purchase.unitCost-.001;purchase.paidAt=purchase.paid?paymentDate:undefined;next.accountMatches.push({entryId:'batch-payment-'+purchase.id+'-'+pid,account:paymentAccount,matched:true,reference:paymentReference.trim()||'Supplier payment'});
+ if(await save(next)){setPaymentDialog(null);toast.success('Supplier payment posted to '+accountNames[paymentAccount]+' and reconciled.')}
 }
 function reverseCashEntry(id:string){
   if(!canEdit('cashEntries'))return;
@@ -526,20 +555,13 @@ async function releaseCancelledInspection(orderId:string){if(!canInspectReturns|
 async function markCancelledInspectionDamaged(orderId:string){if(!canInspectReturns||!canEdit('inventoryHolds')){toast.error('Your role cannot inspect cancelled stock.');return}const next=structuredClone(s);const holds=next.inventoryHolds.filter(h=>h.source==='Cancelled'&&h.sourceOrderId===orderId&&!h.releasedAt&&h.type==='Quarantine');if(!holds.length)return;holds.forEach(h=>{h.type='Damaged';h.reason='Cancelled stock inspected as damaged'});await save(next)}
 async function inspectReturnedOrder(o:Order,outcome:'Sellable'|'Quarantine'|'Damaged'){
   if(!canInspectReturns){toast.error('Your role cannot complete return inspection.');return}
-  const next=structuredClone(s),order=next.orders.find(x=>x.id===o.id);
-  if(!order||order.status!=='Returned'||order.restocked)return;
-  order.restocked=true;
-  if(outcome!=='Sellable'){
-    const byBatch=new Map<string,number>();
-    for(const allocation of order.items.flatMap(i=>i.allocations))byBatch.set(allocation.batchId,(byBatch.get(allocation.batchId)||0)+allocation.qty);
-    for(const [batchId,qty] of byBatch){
-      const batch=next.batches.find(b=>b.id===batchId);
-      if(!batch||batch.expiry<=today())continue;
-      if(batchRemaining(next,batch)<qty){toast.error('Returned stock cannot be held safely because the batch no longer has enough available units. Refresh and try again.');return}
-      next.inventoryHolds.push({id:uid(),batchId,qty,date:today(),type:outcome,reason:outcome==='Damaged'?'Returned stock inspected as damaged':'Returned stock needs further inspection',source:'Return',sourceOrderId:order.id});
-    }
-  }
-  await save(next);
+  const recordVersion=orderRecordVersions[o.id];if(!Number.isInteger(recordVersion)){toast.error('Order changed. Refreshing records.');await loadLive(false);return}
+  setBusy(true);
+  try{
+    const res=await fetch('/api/orders/'+encodeURIComponent(o.id)+'/inspection',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({recordVersion,outcome})}),data:any=await res.json();
+    if(!res.ok){if(res.status===409)await loadLive(false,false);throw Error(data.error||'Could not inspect return.')}
+    await loadLive(false,false);toast.success('Return inspection saved.');
+  }catch(e){toast.error(e instanceof Error?e.message:'Could not inspect return.')}finally{setBusy(false)}
 }
 function changeStatus(o:Order,status:Order['status']){if(!canEdit('orders')){toast.error('Your role cannot update order status.');return}if(!nextStatuses(o).includes(status))return;if(status==='Cancelled'){setConfirm({title:'Cancel '+o.number+'?',text:'Reserved products will move into Quarantine for Inventory inspection before they can be sold again. The order stays in your history.',action:()=>{void updateOrder(o,{status})}});return;}if(status==='Returned'){setConfirm({title:'Record return for '+o.number+'?',text:o.status==='Delivered'?'This marks the delivered order as returned. Review refund handling separately in Finance and inspect the products in Inventory → Holds & returns.':'This marks the delivery as returned. The products stay blocked until Inventory completes inspection.',action:()=>{void updateOrder(o,{status,returnedAt:today(),restocked:false})}});return;}void updateOrder(o,{status,...(status==='Delivered'?{delivered:today()}: {})})}
 function exportData(){if(!canExport){toast.error('Only the owner or an admin can export business data.');return}const safe=(v:unknown)=>{let t=String(v??'');if(/^[=+@-]/.test(t))t="'"+t;return '"'+t.replaceAll('"','""')+'"'};const rows=[['Order','Date','Customer','Channel','Status','Payment','Product revenue','Customer total','Product cost','Courier','Payment fee','Packaging','Settled']];for(const o of s.orders)rows.push([o.number,o.created,s.customers.find(c=>c.id===o.customerId)?.name||'',o.channel,o.status,o.payment,String(subtotal(o)),String(total(o)),String(o.items.flatMap(i=>i.allocations).reduce((n,a)=>n+a.qty*a.unitCost,0)),String(o.courierCost),String(o.paymentFee),String(o.packaging),o.settled?'Yes':'No']);const blob=new Blob(['\ufeff'+rows.map(r=>r.map(safe).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='aloyri-orders-'+today()+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast.success('Order report downloaded')}
@@ -659,7 +681,21 @@ const orderStageSequence=[...statuses] as readonly Order['status'][];
 const orderQueueSort=(a:Order,b:Order)=>{const stage=orderStageSequence.indexOf(a.status)-orderStageSequence.indexOf(b.status);if(stage)return stage;const terminal=['Delivered','Returned','Cancelled'].includes(a.status);return terminal?b.created.localeCompare(a.created)||b.number.localeCompare(a.number):a.created.localeCompare(b.created)||a.number.localeCompare(b.number)};
 const filteredOrders=useMemo(()=>s.orders.filter(o=>filter==='All'||o.status===filter).filter(o=>{const customer=customerById.get(o.customerId);return match(o.number,customer?.name,customer?.phone,customer?.city,o.channel,o.tracking,o.payment,orderPaymentStatus(o))}).sort(orderQueueSort),[s.orders,customerById,filter,deferredQuery]);
 const filteredCustomers=useMemo(()=>s.customers.filter(c=>match(c.name,c.phone,c.city,c.preference,c.notes)),[s.customers,deferredQuery]);
-async function bulkAdvanceSelectedOrders(){if(!canEdit('orders')||!selectedOrderIds.length)return;const next=structuredClone(s);let changed=0;for(const id of selectedOrderIds){const order=next.orders.find(o=>o.id===id);if(!order)continue;const status=nextStatuses(order).find(x=>!['Cancelled','Returned'].includes(x));if(!status)continue;order.status=status;if(status==='Delivered')order.delivered=today();changed++;}if(!changed){toast.error('None of the selected orders has a safe next step.');return}setConfirm({title:'Advance '+changed+' selected orders?',text:'Each eligible order will move forward by exactly one valid fulfillment step. Cancel and return actions are never applied in bulk.',confirmLabel:'Advance orders',action:()=>{void save(next).then(ok=>{if(ok)setSelectedOrderIds([])})}});}
+async function bulkAdvanceSelectedOrders(){
+ if(!canEdit('orders')||!selectedOrderIds.length)return;
+ const eligible=selectedOrderIds.map(id=>s.orders.find(o=>o.id===id)).filter((o):o is Order=>Boolean(o&&nextStatuses(o).some(x=>!['Cancelled','Returned'].includes(x))));
+ if(!eligible.length){toast.error('None of the selected orders has a safe next step.');return}
+ setConfirm({title:'Advance '+eligible.length+' selected orders?',text:'Each eligible order will move forward by exactly one valid fulfillment step. Cancel and return actions are never applied in bulk.',confirmLabel:'Advance orders',action:()=>{void (async()=>{
+   const orders=eligible.map(order=>({id:order.id,recordVersion:orderRecordVersions[order.id]})).filter(x=>Number.isInteger(x.recordVersion));
+   if(!orders.length){toast.error('Order records changed. Refresh and try again.');await loadLive(false);return}
+   setBusy(true);try{
+     const res=await fetch('/api/orders/bulk-advance',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({orders})}),data:any=await res.json();
+     if(!res.ok)throw Error(data.error||'Could not advance orders.');
+     await loadLive(false,false);setSelectedOrderIds([]);
+     const failed=(data.results||[]).filter((x:any)=>!x.ok).length;toast.success(failed?'Orders advanced; '+failed+' stale/ineligible record(s) skipped.':'Selected orders advanced.');
+   }catch(e){toast.error(e instanceof Error?e.message:'Could not advance orders.')}finally{setBusy(false)}
+ })()}})
+}
 async function bulkCreateCustomerFollowUps(){if(!canEdit('tasks')||!selectedCustomerIds.length)return;const next=structuredClone(s);let created=0;for(const id of selectedCustomerIds){const customer=next.customers.find(c=>c.id===id);if(!customer||next.tasks.some(t=>t.customerId===id&&!t.done))continue;next.tasks.push({id:uid(),customerId:id,orderId:'',title:'Customer follow-up · '+customer.name,due:shiftDate(7),done:false,kind:'Follow-up',priority:'Normal',channel:'WhatsApp',notes:'Created from bulk customer action.',completedAt:''});created++;}if(!created){toast.error('Every selected customer already has an open follow-up.');return}if(await save(next)){setSelectedCustomerIds([]);toast.success(created+' follow-ups created.');}}
 async function bulkSendPurchaseOrders(){if(!canEdit('purchaseOrders')||!selectedPurchaseOrderIds.length)return;const next=structuredClone(s);const eligible=next.purchaseOrders.filter(po=>selectedPurchaseOrderIds.includes(po.id)&&po.status==='Draft');if(!eligible.length){toast.error('Only draft purchase orders can be marked sent in bulk.');return}setConfirm({title:'Mark '+eligible.length+' purchase orders sent?',text:'Only selected Draft purchase orders will move to Sent. Receiving and cancellation still require individual review.',confirmLabel:'Mark sent',action:()=>{eligible.forEach(po=>{po.status='Sent'});void save(next).then(ok=>{if(ok)setSelectedPurchaseOrderIds([])})}})}
 async function bulkCompleteFollowUps(){if(!canEdit('tasks')||!selectedTaskIds.length)return;const next=structuredClone(s);const eligible=next.tasks.filter(task=>selectedTaskIds.includes(task.id)&&!task.done);if(!eligible.length){toast.error('The selected follow-ups are already completed.');return}setConfirm({title:'Complete '+eligible.length+' follow-ups?',text:'Selected open reminders will be marked complete today. No customer message will be sent.',confirmLabel:'Complete follow-ups',action:()=>{eligible.forEach(task=>{task.done=true;task.completedAt=today()});void save(next).then(ok=>{if(ok)setSelectedTaskIds([])})}})}
