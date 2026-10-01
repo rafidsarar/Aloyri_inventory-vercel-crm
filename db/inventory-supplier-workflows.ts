@@ -1,9 +1,11 @@
 import { database } from './raw.ts';
+import { getDomainVersion,bumpDomainVersion } from './domain-version.ts';
 import { migrateFinanceShadow } from './finance-shadow.ts';
 import { applyPurchaseOrderReceipt, accountIds, fixedBusinessName, stateSchema, today, uid, validateRelations, type State } from '../lib/crm.ts';
 import { validateWorkspaceChange } from '../lib/role-data.ts';
 import type { WorkspaceRole } from '../lib/roles.ts';
-import { ensureInventorySupplierApiReady, migrateInventorySupplierShadow } from './inventory-supplier-shadow.ts';
+import { ensureInventorySupplierApiReady, migrateInventorySupplierShadow, INVENTORY_SUPPLIER_DOMAIN } from './inventory-supplier-shadow.ts';
+import { FINANCE_DOMAIN } from './finance-shadow.ts';
 
 type Actor={userId:string;name:string;role:WorkspaceRole};
 
@@ -21,29 +23,33 @@ async function commit(ownerId:string,before:State,next:State,version:number,acto
     .bind(JSON.stringify(fixedBusinessName(next)),now,ownerId,version).run();
   if(!result.meta.changes)throw new Error('WORKSPACE_VERSION_CONFLICT');
   await migrateInventorySupplierShadow(ownerId,next,nextVersion);
-  if(sections.includes('accountMatches'))try{await migrateFinanceShadow(ownerId,next,nextVersion)}catch(error){console.error('Finance shadow sync failed after supplier workflow',error)}
+  await bumpDomainVersion(ownerId,INVENTORY_SUPPLIER_DOMAIN);
+  if(sections.includes('accountMatches')){
+    try{await migrateFinanceShadow(ownerId,next,nextVersion)}catch(error){console.error('Finance shadow sync failed after supplier workflow',error)}
+    await bumpDomainVersion(ownerId,FINANCE_DOMAIN);
+  }
   await db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)')
     .bind(crypto.randomUUID(),ownerId,actor.userId,actor.name,actor.role,summary,JSON.stringify(sections),now).run();
   return {version:nextVersion};
 }
 
-export async function receivePurchaseOrderWorkflow(ownerId:string,input:{purchaseOrderId:string;received:string;invoice:string;dueDate?:string;lines:{productId:string;qty:number;expiry:string}[];version:number},actor:Actor){
+export async function receivePurchaseOrderWorkflow(ownerId:string,input:{purchaseOrderId:string;received:string;invoice:string;dueDate?:string;lines:{productId:string;qty:number;expiry:string}[];domainVersion:number},actor:Actor){
   if(!['owner','admin','inventory'].includes(actor.role))throw new Error('PURCHASING_FORBIDDEN');
   const {row,state}=await ensureInventorySupplierApiReady(ownerId);
-  if(row.version!==input.version)throw new Error('WORKSPACE_VERSION_CONFLICT');
+  if(await getDomainVersion(ownerId,INVENTORY_SUPPLIER_DOMAIN)!==input.domainVersion)throw new Error('DOMAIN_VERSION_CONFLICT');
   const next=applyPurchaseOrderReceipt(state,{purchaseOrderId:input.purchaseOrderId,received:input.received,invoice:input.invoice,dueDate:input.dueDate,lines:input.lines});
   const po=next.purchaseOrders.find(x=>x.id===input.purchaseOrderId);
   const result=await commit(ownerId,state,next,row.version,actor,'Received stock for '+(po?.number||'purchase order'),['purchaseOrders','batches']);
   return {...result,data:{purchaseOrders:next.purchaseOrders,batches:next.batches}};
 }
 
-export async function postSupplierPaymentWorkflow(ownerId:string,input:{batchId:string;date:string;amount:number;note:string;account:string;version:number},actor:Actor){
+export async function postSupplierPaymentWorkflow(ownerId:string,input:{batchId:string;date:string;amount:number;note:string;account:string;domainVersion:number},actor:Actor){
   if(!['owner','admin'].includes(actor.role))throw new Error('FINANCE_FORBIDDEN');
   if(!accountIds.includes(input.account as any))throw new Error('Choose a valid account.');
   if(!/^\d{4}-\d{2}-\d{2}$/.test(input.date)||input.date>today())throw new Error('Choose a valid payment date that is not in the future.');
   if(!Number.isFinite(input.amount)||input.amount<=0)throw new Error('Payment amount must be above zero.');
   const {row,state}=await ensureInventorySupplierApiReady(ownerId);
-  if(row.version!==input.version)throw new Error('WORKSPACE_VERSION_CONFLICT');
+  if(await getDomainVersion(ownerId,INVENTORY_SUPPLIER_DOMAIN)!==input.domainVersion)throw new Error('DOMAIN_VERSION_CONFLICT');
   const batch=state.batches.find(x=>x.id===input.batchId);if(!batch)throw new Error('Inventory batch not found.');
   const opening=state.accountOpenings.find(a=>a.account===input.account);if(!opening)throw new Error('Configure this account opening balance before posting supplier payments.');
   if(input.date<opening.date)throw new Error('Payment date cannot be before the account opening date.');
