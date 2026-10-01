@@ -38,19 +38,19 @@ export async function ensureCustomerRecordApiReady(ownerId:string){
 }
 
 export async function listCustomerRecords(ownerId:string){
-  await ensureCustomerRecordApiReady(ownerId);
+  const {row}=await ensureCustomerRecordApiReady(ownerId);
   const result=await database().prepare(
     'SELECT id,name,phone,address,city,preference,notes,consent,created,record_version FROM crm_rel_customers WHERE owner_id=? ORDER BY created DESC,id'
   ).bind(ownerId).all<CustomerRow>();
-  return result.results.map(mapCustomer);
+  return {customers:result.results.map(mapCustomer),workspaceVersion:row.version};
 }
 
 export async function getCustomerRecord(ownerId:string,id:string){
-  await ensureCustomerRecordApiReady(ownerId);
+  const {row}=await ensureCustomerRecordApiReady(ownerId);
   const row=await database().prepare(
     'SELECT id,name,phone,address,city,preference,notes,consent,created,record_version FROM crm_rel_customers WHERE owner_id=? AND id=?'
   ).bind(ownerId,id).first<CustomerRow>();
-  return row?mapCustomer(row):null;
+  return {customer:row?mapCustomer(row):null,workspaceVersion:(await loadWorkspace(ownerId)).row.version};
 }
 
 async function ensureAuditTable(){
@@ -96,7 +96,7 @@ export async function createCustomerRecord(ownerId:string,input:unknown,actor:Cu
     db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)')
       .bind(auditId,ownerId,actor.userId,actor.name,actor.role,'Created customer '+customer.name,JSON.stringify(['customers']),now)
   ]);
-  return {...customer,recordVersion:0} satisfies CustomerRecord;
+  return {customer:{...customer,recordVersion:0} satisfies CustomerRecord,workspaceVersion:nextVersion};
 }
 
 export async function updateCustomerRecord(ownerId:string,id:string,input:unknown,expectedVersion:number,actor:CustomerActor){
@@ -125,7 +125,7 @@ export async function updateCustomerRecord(ownerId:string,id:string,input:unknow
     db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)')
       .bind(auditId,ownerId,actor.userId,actor.name,actor.role,'Updated customer '+customer.name,JSON.stringify(['customers']),now)
   ]);
-  return {...customer,recordVersion:nextRecordVersion} satisfies CustomerRecord;
+  return {customer:{...customer,recordVersion:nextRecordVersion} satisfies CustomerRecord,workspaceVersion:nextWorkspaceVersion};
 }
 
 export async function deleteCustomerRecord(ownerId:string,id:string,expectedVersion:number,actor:CustomerActor){
@@ -154,5 +154,5 @@ export async function deleteCustomerRecord(ownerId:string,id:string,expectedVers
     db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)')
       .bind(auditId,ownerId,actor.userId,actor.name,actor.role,'Deleted customer '+customer.name,JSON.stringify(['customers']),now)
   ]);
-  return {id};
+  return {id,workspaceVersion:nextWorkspaceVersion};
 }
