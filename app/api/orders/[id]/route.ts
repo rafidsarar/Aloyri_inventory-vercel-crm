@@ -13,8 +13,8 @@ export async function GET(_request:Request,{params}:{params:Promise<{id:string}>
     const {ownerId,role}=await resolveWorkspace(user);
     if(!roleCanViewSection(role,'Orders'))return response({error:'You do not have access to orders.'},403);
     const {id}=await params;
-    const order=await getOrderRecord(ownerId,id);
-    return order?response({order}):response({error:'Order not found.'},404);
+    const result=await getOrderRecord(ownerId,id);
+    return result.order?response({order:result.order,version:result.workspaceVersion}):response({error:'Order not found.'},404);
   }catch(error){
     if(error instanceof AccessDenied)return response({error:error.message},403);
     console.error('Order read failed',error);
@@ -32,8 +32,8 @@ export async function PUT(request:Request,{params}:{params:Promise<{id:string}>}
     const {id}=await params;
     let body:{order?:unknown;recordVersion?:number};
     try{body=await request.json()}catch{return response({error:'Invalid request.'},400)}
-    const order=await updateOrderRecord(ownerId,id,body.order,Number(body.recordVersion),{userId:user.userId,name:user.displayName||user.email,role});
-    return response({order});
+    const result=await updateOrderRecord(ownerId,id,body.order,Number(body.recordVersion),{userId:user.userId,name:user.displayName||user.email,role});
+    return response({order:result.order,version:result.workspaceVersion});
   }catch(error){
     if(error instanceof AccessDenied)return response({error:error.message},403);
     const message=error instanceof Error?error.message:'Could not update order.';
@@ -56,8 +56,8 @@ export async function DELETE(request:Request,{params}:{params:Promise<{id:string
     const {id}=await params;
     let body:{recordVersion?:number};
     try{body=await request.json()}catch{return response({error:'Invalid request.'},400)}
-    await deleteOrderRecord(ownerId,id,Number(body.recordVersion),{userId:user.userId,name:user.displayName||user.email,role});
-    return response({deleted:true,id});
+    const result=await deleteOrderRecord(ownerId,id,Number(body.recordVersion),{userId:user.userId,name:user.displayName||user.email,role});
+    return response({deleted:true,id,version:result.workspaceVersion});
   }catch(error){
     if(error instanceof AccessDenied)return response({error:error.message},403);
     const message=error instanceof Error?error.message:'Could not delete order.';
