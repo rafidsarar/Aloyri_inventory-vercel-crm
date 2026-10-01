@@ -2,7 +2,7 @@ import { database } from './raw.ts';
 import { ensureCustomerRecordApiReady } from './customer-records.ts';
 import { CUSTOMER_ORDER_DOMAIN } from './customer-order-shadow.ts';
 import { validateWorkspaceChange } from '../lib/role-data.ts';
-import { accountIds, applyDeliveryFollowUps, batchRemaining, collectedAmount, nextStatuses, orderBalance, receivable, today, uid, type Order, type State } from '../lib/crm.ts';
+import { accountIds, applyDeliveryFollowUps, batchRemaining, collectedAmount, customerSchema, nextStatuses, orderBalance, orderSchema, receivable, today, uid, type Customer, type Order, type State } from '../lib/crm.ts';
 import type { WorkspaceRole } from '../lib/roles.ts';
 
 type Actor={userId:string;name:string;role:WorkspaceRole};
@@ -119,4 +119,32 @@ export async function bulkAdvanceOrdersWorkflow(ownerId:string,input:{orders:{id
   const finalChanged=changed.map(c=>({order:byId.get(c.order.id)!,expectedVersion:c.expectedVersion}));
   const commit=await commitWorkflow(ownerId,state,automated,row.version,finalChanged,actor,'Advanced '+changed.length+' orders in bulk',['orders',...(automated.tasks.length!==state.tasks.length?['tasks']:[])]);
   return {...commit,results};
+}
+
+
+export async function createOrderWithCustomerWorkflow(ownerId:string,input:{customer:unknown;order:unknown},actor:Actor){
+  if(!['owner','admin','sales'].includes(actor.role))throw new Error('ORDER_EDIT_FORBIDDEN');
+  const customer=customerSchema.parse(input.customer),order=orderSchema.parse(input.order);
+  if(order.customerId!==customer.id)throw new Error('Order customer does not match the new customer.');
+  const {row,state}=await ensureCustomerRecordApiReady(ownerId);
+  if(state.customers.some(c=>c.id===customer.id)||state.orders.some(o=>o.id===order.id))throw new Error('Customer or order already exists.');
+  const next=structuredClone(state);next.customers.push(customer);next.orders.unshift(order);validateWorkspaceChange(state,next);
+  const now=new Date().toISOString(),db=database(),nextWorkspaceVersion=row.version+1;
+  await ensureAuditTable();
+  const statements:any[]=[
+    db.prepare('INSERT INTO crm_rel_customers (owner_id,id,name,phone,address,city,preference,notes,consent,created,record_version,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)')
+      .bind(ownerId,customer.id,customer.name,customer.phone,customer.address,customer.city,customer.preference,customer.notes,customer.consent,customer.created,0,now,now),
+    db.prepare('INSERT INTO crm_rel_orders (owner_id,id,number,customer_id,created,delivered,returned_at,settled_at,channel,payment,status,discount,delivery_charge,courier_cost,packaging,payment_fee,return_fee,settled,restocked,tracking,notes,record_version,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+      .bind(ownerId,order.id,order.number,order.customerId,order.created,order.delivered||null,order.returnedAt||null,order.settledAt||null,order.channel,order.payment,order.status,order.discount,order.deliveryCharge,order.courierCost,order.packaging,order.paymentFee,order.returnFee,order.settled,order.restocked,order.tracking,order.notes,0,now,now)
+  ];
+  order.items.forEach((item,lineNo)=>{
+    statements.push(db.prepare('INSERT INTO crm_rel_order_items (owner_id,order_id,line_no,product_id,qty,price) VALUES (?,?,?,?,?,?)').bind(ownerId,order.id,lineNo,item.productId,item.qty,item.price));
+    item.allocations.forEach((a,allocationNo)=>statements.push(db.prepare('INSERT INTO crm_rel_order_allocations (owner_id,order_id,line_no,allocation_no,batch_id,qty,unit_cost) VALUES (?,?,?,?,?,?,?)').bind(ownerId,order.id,lineNo,allocationNo,a.batchId,a.qty,a.unitCost)));
+  });
+  statements.push(db.prepare('UPDATE crm_workspaces SET data=?,version=version+1,updated_at=? WHERE owner_id=? AND version=?').bind(JSON.stringify(next),now,ownerId,row.version));
+  statements.push(db.prepare("SELECT CASE WHEN EXISTS (SELECT 1 FROM crm_workspaces WHERE owner_id=? AND version=? AND updated_at=?) THEN 1 ELSE 1/0 END").bind(ownerId,nextWorkspaceVersion,now));
+  statements.push(db.prepare('UPDATE crm_relational_migrations SET status=?,source_version=?,verified_at=?,updated_at=? WHERE owner_id=? AND domain=?').bind('verified',nextWorkspaceVersion,now,now,ownerId,CUSTOMER_ORDER_DOMAIN));
+  statements.push(db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)').bind(crypto.randomUUID(),ownerId,actor.userId,actor.name,actor.role,'Created order '+order.number+' with new customer '+customer.name,JSON.stringify(['customers','orders']),now));
+  await db.batch(statements);
+  return {workspaceVersion:nextWorkspaceVersion,customer:{...customer,recordVersion:0},order:{...order,recordVersion:0}};
 }
