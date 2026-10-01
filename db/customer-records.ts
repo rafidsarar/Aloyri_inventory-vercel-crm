@@ -101,7 +101,7 @@ export async function createCustomerRecord(ownerId:string,input:unknown,actor:Cu
 
 export async function updateCustomerRecord(ownerId:string,id:string,input:unknown,expectedVersion:number,actor:CustomerActor){
   if(!Number.isInteger(expectedVersion)||expectedVersion<0)throw new Error('A valid customer record version is required.');
-  const customer=customerSchema.parse({...input,id});
+  const customer=customerSchema.parse({...((input&&typeof input==='object')?input:{}),id});
   const {row,state}=await ensureCustomerRecordApiReady(ownerId);
   if(!state.customers.some(item=>item.id===id))throw new Error('Customer not found.');
   const current=await database().prepare('SELECT record_version FROM crm_rel_customers WHERE owner_id=? AND id=?').bind(ownerId,id).first<{record_version:number}>();
