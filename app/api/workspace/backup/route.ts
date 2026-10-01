@@ -1,7 +1,7 @@
 import { getAppUser, checkOrigin } from '@/app/local-auth';
 import { AccessDenied, resolveWorkspace } from '@/app/team-access';
 import { database } from '@/db/raw';
-import { fixedBusinessName, stateSchema, validateRelations, type State } from '@/lib/crm';
+import { fixedBusinessName, stateSchema, validateRelations, workspaceIntegrityWarnings, type State } from '@/lib/crm';
 import { roleCanBackup } from '@/lib/roles';
 
 export const dynamic='force-dynamic';
@@ -31,10 +31,10 @@ async function sha256(data:unknown){
 }
 
 async function parseBackup(backup:any){
-  if(backup?.format!=='aloyri-workspace-backup'||![1,2].includes(backup?.schemaVersion))
+  if(backup?.format!=='aloyri-workspace-backup'||![1,2,3].includes(backup?.schemaVersion))
     throw new Error('This is not a supported ALOYRI workspace backup.');
   const rawChecksum=await sha256(backup.data);
-  if(backup.schemaVersion===2){
+  if(backup.schemaVersion>=2){
     if(backup?.integrity?.algorithm!=='SHA-256'||typeof backup?.integrity?.checksum!=='string')
       throw new Error('Backup integrity metadata is missing.');
     if(backup.integrity.checksum!==rawChecksum)throw new Error('Backup integrity check failed. The file may be incomplete or modified.');
@@ -42,9 +42,10 @@ async function parseBackup(backup:any){
   const restored=fixedBusinessName(stateSchema.parse(backup.data));
   validateRelations(restored,{skipOrderNumberUniqueness:true});
   const counts=recordCounts(restored);
-  if(backup.schemaVersion===2&&backup.integrity.counts&&Object.entries(counts).some(([key,value])=>backup.integrity.counts[key]!==value))
+  if(backup.schemaVersion>=2&&backup.integrity.counts&&Object.entries(counts).some(([key,value])=>backup.integrity.counts[key]!==value))
     throw new Error('Backup record counts do not match the file contents.');
-  return {restored,counts,checksum:rawChecksum};
+  if(backup.schemaVersion>=3&&!backup.integrity.counts)throw new Error('Backup record-count metadata is missing.');
+  return {restored,counts,checksum:rawChecksum,warnings:workspaceIntegrityWarnings(restored)};
 }
 
 export async function GET(){
@@ -60,11 +61,11 @@ export async function GET(){
     const counts=recordCounts(data),checksum=await sha256(data);
     return response({
       format:'aloyri-workspace-backup',
-      schemaVersion:2,
+      schemaVersion:3,
       createdAt:new Date().toISOString(),
       workspaceVersion:row.version,
       workspaceUpdatedAt:row.updated_at,
-      integrity:{algorithm:'SHA-256',checksum,counts},
+      integrity:{algorithm:'SHA-256',checksum,counts,relationsValidated:true,warnings:workspaceIntegrityWarnings(data)},
       data
     });
   }catch(e){
@@ -85,29 +86,42 @@ export async function POST(request:Request){
     if(text.length>1900000)return response({error:'Backup is too large.'},413);
     let body:any;
     try{body=JSON.parse(text)}catch{return response({error:'Invalid backup JSON.'},400)}
-    const {restored,counts,checksum}=await parseBackup(body?.backup);
+    const {restored,counts,checksum,warnings}=await parseBackup(body?.backup);
     if(body?.action==='validate'){
+      const current=await database().prepare('SELECT data,version,updated_at FROM crm_workspaces WHERE owner_id=?').bind(ownerId).first<{data:string;version:number;updated_at:string}>();
+      let currentWorkspace:null|{version:number;updatedAt:string;counts:ReturnType<typeof recordCounts>;checksum:string}=null;
+      if(current){
+        const currentData=fixedBusinessName(stateSchema.parse(JSON.parse(current.data)));
+        currentWorkspace={version:current.version,updatedAt:current.updated_at,counts:recordCounts(currentData),checksum:await sha256(currentData)};
+      }
       return response({
         ok:true,
         valid:true,
         schemaVersion:body.backup.schemaVersion,
         createdAt:body.backup.createdAt||null,
         workspaceVersion:body.backup.workspaceVersion??null,
-        integrity:{checksum,counts}
+        backupWorkspace:{counts,checksum,warnings},
+        currentWorkspace,
+        integrity:{checksum,counts,warnings}
       });
     }
     if(body?.action!=='restore'||body?.confirmation!=='RESTORE ALOYRI')
       return response({error:'Type RESTORE ALOYRI to confirm.'},400);
     const db=database();
-    const row=await db.prepare('SELECT version FROM crm_workspaces WHERE owner_id=?').bind(ownerId).first<{version:number}>();
+    const row=await db.prepare('SELECT data,version,updated_at FROM crm_workspaces WHERE owner_id=?').bind(ownerId).first<{data:string;version:number;updated_at:string}>();
     if(!row)return response({error:'Workspace not found.'},404);
-    const now=new Date().toISOString();
+    const now=new Date().toISOString(),snapshotId=crypto.randomUUID();
+    const currentData=fixedBusinessName(stateSchema.parse(JSON.parse(row.data))),currentChecksum=await sha256(currentData);
+    await db.prepare('CREATE TABLE IF NOT EXISTS crm_restore_snapshots (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, workspace_version INTEGER NOT NULL, workspace_updated_at TEXT NOT NULL, checksum TEXT NOT NULL, data TEXT NOT NULL, created_at TEXT NOT NULL)').run();
+    await db.prepare('CREATE INDEX IF NOT EXISTS crm_restore_snapshots_owner_created_idx ON crm_restore_snapshots(owner_id,created_at DESC)').run();
+    await db.prepare('INSERT INTO crm_restore_snapshots (id,owner_id,workspace_version,workspace_updated_at,checksum,data,created_at) VALUES (?,?,?,?,?,?,?)').bind(snapshotId,ownerId,row.version,row.updated_at,currentChecksum,JSON.stringify(currentData),now).run();
+    await db.prepare('DELETE FROM crm_restore_snapshots WHERE owner_id=? AND id NOT IN (SELECT id FROM crm_restore_snapshots WHERE owner_id=? ORDER BY created_at DESC LIMIT 5)').bind(ownerId,ownerId).run();
     const result=await db.prepare('UPDATE crm_workspaces SET data=?,version=version+1,updated_at=? WHERE owner_id=? AND version=?').bind(JSON.stringify(restored),now,ownerId,row.version).run();
     if(!result.meta.changes)return response({error:'Workspace changed while restoring. Try again.'},409);
     await db.prepare('CREATE TABLE IF NOT EXISTS crm_audit_log (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, actor_id TEXT NOT NULL, actor_name TEXT NOT NULL, role TEXT NOT NULL, summary TEXT NOT NULL, sections TEXT NOT NULL, created_at TEXT NOT NULL)').run();
     await db.prepare('CREATE INDEX IF NOT EXISTS crm_audit_owner_created_idx ON crm_audit_log(owner_id,created_at DESC)').run();
-    await db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)').bind(crypto.randomUUID(),ownerId,user.userId,user.displayName||user.email,role,'Restored validated workspace backup',JSON.stringify(['backup restore']),now).run();
-    return response({ok:true,version:row.version+1,integrity:{checksum,counts}});
+    await db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)').bind(crypto.randomUUID(),ownerId,user.userId,user.displayName||user.email,role,'Restored validated workspace backup · safety snapshot '+snapshotId.slice(0,8),JSON.stringify(['backup restore']),now).run();
+    return response({ok:true,version:row.version+1,safetySnapshot:{id:snapshotId,checksum:currentChecksum},integrity:{checksum,counts,warnings}});
   }catch(e){
     if(e instanceof AccessDenied)return response({error:e.message},403);
     console.error('Backup validation/restore failed',e);
