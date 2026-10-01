@@ -78,11 +78,20 @@ export async function verifyRelationalParity(ownerId:string){
 
 export async function ensureRelationalCutover(ownerId:string){
   await ensureRelationalFoundation();
-  const existing=await database().prepare('SELECT enabled FROM crm_relational_cutover WHERE owner_id=?').bind(ownerId).first<{enabled:boolean}>();
-  if(existing)return getCutoverState(ownerId);
+  const db=database();
+  const existing=await db.prepare('SELECT enabled,enabled_by,last_verification FROM crm_relational_cutover WHERE owner_id=?').bind(ownerId).first<{enabled:boolean;enabled_by:string|null;last_verification:string}>();
+  if(existing){
+    if(Boolean(existing.enabled)||existing.enabled_by)return getCutoverState(ownerId);
+    let lastOk=false;try{lastOk=Boolean(JSON.parse(existing.last_verification||'{}').ok)}catch{}
+    if(!lastOk)return getCutoverState(ownerId);
+    const now=new Date().toISOString();
+    await db.prepare('UPDATE crm_relational_cutover SET enabled=TRUE,enabled_at=?,enabled_by=?,updated_at=? WHERE owner_id=? AND enabled=FALSE AND enabled_by IS NULL')
+      .bind(now,'stage-3-step-8-auto-cutover',now,ownerId).run();
+    return getCutoverState(ownerId);
+  }
   const verification=await verifyRelationalParity(ownerId);
   const now=new Date().toISOString(),enabled=verification.ok;
-  await database().prepare('INSERT INTO crm_relational_cutover (owner_id,enabled,enabled_at,enabled_by,last_verified_at,last_verification,updated_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(owner_id) DO UPDATE SET enabled=EXCLUDED.enabled,enabled_at=EXCLUDED.enabled_at,enabled_by=EXCLUDED.enabled_by,last_verified_at=EXCLUDED.last_verified_at,last_verification=EXCLUDED.last_verification,updated_at=EXCLUDED.updated_at')
+  await db.prepare('INSERT INTO crm_relational_cutover (owner_id,enabled,enabled_at,enabled_by,last_verified_at,last_verification,updated_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(owner_id) DO UPDATE SET enabled=EXCLUDED.enabled,enabled_at=EXCLUDED.enabled_at,enabled_by=EXCLUDED.enabled_by,last_verified_at=EXCLUDED.last_verified_at,last_verification=EXCLUDED.last_verification,updated_at=EXCLUDED.updated_at')
     .bind(ownerId,enabled,enabled?now:null,enabled?'stage-3-step-8-auto-cutover':null,now,JSON.stringify(verification),now).run();
   return getCutoverState(ownerId);
 }
@@ -92,6 +101,6 @@ export async function setRelationalCutover(ownerId:string,enabled:boolean,actor:
   if(enabled&&!verification.ok)throw new Error('RELATIONAL_PARITY_FAILED');
   const now=new Date().toISOString();
   await database().prepare('INSERT INTO crm_relational_cutover (owner_id,enabled,enabled_at,enabled_by,last_verified_at,last_verification,updated_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(owner_id) DO UPDATE SET enabled=EXCLUDED.enabled,enabled_at=EXCLUDED.enabled_at,enabled_by=EXCLUDED.enabled_by,last_verified_at=EXCLUDED.last_verified_at,last_verification=EXCLUDED.last_verification,updated_at=EXCLUDED.updated_at')
-    .bind(ownerId,enabled,enabled?now:null,enabled?actor:null,now,JSON.stringify(verification),now).run();
+    .bind(ownerId,enabled,enabled?now:null,actor,now,JSON.stringify(verification),now).run();
   return {enabled,verification};
 }
