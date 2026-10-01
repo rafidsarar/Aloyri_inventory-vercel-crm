@@ -38,3 +38,5 @@ Create a Neon development database and run `sql/001_init.sql` in its SQL Editor.
 ## Security
 
 Passwords are salted PBKDF2-SHA256 hashes; sessions are backed by revocable database records and HttpOnly cookies. Staff access is checked on the server. Back up the Neon database and retain access to your Neon and Vercel accounts. `/setup` cannot create a second owner.
+
+<!-- vercel reconnect deployment trigger -->
