@@ -42,3 +42,4 @@ Passwords are salted PBKDF2-SHA256 hashes; sessions are backed by revocable data
 <!-- vercel reconnect deployment trigger -->
 <!-- vercel git integration recheck 1790842919116 -->
 <!-- vercel project binding recheck 1790843056314 -->
+<!-- production management intelligence release -->
