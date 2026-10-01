@@ -59,6 +59,17 @@ export async function verifyRelationalParity(ownerId:string){
   return result;
 }
 
+export async function ensureRelationalCutover(ownerId:string){
+  await ensureRelationalFoundation();
+  const existing=await database().prepare('SELECT enabled FROM crm_relational_cutover WHERE owner_id=?').bind(ownerId).first<{enabled:boolean}>();
+  if(existing)return getCutoverState(ownerId);
+  const verification=await verifyRelationalParity(ownerId);
+  const now=new Date().toISOString(),enabled=verification.ok;
+  await database().prepare('INSERT INTO crm_relational_cutover (owner_id,enabled,enabled_at,enabled_by,last_verified_at,last_verification,updated_at) VALUES (?,?,?,?,?,?,?)')
+    .bind(ownerId,enabled,enabled?now:null,enabled?'stage-3-step-8-auto-cutover':null,now,JSON.stringify(verification),now).run();
+  return getCutoverState(ownerId);
+}
+
 export async function setRelationalCutover(ownerId:string,enabled:boolean,actor:string){
   const verification=await verifyRelationalParity(ownerId);
   if(enabled&&!verification.ok)throw new Error('RELATIONAL_PARITY_FAILED');
