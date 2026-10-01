@@ -14,7 +14,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
   if(error instanceof AccessDenied)return response({error:error.message},403);
   const message=error instanceof Error?error.message:'Could not receive purchase order.';
   if(message==='PURCHASING_FORBIDDEN')return response({error:'Your role cannot receive purchase orders.'},403);
-  if(message==='DOMAIN_VERSION_CONFLICT')return response({error:'Purchasing records changed in another window. Refresh and try again.'},409);
+  if(message==='DOMAIN_VERSION_CONFLICT'||message==='WORKSPACE_VERSION_CONFLICT')return response({error:'Purchasing records changed in another window. Refresh and try again.'},409);
   if(message.includes('purchase order')||message.includes('Received')||message.includes('expiry')||message.includes('quantity')||message.includes('date')||message.includes('stock'))return response({error:message},400);
   console.error('Purchase receipt workflow failed',error);return response({error:message},500);
  }
