@@ -6,16 +6,29 @@ import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Table,TableBody,TableCell,TableHead,TableHeader,TableRow } from '@/components/ui/table';
 import { Tabs,TabsList,TabsTrigger } from '@/components/ui/tabs';
-import { dateLabel,purchaseOrderOutstandingUnits,purchaseOrderProgress,purchaseOrderReceivedUnits,purchaseOrderUnits,purchaseOrderValue,taka,today } from '@/lib/crm';
+import { dateLabel,purchaseOrderOutstandingUnits,purchaseOrderProgress,purchaseOrderReceivedUnits,purchaseOrderUnits,purchaseOrderValue,supplierInsight,taka,today,type PurchaseOrder,type State,type Supplier } from '@/lib/crm';
+import type { View } from '../crm-ui';
 import { Empty,Status } from '../crm-ui';
 
-type Props={ctx:any};
+type AnyFn=(...args:any[])=>any;
+type SupplierRow=ReturnType<typeof supplierInsight>&{supplier:Supplier;index:number};
+type Ctx={
+  purchasingTab:'Purchase orders'|'Suppliers'; s:State; canEdit:(key:string)=>boolean; openPurchaseOrder:AnyFn;
+  openModal:AnyFn; purchasingOpen:PurchaseOrder[]; purchasingOpenValue:number; purchasingOverdue:PurchaseOrder[];
+  purchasingIncomingUnits:number; canFinance:boolean; purchasingPayable:number; setView:(view:View)=>void;
+  setFinanceTab:(value:string)=>void; verifiedSupplierCount:number;
+  setPurchasingTab:(value:'Purchase orders'|'Suppliers')=>void; setFilter:(value:string)=>void; setQuery:(value:string)=>void;
+  query:string; filter:string; purchaseOrderRows:PurchaseOrder[]; selectedPurchaseOrderIds:string[];
+  setSelectedPurchaseOrderIds:(value:string[])=>void; busy:boolean; bulkSendPurchaseOrders:()=>Promise<void>;
+  setPurchaseOrderStatus:AnyFn; openPurchaseOrderReceipt:AnyFn; supplierRows:SupplierRow[]; setDetail:AnyFn;
+};
+type Props={ctx:Ctx};
 
 export default function SuppliersSection({ctx}:Props){
   const {
     purchasingTab,s,canEdit,openPurchaseOrder,openModal,purchasingOpen,purchasingOpenValue,
     purchasingOverdue,purchasingIncomingUnits,canFinance,purchasingPayable,setView,setFinanceTab,
-    verifiedSupplierCount,setPurchasingTab,setFilter,setQuery,query,purchaseOrderRows,
+    verifiedSupplierCount,setPurchasingTab,setFilter,setQuery,query,filter,purchaseOrderRows,
     selectedPurchaseOrderIds,setSelectedPurchaseOrderIds,busy,bulkSendPurchaseOrders,
     setPurchaseOrderStatus,openPurchaseOrderReceipt,supplierRows,setDetail
   }=ctx;
