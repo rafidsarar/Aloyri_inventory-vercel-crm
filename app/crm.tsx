@@ -24,7 +24,7 @@ import Team from './team';
 import ChangePassword from './change-password';
 import Reconciliation from './reconciliation';
 import { canManageBusinessSettings, roleCanBackup, roleCanEdit, roleCanPrintInvoice, roleCanManageFinance, roleCanCloseFinance, roleCanExportData, roleCanImport, roleCanInspectReturns, roleCanManageTeam, roleCanReset, type WorkspaceRole } from '@/lib/roles';
-import { Avatar, Empty, Nav, OrderProgress, ProductIcon, Stat, Status, sections, visibleSections, type View } from './crm-ui';
+import { Avatar, Empty, Nav, OrderProgress, ProductIcon, Stat, Status, navIcons, sections, visibleSections, type View } from './crm-ui';
 import AlertsSection,{type AutoAlert} from './crm-sections/alerts';
 type GlobalResult={id:string;view:View;title:string;meta:string;query:string;score:number;detail?:{type:'order'|'customer'|'supplier';id:string}};
 const modalCollection:Record<Modal['type'],string>={order:'orders',orderEdit:'orders',customer:'customers',task:'tasks',product:'products',category:'productCategories',batch:'batches',stockAdjust:'stockAdjustments',stockHold:'inventoryHolds',supplier:'suppliers',expense:'expenses',cashEntry:'cashEntries',settings:'businessName'};
