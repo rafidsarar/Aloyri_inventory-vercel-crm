@@ -4,12 +4,31 @@ import { AlertTriangle, ArrowDownLeft, ArrowUpRight, Check, CheckCircle2, Chevro
 import { Progress } from '@/components/ui/progress';
 import { Table,TableBody,TableCell,TableHead,TableHeader,TableRow } from '@/components/ui/table';
 import { Tabs,TabsList,TabsTrigger } from '@/components/ui/tabs';
-import { contribution,dateLabel,receivable,subtotal,taka,today } from '@/lib/crm';
+import { cashflow,contribution,dateLabel,metrics,receivable,subtotal,taka,today,type Order,type Product,type State,type Supplier } from '@/lib/crm';
 import { Choice } from '../forms';
 import Reconciliation from '../reconciliation';
 import { Empty,Stat,Status } from '../crm-ui';
 
-type Props={ctx:any};
+type AnyFn=(...args:any[])=>any;
+type Ctx={
+  s:State; busy:boolean; canCloseFinance:boolean; canEdit:(key:string)=>boolean; canExport:boolean; canFinance:boolean;
+  cashRange:string; closeBlockers:number; closeMissingAccounts:number; closeMonth:string; closePayables:number;
+  closeReceivables:number; closeRecord:State['financeCloses'][number]|undefined; closeUnassigned:number;
+  allCashIn:number; allCashOut:number; availableCash:number; configuredBalances:any[]; exportFinance:AnyFn;
+  financeTab:string; forecastPayables30:number; forecastReceivables:number; m:ReturnType<typeof metrics>;
+  memberName:string; monthlyTrend:any[]; netCashMovement:number; openModal:AnyFn; openOwnerMoney:AnyFn;
+  openPaymentDialog:AnyFn; overduePayables:number; payableAging:any[]; previousRevenue:number;
+  productById:Map<string,Product>; projected30:number; receivableAging:any[]; recentNet:number;
+  reconciledAccounts:number; reportCogs:number; reportDeliveryIncome:number; reportExpenses:State['expenses'];
+  reportFulfillment:number; reportGross:number; reportMargin:number; reportMonth:string; reportMonths:string[];
+  reportOpex:number; reportOrders:Order[]; reportProfit:number; reportReturns:number; reportRevenue:number;
+  reverseCashEntry:AnyFn; save:AnyFn; setCashRange:(value:string)=>void; setCloseMonth:(value:string)=>void;
+  setDetail:AnyFn; setFinanceTab:(value:string)=>void; setReportMonth:(value:string)=>void;
+  signedTaka:(amount:number)=>string; supplierById:Map<string,Supplier>; trendMax:number; unassignedMovements:number;
+  visibleCash:ReturnType<typeof cashflow>['entries']; cashIn:number; cashOut:number; flow:ReturnType<typeof cashflow>;
+  integrityIssues:any[]; isCollectible:(order:Order)=>boolean;
+};
+type Props={ctx:Ctx};
 
 export default function FinancesSection({ctx}:Props){
   const {
