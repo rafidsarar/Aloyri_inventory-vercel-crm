@@ -44,21 +44,24 @@ function mapOrder(row:OrderRow,items:ItemRow[],allocations:AllocationRow[],colle
 }
 
 async function readOrderRows(ownerId:string,id?:string){
-  await ensureCustomerRecordApiReady(ownerId);
+  const {row}=await ensureCustomerRecordApiReady(ownerId);
   const db=database();
   const where=id?'owner_id=? AND id=?':'owner_id=?';
   const binds=id?[ownerId,id]:[ownerId];
   const parents=await db.prepare('SELECT id,number,customer_id,created,delivered,returned_at,settled_at,channel,payment,status,discount,delivery_charge,courier_cost,packaging,payment_fee,return_fee,settled,restocked,tracking,notes,record_version FROM crm_rel_orders WHERE '+where+' ORDER BY created DESC,id').bind(...binds).all<OrderRow>();
   const orderIds=parents.results.map(r=>r.id);
-  if(!orderIds.length)return [];
+  if(!orderIds.length)return {orders:[] as OrderRecord[],workspaceVersion:row.version};
   const items=await db.prepare('SELECT order_id,line_no,product_id,qty,price FROM crm_rel_order_items WHERE owner_id=?'+(id?' AND order_id=?':'')+' ORDER BY order_id,line_no').bind(...binds).all<ItemRow>();
   const allocations=await db.prepare('SELECT order_id,line_no,allocation_no,batch_id,qty,unit_cost FROM crm_rel_order_allocations WHERE owner_id=?'+(id?' AND order_id=?':'')+' ORDER BY order_id,line_no,allocation_no').bind(...binds).all<AllocationRow>();
   const collections=await db.prepare('SELECT order_id,id,date,amount,reference FROM crm_rel_order_collections WHERE owner_id=?'+(id?' AND order_id=?':'')+' ORDER BY order_id,date,id').bind(...binds).all<CollectionRow>();
-  return parents.results.map(row=>mapOrder(row,items.results,allocations.results,collections.results));
+  return {orders:parents.results.map(orderRow=>mapOrder(orderRow,items.results,allocations.results,collections.results)),workspaceVersion:row.version};
 }
 
 export const listOrderRecords=(ownerId:string)=>readOrderRows(ownerId);
-export async function getOrderRecord(ownerId:string,id:string){return (await readOrderRows(ownerId,id))[0]||null}
+export async function getOrderRecord(ownerId:string,id:string){
+  const result=await readOrderRows(ownerId,id);
+  return {order:result.orders[0]||null,workspaceVersion:result.workspaceVersion};
+}
 
 function proposedWithOrder(state:State,order:Order,role:WorkspaceRole){
   const proposed=structuredClone(visibleState(state,role));
@@ -115,7 +118,7 @@ export async function createOrderRecord(ownerId:string,input:unknown,actor:Order
     db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)').bind(auditId,ownerId,actor.userId,actor.name,actor.role,'Created order '+order.number,JSON.stringify(['orders']),now)
   ];
   await db.batch(statements);
-  return {...order,recordVersion:0} satisfies OrderRecord;
+  return {order:{...order,recordVersion:0} satisfies OrderRecord,workspaceVersion:nextWorkspaceVersion};
 }
 
 export async function updateOrderRecord(ownerId:string,id:string,input:unknown,expectedVersion:number,actor:OrderActor){
@@ -144,7 +147,7 @@ export async function updateOrderRecord(ownerId:string,id:string,input:unknown,e
     db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)').bind(auditId,ownerId,actor.userId,actor.name,actor.role,'Updated order '+order.number,JSON.stringify(['orders']),now)
   ];
   await db.batch(statements);
-  return {...order,recordVersion:nextRecordVersion} satisfies OrderRecord;
+  return {order:{...order,recordVersion:nextRecordVersion} satisfies OrderRecord,workspaceVersion:nextWorkspaceVersion};
 }
 
 export async function deleteOrderRecord(ownerId:string,id:string,expectedVersion:number,actor:OrderActor){
@@ -167,5 +170,5 @@ export async function deleteOrderRecord(ownerId:string,id:string,expectedVersion
     db.prepare('UPDATE crm_relational_migrations SET status=?,source_version=?,verified_at=?,updated_at=? WHERE owner_id=? AND domain=?').bind('verified',nextWorkspaceVersion,now,now,ownerId,CUSTOMER_ORDER_DOMAIN),
     db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)').bind(auditId,ownerId,actor.userId,actor.name,actor.role,'Deleted order '+before.number,JSON.stringify(['orders']),now)
   ]);
-  return {id};
+  return {id,workspaceVersion:nextWorkspaceVersion};
 }
