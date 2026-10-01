@@ -1034,3 +1034,15 @@ html,body{max-width:100%;overflow-x:hidden}
   .global-search-shell{width:min(205px,61vw)!important}
   .notification-button{min-width:40px;min-height:40px}
 }
+
+
+/* Final operational polish · Backup and integrity */
+.settings-integrity-summary{display:grid;gap:5px;margin:12px 0 16px;padding:13px 14px;border:1px solid #d9e7dd;border-radius:11px;background:#f7fbf8}
+.settings-integrity-summary.warning{border-color:#eadbc5;background:#fffaf1}
+.settings-integrity-summary>strong{font-size:12px;color:#476451}
+.settings-integrity-summary.warning>strong{color:#8b6936}
+.settings-integrity-summary>small{font-size:10px;line-height:1.5;color:#7e9084}
+.settings-integrity-summary ul{display:grid;gap:7px;margin:7px 0 0;padding:0;list-style:none}
+.settings-integrity-summary li{display:flex;flex-direction:column;gap:2px;padding-top:7px;border-top:1px solid rgba(115,139,122,.14)}
+.settings-integrity-summary li b{font-size:10px;color:#5a6e60}
+.settings-integrity-summary li span{font-size:9px;line-height:1.45;color:#849188}
