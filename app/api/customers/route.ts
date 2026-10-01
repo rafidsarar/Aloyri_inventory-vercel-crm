@@ -12,7 +12,7 @@ export async function GET(){
     if(!user)return response({error:'Sign in to view customers.'},401);
     const {ownerId,role}=await resolveWorkspace(user);
     if(!roleCanViewSection(role,'Customers'))return response({error:'You do not have access to customers.'},403);
-    return response({customers:await listCustomerRecords(ownerId)});
+    return response(await listCustomerRecords(ownerId));
   }catch(error){
     if(error instanceof AccessDenied)return response({error:error.message},403);
     console.error('Customer list failed',error);
@@ -29,8 +29,8 @@ export async function POST(request:Request){
     if(!roleCanEdit(role,'customers'))return response({error:'You do not have permission to create customers.'},403);
     let body:unknown;
     try{body=await request.json()}catch{return response({error:'Invalid request.'},400)}
-    const customer=await createCustomerRecord(ownerId,body,{userId:user.userId,name:user.displayName||user.email,role});
-    return response({customer},201);
+    const result=await createCustomerRecord(ownerId,body,{userId:user.userId,name:user.displayName||user.email,role});
+    return response({customer:result.customer,version:result.workspaceVersion},201);
   }catch(error){
     if(error instanceof AccessDenied)return response({error:error.message},403);
     const message=error instanceof Error?error.message:'Could not create customer.';
