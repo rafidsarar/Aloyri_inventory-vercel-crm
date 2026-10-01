@@ -35,8 +35,8 @@ const expenseSchema = z.object({id,category:z.enum(expenseCategories),amount:mon
 const cashEntrySchema = z.object({id,date,kind:z.enum(['in','out']),category:z.string().trim().min(1).max(100),description:str,amount:money.refine(n=>n>0),transferId:id.optional(),reversalOf:id.optional(),reversalReason:z.string().trim().max(300).optional()});
 const accountOpeningSchema=z.object({account:z.enum(accountIds),date,balance:money,statementDate:date.optional(),statementBalance:money.optional()});
 const accountMatchSchema=z.object({entryId:id,account:z.enum(accountIds),matched:z.boolean(),reference:z.string().trim().max(200)});
-const businessProfileSchema=z.object({phone:z.string().trim().max(40),email:z.union([z.literal(''),z.string().trim().email().max(200)]),address:z.string().trim().max(500),bin:z.string().trim().max(60),logoDataUrl:z.union([z.literal(''),z.string().regex(/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/).max(150000)]),invoiceFooter:z.string().trim().max(500),returnPolicy:z.string().trim().max(500)});
-export const emptyBusinessProfile=()=>({phone:'',email:'',address:'',bin:'',logoDataUrl:'',invoiceFooter:'',returnPolicy:''});
+const businessProfileSchema=z.object({phone:z.string().trim().max(40),email:z.union([z.literal(''),z.string().trim().email().max(200)]),address:z.string().trim().max(500),bin:z.string().trim().max(60),logoDataUrl:z.union([z.literal(''),z.string().regex(/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/).max(150000)]),invoiceFooter:z.string().trim().max(500),returnPolicy:z.string().trim().max(500),appearanceMode:z.enum(['light','dark']).default('light')});
+export const emptyBusinessProfile=()=>({phone:'',email:'',address:'',bin:'',logoDataUrl:'',invoiceFooter:'',returnPolicy:'',appearanceMode:'light' as const});
 const taskSchema = z.object({
   id,
   customerId:str,
