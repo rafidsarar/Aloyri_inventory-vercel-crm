@@ -4,10 +4,9 @@ import { database } from '@/db/raw';
 import { fixedBusinessName, stateSchema, validateRelations, workspaceIntegrityWarnings, type State } from '@/lib/crm';
 import { roleCanBackup } from '@/lib/roles';
 import { relationalCoreState,setRelationalCutover,verifyRelationalParity } from '@/db/relational-cutover';
-import { migrateCustomersOrdersShadow } from '@/db/customer-order-shadow';
+import { migrateCustomersOrdersShadow,CUSTOMER_ORDER_DOMAIN } from '@/db/customer-order-shadow';
 import { migrateInventorySupplierShadow,INVENTORY_SUPPLIER_DOMAIN } from '@/db/inventory-supplier-shadow';
 import { migrateFinanceShadow,FINANCE_DOMAIN } from '@/db/finance-shadow';
-import { CUSTOMER_ORDER_DOMAIN } from '@/db/customer-order-shadow';
 
 export const dynamic='force-dynamic';
 const response=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
@@ -97,7 +96,7 @@ export async function POST(request:Request){
       const current=await database().prepare('SELECT data,version,updated_at FROM crm_workspaces WHERE owner_id=?').bind(ownerId).first<{data:string;version:number;updated_at:string}>();
       let currentWorkspace:null|{version:number;updatedAt:string;counts:ReturnType<typeof recordCounts>;checksum:string}=null;
       if(current){
-        const currentData=fixedBusinessName(stateSchema.parse(JSON.parse(current.data)));
+        const currentData=(await relationalCoreState(ownerId)).state;
         currentWorkspace={version:current.version,updatedAt:current.updated_at,counts:recordCounts(currentData),checksum:await sha256(currentData)};
       }
       return response({
@@ -117,7 +116,7 @@ export async function POST(request:Request){
     const row=await db.prepare('SELECT data,version,updated_at FROM crm_workspaces WHERE owner_id=?').bind(ownerId).first<{data:string;version:number;updated_at:string}>();
     if(!row)return response({error:'Workspace not found.'},404);
     const now=new Date().toISOString(),snapshotId=crypto.randomUUID();
-    const currentData=fixedBusinessName(stateSchema.parse(JSON.parse(row.data))),currentChecksum=await sha256(currentData);
+    const currentData=(await relationalCoreState(ownerId)).state,currentChecksum=await sha256(currentData);
     await db.prepare('CREATE TABLE IF NOT EXISTS crm_restore_snapshots (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, workspace_version INTEGER NOT NULL, workspace_updated_at TEXT NOT NULL, checksum TEXT NOT NULL, data TEXT NOT NULL, created_at TEXT NOT NULL)').run();
     await db.prepare('CREATE INDEX IF NOT EXISTS crm_restore_snapshots_owner_created_idx ON crm_restore_snapshots(owner_id,created_at DESC)').run();
     await db.prepare('INSERT INTO crm_restore_snapshots (id,owner_id,workspace_version,workspace_updated_at,checksum,data,created_at) VALUES (?,?,?,?,?,?,?)').bind(snapshotId,ownerId,row.version,row.updated_at,currentChecksum,JSON.stringify(currentData),now).run();
