@@ -21,7 +21,7 @@ type Ctx={
   setInventoryTab:(value:string)=>void; setFilter:(value:string)=>void; setQuery:(value:string)=>void; m:any;
   inventoryLow:Product[]; inventoryOut:Product[]; inventoryExpiring:Batch[]; openPurchaseOrders:PurchaseOrder[];
   inventoryPhysicalUnits:number; inventoryReservedUnits:number; inventoryReturnPendingUnits:number; inventoryBlockedUnits:number;
-  receivedUnitsThisMonth:number; receivedThisMonth:Batch[]; fastestMoving:{product:Product;units:number}|null;
+  receivedUnitsThisMonth:number; receivedThisMonth:Batch[]; fastestMoving:{product:Product;units:number}|null|undefined;
   slowMovingCount:number; inventoryExpired:Batch[]; changeView:(view:View)=>void; inventoryTab:string;
   pendingReturnOrders:Order[]; cancelledInspectionGroups:CancelledInspectionGroup[]; managedInventoryHolds:State['inventoryHolds'];
   canInspectReturns:boolean; query:string; inventorySort:string; setInventorySort:(value:string)=>void; filter:string;
