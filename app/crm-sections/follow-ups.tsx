@@ -5,7 +5,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import type { Customer, Order, Task } from '@/lib/crm';
 import { shiftDate, today } from '@/lib/crm';
-import { Empty } from '../crm-ui';
+import { Empty,WorkspaceSection } from '../crm-ui';
 
 type Detail={type:'order'|'customer'|'supplier';id:string};
 
@@ -43,7 +43,7 @@ export default function FollowUpsSection({
   tasks,busy,bulkCompleteFollowUps,customers,orders,updateFollowUp,followUpDueLabel,setDetail,
   deleteFollowUp,changeView
 }:Props){
-  return <>
+  return <WorkspaceSection>
     <section className="followup-header-card">
       <div className="followup-header-copy">
         <span className="orders-eyebrow"><CalendarCheck size={15}/>Customer care</span>
@@ -95,5 +95,5 @@ export default function FollowUpsSection({
         <button className="btn secondary" onClick={()=>changeView('Customers')}>View customers<ArrowRight size={16}/></button>
       </aside>
     </div>
-  </>;
+  </WorkspaceSection>;
 }
