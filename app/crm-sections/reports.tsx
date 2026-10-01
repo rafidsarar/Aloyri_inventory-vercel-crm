@@ -6,7 +6,7 @@ import { dateLabel,taka,type Batch,type Order,type Product } from '@/lib/crm';
 import type { WorkspaceRole } from '@/lib/roles';
 import { canManageBusinessSettings } from '@/lib/roles';
 import { Choice } from '../forms';
-import { Empty,type View } from '../crm-ui';
+import { Empty,WorkspaceSection,type View } from '../crm-ui';
 
 type AnyFn=(...args:any[])=>any;
 type Ctx={
@@ -39,7 +39,7 @@ export default function ReportsSection({ctx}:Props){
     unassignedMovements,automationActiveRules,inventoryExpired,projected30,reportCollectionRate,
     role,openModal
   }=ctx;
-  return <div className="management-report-page">
+  return <WorkspaceSection className="management-report-page">
 <section className="management-report-hero">
   <div className="management-report-hero-copy">
     <span className="management-report-eyebrow"><TrendingUp size={15}/>Management reports</span>
@@ -197,5 +197,5 @@ export default function ReportsSection({ctx}:Props){
     {canManageBusinessSettings(role)&&<button className="btn secondary management-data-button" onClick={()=>openModal({type:'settings'})}><ShieldCheck size={15}/>Open data management</button>}
   </section>
 </section>
-</div>;
+</WorkspaceSection>;
 }
