@@ -61,7 +61,7 @@ export const relationalFoundationSql = [
       REFERENCES crm_rel_customers(owner_id, id)
       DEFERRABLE INITIALLY DEFERRED
   )`,
-  `CREATE UNIQUE INDEX IF NOT EXISTS crm_rel_orders_owner_number_idx
+  `CREATE INDEX IF NOT EXISTS crm_rel_orders_owner_number_idx
     ON crm_rel_orders(owner_id, lower(number))`,
   `CREATE INDEX IF NOT EXISTS crm_rel_orders_owner_customer_idx
     ON crm_rel_orders(owner_id, customer_id)`,
