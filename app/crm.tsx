@@ -1,5 +1,6 @@
 'use client';
 /* Final operational polish complete */
+/* Production release: management intelligence */
 import React,{useDeferredValue,useEffect,useMemo,useRef,useState} from 'react';
 import { LayoutDashboard,ShoppingBag,Package,Users,Truck,Wallet,CalendarCheck,Settings,Plus,ArrowUpRight,ArrowRight,ChevronRight,ChevronDown,Download,Search,Bell,Check,CheckCircle2,Clock,AlertTriangle,Sun,Droplets,Leaf,RefreshCw,ShieldCheck,Receipt,ArrowDownLeft,Box,LogOut,Loader2,X,Mail,Phone,MapPin,ExternalLink,TrendingUp,Zap } from 'lucide-react';
 import { SidebarProvider,Sidebar,SidebarHeader,SidebarContent,SidebarFooter,SidebarGroup,SidebarGroupLabel,SidebarMenu,SidebarMenuItem,SidebarMenuButton,SidebarTrigger,useSidebar } from '@/components/ui/sidebar';
