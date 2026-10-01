@@ -58,7 +58,7 @@ const signedTaka=(amount:number)=>amount<0?'− '+taka(-amount):taka(amount);
 const isCollectible=(o:Order)=>o.status==='Delivered'||(o.payment!=='COD'&&!['Cancelled','Returned'].includes(o.status));
 export default function CRM(){
 const [live,setLive]=useState<State>(initialState),[version,setVersion]=useState(0),[loaded,setLoaded]=useState(false),[error,setError]=useState(''),[authRequired,setAuthRequired]=useState(false),[busy,setBusy]=useState(false),[view,setView]=useState<View>('Overview'),[query,setQuery]=useState(''),[filter,setFilter]=useState('All'),[globalQuery,setGlobalQuery]=useState(''),[alertFilter,setAlertFilter]=useState<'All'|'Critical'|'Action needed'|'Upcoming'>('All'),[selectedOrderIds,setSelectedOrderIds]=useState<string[]>([]),[selectedCustomerIds,setSelectedCustomerIds]=useState<string[]>([]),[selectedPurchaseOrderIds,setSelectedPurchaseOrderIds]=useState<string[]>([]),[selectedTaskIds,setSelectedTaskIds]=useState<string[]>([]),[inventoryTab,setInventoryTab]=useState('Products'),[inventorySort,setInventorySort]=useState('Stock health'),[financeTab,setFinanceTab]=useState('Overview'),[purchasingTab,setPurchasingTab]=useState<'Purchase orders'|'Suppliers'>('Purchase orders'),[closeMonth,setCloseMonth]=useState(today().slice(0,7)),[reportMonth,setReportMonth]=useState(today().slice(0,7)),[cashRange,setCashRange]=useState('30'),[range,setRange]=useState('7'),[modal,setModal]=useState<Modal|null>(null),[detail,setDetail]=useState<{type:'order'|'customer'|'supplier';id:string}|null>(null),[invoiceId,setInvoiceId]=useState<string|null>(null),[teamOpen,setTeamOpen]=useState(false),[passwordOpen,setPasswordOpen]=useState(false),[memberName,setMemberName]=useState('Rafid'),[role,setRole]=useState<WorkspaceRole>('owner'),[confirm,setConfirm]=useState<{title:string;text:string;action:()=>void;confirmLabel?:string}|null>(null),[paymentDialog,setPaymentDialog]=useState<{kind:'collection'|'supplier';id:string;max:number;label:string}|null>(null),[paymentAmount,setPaymentAmount]=useState(''),[paymentDate,setPaymentDate]=useState(today()),[paymentAccount,setPaymentAccount]=useState<typeof accountIds[number]>('bkash'),[paymentReference,setPaymentReference]=useState(''),[ownerMoneyOpen,setOwnerMoneyOpen]=useState(false),[ownerMoneyKind,setOwnerMoneyKind]=useState<'capital'|'drawing'>('capital'),[ownerMoneyAmount,setOwnerMoneyAmount]=useState(''),[ownerMoneyDate,setOwnerMoneyDate]=useState(today()),[ownerMoneyAccount,setOwnerMoneyAccount]=useState<typeof accountIds[number]>('bank'),[ownerMoneyReference,setOwnerMoneyReference]=useState(''),[auditEvents,setAuditEvents]=useState<{id:string;actor_name:string;role:string;summary:string;sections:string[];created_at:string}[]>([]),[auditQuery,setAuditQuery]=useState(''),[auditSection,setAuditSection]=useState('All'),[auditRole,setAuditRole]=useState('All'),[auditHasMore,setAuditHasMore]=useState(false),[auditLoading,setAuditLoading]=useState(false),[poOpen,setPoOpen]=useState(false),[poSupplier,setPoSupplier]=useState(''),[poExpected,setPoExpected]=useState(shiftDate(14)),[poNotes,setPoNotes]=useState(''),[poLines,setPoLines]=useState<{productId:string;qty:number;unitCost:number}[]>([]),[poReceiveId,setPoReceiveId]=useState<string|null>(null),[poReceiveDate,setPoReceiveDate]=useState(today()),[poReceiveInvoice,setPoReceiveInvoice]=useState(''),[poReceiveDue,setPoReceiveDue]=useState(''),[poReceiveLines,setPoReceiveLines]=useState<{productId:string;qty:number;expiry:string}[]>([]);
-const saving=useRef(false),globalSearchRef=useRef<HTMLInputElement|null>(null);const [globalActiveIndex,setGlobalActiveIndex]=useState(0);const [customerRecordVersions,setCustomerRecordVersions]=useState<Record<string,number>>({}),[orderRecordVersions,setOrderRecordVersions]=useState<Record<string,number>>({});const s=live;
+const saving=useRef(false),globalSearchRef=useRef<HTMLInputElement|null>(null);const [globalActiveIndex,setGlobalActiveIndex]=useState(0);const [customerRecordVersions,setCustomerRecordVersions]=useState<Record<string,number>>({}),[orderRecordVersions,setOrderRecordVersions]=useState<Record<string,number>>({}),[inventorySupplierVersion,setInventorySupplierVersion]=useState(0),[financeDomainVersion,setFinanceDomainVersion]=useState(0);const s=live;
 useEffect(()=>{const mode=s.businessProfile.appearanceMode==='dark'?'dark':'light';document.documentElement.dataset.crmTheme=mode;document.documentElement.classList.toggle('dark',mode==='dark');document.documentElement.style.colorScheme=mode;},[s.businessProfile.appearanceMode]);
 const deferredQuery=useDeferredValue(query),deferredGlobalQuery=useDeferredValue(globalQuery);
 const m=useMemo(()=>metrics(s),[s]);const flow=useMemo(()=>cashflow(s),[s]);
@@ -268,12 +268,14 @@ async function loadInventorySupplierRecords(nextRole:WorkspaceRole){
   if(!visibleSections(nextRole).some(section=>section==='Inventory'||section==='Suppliers'))return;
   const res=await fetch('/api/inventory-suppliers',{cache:'no-store'}),data:any=await res.json();
   if(!res.ok)throw Error(data.error||'Could not load Inventory and Supplier records.');
+  setInventorySupplierVersion(Number(data.domainVersion||0));
   setLive(current=>({...current,...data.data}));
 }
 async function loadFinanceRecords(nextRole:WorkspaceRole){
   if(!visibleSections(nextRole).includes('Finances'))return;
   const res=await fetch('/api/finances',{cache:'no-store'}),data:any=await res.json();
   if(!res.ok)throw Error(data.error||'Could not load Finance records.');
+  setFinanceDomainVersion(Number(data.domainVersion||0));
   setLive(current=>({...current,...data.data}));
 }
 async function loadLive(showErrors=true,manageBusy=true){
@@ -318,11 +320,11 @@ useEffect(()=>{let active=true;(async()=>{try{
   }
   if(visibleSections(nextRole).some(section=>section==='Inventory'||section==='Suppliers')){
     const domainRes=await fetch('/api/inventory-suppliers',{cache:'no-store'}),domainData:any=await domainRes.json();
-    if(active&&domainRes.ok)setLive(current=>({...current,...domainData.data}));
+    if(active&&domainRes.ok){setInventorySupplierVersion(Number(domainData.domainVersion||0));setLive(current=>({...current,...domainData.data}));}
   }
   if(visibleSections(nextRole).includes('Finances')){
     const financeRes=await fetch('/api/finances',{cache:'no-store'}),financeData:any=await financeRes.json();
-    if(active&&financeRes.ok)setLive(current=>({...current,...financeData.data}));
+    if(active&&financeRes.ok){setFinanceDomainVersion(Number(financeData.domainVersion||0));setLive(current=>({...current,...financeData.data}));}
   }
 }catch{}})();return()=>{active=false}},[]);
 async function save(next:State):Promise<boolean>{if(saving.current)return false;try{next=stateSchema.parse(next);if(role==='inventory')validateRoleRelations(next,role);else validateWorkspaceChange(s,next);}catch(e){toast.error(e instanceof Error?e.message:'Please check the values.');return false;}if(!loaded){toast.error('Load your workspace before saving.');return false;}if(Object.keys(s).some(key=>!roleCanEdit(role,key)&&!(role==='inventory'&&key==='orders')&&JSON.stringify(next[key as keyof State])!==JSON.stringify(s[key as keyof State]))){toast.error('Your role cannot change that section.');return false;}saving.current=true;setBusy(true);try{const res=await fetch('/api/workspace',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:next,version})});const d:any=await res.json();if(!res.ok)throw Error(d.error||'Could not save.');setLive(d.data?stateSchema.parse(d.data):next);setVersion(d.version);setError('');toast.success('Changes saved');return true;}catch(e){const message=e instanceof Error?e.message:'Could not save.';setError(message);toast.error(message);return false;}finally{saving.current=false;setBusy(false)}}
@@ -433,7 +435,7 @@ async function saveInventorySupplierDomain(next:State):Promise<boolean>{
   saving.current=true;setBusy(true);
   try{
     const data=Object.fromEntries(inventorySupplierKeys.map(key=>[key,next[key]]));
-    const res=await fetch('/api/inventory-suppliers',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({data,version})}),result:any=await res.json();
+    const res=await fetch('/api/inventory-suppliers',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({data,domainVersion:inventorySupplierVersion})}),result:any=await res.json();
     if(!res.ok){if(res.status===409)await loadLive(false,false);throw Error(result.error||'Could not save Inventory or Supplier records.')}
     const synced=await loadLive(false,false);if(!synced)throw Error('Changes saved, but the workspace could not be refreshed.');
     setError('');toast.success('Changes saved');return true;
@@ -451,7 +453,7 @@ async function saveFinanceDomain(next:State):Promise<boolean>{
   if(saving.current)return false;saving.current=true;setBusy(true);
   try{
     const data=Object.fromEntries(financeKeys.map(key=>[key,next[key]]));
-    const res=await fetch('/api/finances',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({data,version})}),result:any=await res.json();
+    const res=await fetch('/api/finances',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({data,domainVersion:financeDomainVersion})}),result:any=await res.json();
     if(!res.ok){if(res.status===409)await loadLive(false,false);throw Error(result.error||'Could not save Finance.')}
     const synced=await loadLive(false,false);if(!synced)throw Error('Finance saved, but the workspace could not be refreshed.');
     setError('');toast.success('Finance changes saved');return true;
