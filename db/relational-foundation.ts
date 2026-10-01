@@ -245,7 +245,33 @@ export const relationalFoundationSql = [
     PRIMARY KEY (owner_id, id)
   )`,
   `CREATE INDEX IF NOT EXISTS crm_rel_inventory_holds_owner_batch_idx ON crm_rel_inventory_holds(owner_id, batch_id)`,
-  `CREATE INDEX IF NOT EXISTS crm_rel_inventory_holds_owner_source_order_idx ON crm_rel_inventory_holds(owner_id, source_order_id)`
+  `CREATE INDEX IF NOT EXISTS crm_rel_inventory_holds_owner_source_order_idx ON crm_rel_inventory_holds(owner_id, source_order_id)`,
+  `CREATE TABLE IF NOT EXISTS crm_rel_finance_expenses (
+    owner_id TEXT NOT NULL,id TEXT NOT NULL,category TEXT NOT NULL,amount NUMERIC NOT NULL,date DATE NOT NULL,
+    notes TEXT NOT NULL DEFAULT '',vendor TEXT NOT NULL DEFAULT '',reference TEXT NOT NULL DEFAULT '',
+    recurring TEXT NOT NULL DEFAULT 'none',account TEXT,record_version INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,updated_at TEXT NOT NULL,PRIMARY KEY(owner_id,id)
+  )`,
+  `CREATE INDEX IF NOT EXISTS crm_rel_finance_expenses_owner_date_idx ON crm_rel_finance_expenses(owner_id,date DESC)`,
+  `CREATE TABLE IF NOT EXISTS crm_rel_finance_cash_entries (
+    owner_id TEXT NOT NULL,id TEXT NOT NULL,date DATE NOT NULL,kind TEXT NOT NULL,category TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',amount NUMERIC NOT NULL,transfer_id TEXT,reversal_of TEXT,reversal_reason TEXT,
+    record_version INTEGER NOT NULL DEFAULT 0,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,PRIMARY KEY(owner_id,id)
+  )`,
+  `CREATE INDEX IF NOT EXISTS crm_rel_finance_cash_owner_date_idx ON crm_rel_finance_cash_entries(owner_id,date DESC)`,
+  `CREATE TABLE IF NOT EXISTS crm_rel_finance_account_openings (
+    owner_id TEXT NOT NULL,account TEXT NOT NULL,date DATE NOT NULL,balance NUMERIC NOT NULL,statement_date DATE,
+    statement_balance NUMERIC,record_version INTEGER NOT NULL DEFAULT 0,updated_at TEXT NOT NULL,PRIMARY KEY(owner_id,account)
+  )`,
+  `CREATE TABLE IF NOT EXISTS crm_rel_finance_account_matches (
+    owner_id TEXT NOT NULL,entry_id TEXT NOT NULL,account TEXT NOT NULL,matched BOOLEAN NOT NULL DEFAULT FALSE,
+    reference TEXT NOT NULL DEFAULT '',record_version INTEGER NOT NULL DEFAULT 0,updated_at TEXT NOT NULL,
+    PRIMARY KEY(owner_id,entry_id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS crm_rel_finance_closes (
+    owner_id TEXT NOT NULL,month TEXT NOT NULL,closed_at DATE NOT NULL,closed_by TEXT NOT NULL,notes TEXT NOT NULL DEFAULT '',
+    record_version INTEGER NOT NULL DEFAULT 0,updated_at TEXT NOT NULL,PRIMARY KEY(owner_id,month)
+  )`
 ] as const;
 
 let ready: Promise<void> | null = null;
