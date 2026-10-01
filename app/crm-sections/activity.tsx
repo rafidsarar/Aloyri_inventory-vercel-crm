@@ -3,7 +3,7 @@
 import { Clock, Loader2, Search, ShieldCheck, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Table,TableBody,TableCell,TableHead,TableHeader,TableRow } from '@/components/ui/table';
-import { ActionBar, Avatar, Empty, SectionPanel, Status } from '../crm-ui';
+import { ActionBar, Avatar, Empty, SectionPanel, Status, WorkspaceSection } from '../crm-ui';
 
 export type AuditEvent={
   id:string;
@@ -40,7 +40,7 @@ export default function ActivitySection({
   auditRoles,auditSections,auditHasMore,auditLoading,setAuditQuery,setAuditRole,setAuditSection,
   loadAudit,auditDate,auditTime,auditRelative
 }:Props){
-  return <>
+  return <WorkspaceSection>
     <section className="activity-hero">
       <div>
         <span className="orders-eyebrow"><ShieldCheck size={15}/>Protected history</span>
@@ -97,5 +97,5 @@ export default function ActivitySection({
           </>
         : <Empty title={auditEvents.length?'No matching activity':'No activity recorded yet'} text={auditEvents.length?'Clear search, role, or section filters to see more history.':'New workspace changes will appear here automatically.'} action={auditEvents.length?<button className="btn secondary" onClick={()=>{setAuditQuery('');setAuditSection('All');setAuditRole('All')}}>Clear filters</button>:undefined}/>}
     </SectionPanel>
-  </>;
+  </WorkspaceSection>;
 }
