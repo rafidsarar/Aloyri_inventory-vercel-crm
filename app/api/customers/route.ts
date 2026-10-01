@@ -12,7 +12,8 @@ export async function GET(){
     if(!user)return response({error:'Sign in to view customers.'},401);
     const {ownerId,role}=await resolveWorkspace(user);
     if(!roleCanViewSection(role,'Customers'))return response({error:'You do not have access to customers.'},403);
-    return response(await listCustomerRecords(ownerId));
+    const result=await listCustomerRecords(ownerId);
+    return response({customers:result.customers,version:result.workspaceVersion});
   }catch(error){
     if(error instanceof AccessDenied)return response({error:error.message},403);
     console.error('Customer list failed',error);
