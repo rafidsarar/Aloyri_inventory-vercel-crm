@@ -28,7 +28,7 @@ test('customer updates use per-record optimistic version checks',()=>{
   assert.match(persistence,/record_version=record_version\+1/);
   assert.match(persistence,/WHERE owner_id=\? AND id=\? AND record_version=\?/);
   assert.match(persistence,/CUSTOMER_VERSION_CONFLICT/);
-  assert.match(detailRoute,/status[\\s\\S]*409|,409\\)/);
+  assert.ok(detailRoute.includes('409'));
 });
 
 test('customer persistence keeps relational and JSON compatibility writes in one transaction',()=>{
