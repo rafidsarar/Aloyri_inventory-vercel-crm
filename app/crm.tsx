@@ -647,7 +647,7 @@ return <SidebarProvider style={{'--sidebar-width':'clamp(196px, 20vw, 240px)'} a
 {view==='Suppliers'&&<SuppliersSection ctx={{
   purchasingTab,s,canEdit,openPurchaseOrder,openModal,purchasingOpen,purchasingOpenValue,
   purchasingOverdue,purchasingIncomingUnits,canFinance,purchasingPayable,setView,setFinanceTab,
-  verifiedSupplierCount,setPurchasingTab,setFilter,setQuery,query,purchaseOrderRows,
+  verifiedSupplierCount,setPurchasingTab,setFilter,setQuery,query,filter,purchaseOrderRows,
   selectedPurchaseOrderIds,setSelectedPurchaseOrderIds,busy,bulkSendPurchaseOrders,
   setPurchaseOrderStatus,openPurchaseOrderReceipt,supplierRows,setDetail
 }}/>}
