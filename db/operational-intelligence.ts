@@ -1,7 +1,7 @@
 import { database } from './raw.ts';
 import { getCutoverState } from './relational-cutover.ts';
 import { relationalCoreState } from './relational-cutover.ts';
-import { accountBalance,accountIds,automationSignals,batchRemaining,cashflow,contribution,orderBalance,shiftDate,stock,subtotal,today,total,type State } from '../lib/crm.ts';
+import { accountBalance,accountIds,automationSignals,cashflow,contribution,orderBalance,shiftDate,stock,subtotal,today,total,type State } from '../lib/crm.ts';
 
 const round=(n:number)=>Math.round(n*100)/100;
 const daysBetween=(from:string,to:string)=>Math.max(0,Math.round((Date.parse(to+'T12:00:00Z')-Date.parse(from+'T12:00:00Z'))/86400000));
