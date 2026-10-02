@@ -11,6 +11,8 @@ type Row={
   missing_domain_versions:string|number;
   restore_snapshots:string|null;
   audit_log:string|null;
+  security_events:string|null;
+  backup_events:string|null;
 };
 
 export async function GET(){
@@ -27,14 +29,18 @@ export async function GET(){
              OR NOT EXISTS (SELECT 1 FROM crm_domain_versions d WHERE d.owner_id=w.owner_id AND d.domain='finances')
         ) AS missing_domain_versions,
         to_regclass('public.crm_restore_snapshots')::text AS restore_snapshots,
-        to_regclass('public.crm_audit_log')::text AS audit_log
+        to_regclass('public.crm_audit_log')::text AS audit_log,
+        to_regclass('public.crm_security_events')::text AS security_events,
+        to_regclass('public.crm_backup_events')::text AS backup_events
     `).first<Row>();
     const checks={
       workspaceReady:Number(row?.workspace_count||0)>0,
       cutoverReady:Number(row?.disabled_cutovers||0)===0,
       relationalDomainsReady:Number(row?.unverified_domains||0)===0,
       domainVersionsReady:Number(row?.missing_domain_versions||0)===0,
-      restoreInfrastructureReady:Boolean(row?.restore_snapshots&&row?.audit_log)
+      restoreInfrastructureReady:Boolean(row?.restore_snapshots&&row?.audit_log),
+      securityInfrastructureReady:Boolean(row?.security_events),
+      recoveryTrackingReady:Boolean(row?.backup_events)
     };
     const ok=Object.values(checks).every(Boolean);
     return Response.json({status:ok?'ok':'unavailable',commit,checks},{status:ok?200:503,headers});
