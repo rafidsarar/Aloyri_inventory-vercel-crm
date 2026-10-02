@@ -68,18 +68,20 @@ test('Step 8D Inventory and Finance saves use domain versions rather than client
   assert.match(crm,/domainVersion:financeDomainVersion/);
 });
 
-test('mixed workflows bump affected relational domain versions',()=>{
-  assert.match(inventoryWorkflows,/bumpDomainVersion\(ownerId,INVENTORY_SUPPLIER_DOMAIN\)/);
-  assert.match(inventoryWorkflows,/bumpDomainVersion\(ownerId,FINANCE_DOMAIN\)/);
-  assert.match(financeWorkflows,/bumpDomainVersion\(ownerId,FINANCE_DOMAIN\)/);
-  assert.match(orderWorkflows,/bumpDomainVersion\(ownerId,FINANCE_DOMAIN\)/);
-  assert.match(orderWorkflows,/bumpDomainVersion\(ownerId,INVENTORY_SUPPLIER_DOMAIN\)/);
+test('mixed workflows atomically bump affected relational domain versions',()=>{
+  assert.match(inventoryWorkflows,/domainVersionBumpStatements\(ownerId,INVENTORY_SUPPLIER_DOMAIN/);
+  assert.match(inventoryWorkflows,/domainVersionBumpStatements\(ownerId,FINANCE_DOMAIN/);
+  assert.match(financeWorkflows,/domainVersionBumpStatements\(ownerId,FINANCE_DOMAIN/);
+  assert.match(orderWorkflows,/domainVersionBumpStatements\(ownerId,FINANCE_DOMAIN/);
+  assert.match(orderWorkflows,/domainVersionBumpStatements\(ownerId,INVENTORY_SUPPLIER_DOMAIN/);
+  assert.match(domainVersion,/export function domainVersionBumpStatements/);
 });
 
-test('order cancellation synchronizes generated inventory holds relationally',()=>{
-  assert.match(orderRecords,/JSON\.stringify\(state\.inventoryHolds\)!==JSON\.stringify\(merged\.inventoryHolds\)/);
-  assert.match(orderRecords,/migrateInventorySupplierShadow/);
-  assert.match(orderRecords,/bumpDomainVersion\(ownerId,INVENTORY_SUPPLIER_DOMAIN\)/);
+test('order cancellation synchronizes generated inventory holds in the same transaction',()=>{
+  assert.match(orderRecords,/inventoryChanged=JSON\.stringify\(state\.inventoryHolds\)!==JSON\.stringify\(merged\.inventoryHolds\)/);
+  assert.match(orderRecords,/inventorySupplierShadowStatements/);
+  assert.match(orderRecords,/domainVersionBumpStatements\(ownerId,INVENTORY_SUPPLIER_DOMAIN/);
+  assert.match(orderRecords,/await db\.batch\(statements\)/);
 });
 
 test('inventory return restock no longer falls back to generic workspace save',()=>{

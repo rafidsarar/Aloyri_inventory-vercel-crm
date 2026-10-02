@@ -21,9 +21,8 @@ export async function getInventorySupplierMigrationStatus(ownerId:string){
     .bind(ownerId,INVENTORY_SUPPLIER_DOMAIN).first<MigrationRow>();
 }
 
-export async function migrateInventorySupplierShadow(ownerId:string,state:State,sourceVersion:number){
-  await ensureRelationalFoundation();
-  const db=database(),now=new Date().toISOString(),q:any[]=[];
+export function inventorySupplierShadowStatements(ownerId:string,state:State,sourceVersion:number,now=new Date().toISOString()){
+  const db=database(),q:any[]=[];
   q.push(db.prepare('INSERT INTO crm_relational_migrations (owner_id,domain,status,source_version,migrated_at,verified_at,updated_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT (owner_id,domain) DO UPDATE SET status=EXCLUDED.status,source_version=EXCLUDED.source_version,migrated_at=EXCLUDED.migrated_at,verified_at=NULL,updated_at=EXCLUDED.updated_at').bind(ownerId,INVENTORY_SUPPLIER_DOMAIN,'migrating',sourceVersion,now,null,now));
   for(const table of ['crm_rel_batch_payments','crm_rel_purchase_order_items','crm_rel_inventory_holds','crm_rel_stock_adjustments','crm_rel_batches','crm_rel_purchase_orders','crm_rel_suppliers','crm_rel_products','crm_rel_product_categories'])
     q.push(db.prepare('DELETE FROM '+table+' WHERE owner_id=?').bind(ownerId));
@@ -41,7 +40,12 @@ export async function migrateInventorySupplierShadow(ownerId:string,state:State,
   state.stockAdjustments.forEach(a=>q.push(db.prepare('INSERT INTO crm_rel_stock_adjustments (owner_id,id,batch_id,delta,date,reason,record_version,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)').bind(ownerId,a.id,a.batchId,a.delta,a.date,a.reason,0,now,now)));
   state.inventoryHolds.forEach(h=>q.push(db.prepare('INSERT INTO crm_rel_inventory_holds (owner_id,id,batch_id,qty,date,type,reason,source,source_order_id,released_at,record_version,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(ownerId,h.id,h.batchId,h.qty,h.date,h.type,h.reason,h.source,h.sourceOrderId||null,h.releasedAt||null,0,now,now)));
   q.push(db.prepare('UPDATE crm_relational_migrations SET status=?,source_version=?,verified_at=?,updated_at=? WHERE owner_id=? AND domain=?').bind('verified',sourceVersion,now,now,ownerId,INVENTORY_SUPPLIER_DOMAIN));
-  await db.batch(q);
+  return q;
+}
+
+export async function migrateInventorySupplierShadow(ownerId:string,state:State,sourceVersion:number){
+  await ensureRelationalFoundation();
+  await database().batch(inventorySupplierShadowStatements(ownerId,state,sourceVersion));
   return {sourceVersion,counts:{products:state.products.length,suppliers:state.suppliers.length,purchaseOrders:state.purchaseOrders.length,batches:state.batches.length,stockAdjustments:state.stockAdjustments.length,inventoryHolds:state.inventoryHolds.length}};
 }
 

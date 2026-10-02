@@ -29,7 +29,9 @@ test('Step 6B domain API limits writes to inventory supplier sections',()=>{
   assert.match(records,/inventorySupplierKeys=\['products','productCategories','suppliers','purchaseOrders','batches','stockAdjustments','inventoryHolds'\]/);
   assert.match(records,/stateSchema\.pick/);
   assert.match(records,/applyRoleChanges/);
-  assert.match(records,/WORKSPACE_VERSION_CONFLICT/);
+  assert.match(records,/SELECT 1 \/ CASE WHEN EXISTS/);
+  assert.match(records,/inventorySupplierShadowStatements/);
+  assert.match(records,/domainVersionBumpStatements/);
   assert.match(domainRoute,/\['owner','admin','inventory'\]/);
 });
 

@@ -27,7 +27,9 @@ test('finance shadow migration is tracked and verified',()=>{
 });
 test('Step 7B Finance API is owner admin write protected and versioned',()=>{
  assert.match(records,/financeKeys=\['expenses','cashEntries','accountOpenings','accountMatches','financeCloses'\]/);
- assert.match(records,/WORKSPACE_VERSION_CONFLICT/);
+ assert.match(records,/SELECT 1 \/ CASE WHEN EXISTS/);
+ assert.match(records,/financeShadowStatements/);
+ assert.match(records,/domainVersionBumpStatements/);
  assert.match(records,/\['owner','admin'\]/);
  assert.match(route,/Only the owner or an admin can edit Finance/);
 });
@@ -51,9 +53,11 @@ test('Step 7E Finance reads from relational tables',()=>{
  assert.match(records,/SELECT id,date,kind,category,description,amount,transfer_id,reversal_of,reversal_reason FROM crm_rel_finance_cash_entries/);
  assert.match(records,/SELECT entry_id,account,matched,reference FROM crm_rel_finance_account_matches/);
 });
-test('cross-domain customer collections and supplier payments sync Finance shadow',()=>{
- assert.match(orderWorkflows,/migrateFinanceShadow/);
- assert.match(supplierWorkflows,/migrateFinanceShadow/);
+test('cross-domain customer collections and supplier payments sync Finance shadow atomically',()=>{
+ assert.match(orderWorkflows,/financeShadowStatements/);
+ assert.match(orderWorkflows,/domainVersionBumpStatements\(ownerId,FINANCE_DOMAIN/);
+ assert.match(supplierWorkflows,/financeShadowStatements/);
+ assert.match(supplierWorkflows,/domainVersionBumpStatements\(ownerId,FINANCE_DOMAIN/);
 });
 test('legacy workspace writes maintain Finance shadow compatibility',()=>{
  assert.match(workspaceRoute,/financeSectionsChanged/);

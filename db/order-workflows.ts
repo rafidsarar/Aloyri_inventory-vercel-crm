@@ -1,7 +1,7 @@
 import { database } from './raw.ts';
-import { getDomainVersion,bumpDomainVersion } from './domain-version.ts';
-import { migrateFinanceShadow,FINANCE_DOMAIN } from './finance-shadow.ts';
-import { INVENTORY_SUPPLIER_DOMAIN } from './inventory-supplier-shadow.ts';
+import { getDomainVersion,domainVersionBumpStatements } from './domain-version.ts';
+import { financeShadowStatements,FINANCE_DOMAIN } from './finance-shadow.ts';
+import { inventorySupplierShadowStatements,INVENTORY_SUPPLIER_DOMAIN } from './inventory-supplier-shadow.ts';
 import { ensureCustomerRecordApiReady } from './customer-records.ts';
 import { CUSTOMER_ORDER_DOMAIN } from './customer-order-shadow.ts';
 import { validateWorkspaceChange } from '../lib/role-data.ts';
@@ -41,19 +41,23 @@ async function commitWorkflow(ownerId:string,before:State,next:State,rowVersion:
   validateWorkspaceChange(before,next);
   const now=new Date().toISOString(),db=database(),nextWorkspaceVersion=rowVersion+1;
   await ensureAuditTable();
+  const financeChanged=sections.includes('accountMatches'),inventoryChanged=sections.includes('inventoryHolds');
+  const expectedFinanceVersion=financeChanged?await getDomainVersion(ownerId,FINANCE_DOMAIN):undefined;
+  const expectedInventoryVersion=inventoryChanged?await getDomainVersion(ownerId,INVENTORY_SUPPLIER_DOMAIN):undefined;
   const statements:any[]=[];
   for(const change of changed)statements.push(...orderReplaceStatements(ownerId,change.order,change.expectedVersion,change.expectedVersion+1,now));
   statements.push(db.prepare('UPDATE crm_workspaces SET data=?,version=version+1,updated_at=? WHERE owner_id=? AND version=?').bind(JSON.stringify(next),now,ownerId,rowVersion));
   statements.push(db.prepare("SELECT 1 / CASE WHEN EXISTS (SELECT 1 FROM crm_workspaces WHERE owner_id=? AND version=? AND updated_at=?) THEN 1 ELSE 0 END").bind(ownerId,nextWorkspaceVersion,now));
   statements.push(db.prepare('UPDATE crm_relational_migrations SET status=?,source_version=?,verified_at=?,updated_at=? WHERE owner_id=? AND domain=?').bind('verified',nextWorkspaceVersion,now,now,ownerId,CUSTOMER_ORDER_DOMAIN));
+  if(financeChanged&&expectedFinanceVersion!==undefined){
+    statements.push(...financeShadowStatements(ownerId,next,nextWorkspaceVersion,now),...domainVersionBumpStatements(ownerId,FINANCE_DOMAIN,expectedFinanceVersion,now));
+  }
+  if(inventoryChanged&&expectedInventoryVersion!==undefined){
+    statements.push(...inventorySupplierShadowStatements(ownerId,next,nextWorkspaceVersion,now),...domainVersionBumpStatements(ownerId,INVENTORY_SUPPLIER_DOMAIN,expectedInventoryVersion,now));
+  }
   statements.push(db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)').bind(crypto.randomUUID(),ownerId,actor.userId,actor.name,actor.role,summary,JSON.stringify(sections),now));
   await db.batch(statements);
-  if(sections.includes('accountMatches')){
-    try{await migrateFinanceShadow(ownerId,next,nextWorkspaceVersion)}catch(error){console.error('Finance shadow sync failed after order workflow',error)}
-    await bumpDomainVersion(ownerId,FINANCE_DOMAIN);
-  }
-  if(sections.includes('inventoryHolds'))await bumpDomainVersion(ownerId,INVENTORY_SUPPLIER_DOMAIN);
-  return {workspaceVersion:nextWorkspaceVersion,recordVersions:Object.fromEntries(changed.map(c=>[c.order.id,c.expectedVersion+1]))};
+  return {workspaceVersion:nextWorkspaceVersion,recordVersions:Object.fromEntries(changed.map(c=>[c.order.id,c.expectedVersion+1])),financeDomainVersion:expectedFinanceVersion===undefined?undefined:expectedFinanceVersion+1,inventoryDomainVersion:expectedInventoryVersion===undefined?undefined:expectedInventoryVersion+1};
 }
 
 export async function postOrderCollection(ownerId:string,input:{orderId:string;recordVersion:number;date:string;amount:number;reference:string;account:string},actor:Actor){
