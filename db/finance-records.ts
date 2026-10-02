@@ -1,4 +1,5 @@
 import { database } from './raw.ts';
+import { optionalRelationalDate, relationalDate } from './relational-date.ts';
 import { getDomainVersion,bumpDomainVersion } from './domain-version.ts';
 import { applyRoleChanges,validateWorkspaceChange } from '../lib/role-data.ts';
 import { fixedBusinessName,stateSchema,validateRelations,type State } from '../lib/crm.ts';
@@ -27,11 +28,11 @@ export async function getFinanceDomain(ownerId:string){
   db.prepare('SELECT month,closed_at,closed_by,notes FROM crm_rel_finance_closes WHERE owner_id=? ORDER BY month DESC').bind(ownerId).all<any>()
  ]);
  const data={
-  expenses:expenses.results.map((x:any)=>({id:x.id,category:x.category,amount:Number(x.amount),date:String(x.date),notes:x.notes,vendor:x.vendor,reference:x.reference,recurring:x.recurring,account:x.account||undefined})),
-  cashEntries:cashEntries.results.map((x:any)=>({id:x.id,date:String(x.date),kind:x.kind,category:x.category,description:x.description,amount:Number(x.amount),transferId:x.transfer_id||undefined,reversalOf:x.reversal_of||undefined,reversalReason:x.reversal_reason||undefined})),
-  accountOpenings:openings.results.map((x:any)=>({account:x.account,date:String(x.date),balance:Number(x.balance),statementDate:x.statement_date?String(x.statement_date):undefined,statementBalance:x.statement_balance==null?undefined:Number(x.statement_balance)})),
+  expenses:expenses.results.map((x:any)=>({id:x.id,category:x.category,amount:Number(x.amount),date:relationalDate(x.date),notes:x.notes,vendor:x.vendor,reference:x.reference,recurring:x.recurring,account:x.account||undefined})),
+  cashEntries:cashEntries.results.map((x:any)=>({id:x.id,date:relationalDate(x.date),kind:x.kind,category:x.category,description:x.description,amount:Number(x.amount),transferId:x.transfer_id||undefined,reversalOf:x.reversal_of||undefined,reversalReason:x.reversal_reason||undefined})),
+  accountOpenings:openings.results.map((x:any)=>({account:x.account,date:relationalDate(x.date),balance:Number(x.balance),statementDate:optionalRelationalDate(x.statement_date),statementBalance:x.statement_balance==null?undefined:Number(x.statement_balance)})),
   accountMatches:matches.results.map((x:any)=>({entryId:x.entry_id,account:x.account,matched:Boolean(x.matched),reference:x.reference})),
-  financeCloses:closes.results.map((x:any)=>({month:x.month,closedAt:String(x.closed_at),closedBy:x.closed_by,notes:x.notes}))
+  financeCloses:closes.results.map((x:any)=>({month:x.month,closedAt:relationalDate(x.closed_at),closedBy:x.closed_by,notes:x.notes}))
  };
  const parsed=stateSchema.pick({expenses:true,cashEntries:true,accountOpenings:true,accountMatches:true,financeCloses:true}).parse(data);
  return {data:parsed,version:row.version,domainVersion:await getDomainVersion(ownerId,FINANCE_DOMAIN)};
