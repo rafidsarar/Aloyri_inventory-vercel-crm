@@ -68,7 +68,7 @@ async function seed(){
     {id:'audit-order-done',number:'AUD-1000',customerId:'audit-customer',created:shiftDate(-10),delivered:shiftDate(-8),collections:[{id:'audit-col-paid',date:shiftDate(-8),amount:809,reference:'Audit paid'}],channel:'Website',payment:'bKash',status:'Delivered',items:[{productId:'simple-wash',qty:1,price:749,allocations:[{batchId:'audit-batch',qty:1,unitCost:500}]}],discount:0,deliveryCharge:60,courierCost:50,packaging:20,paymentFee:0,returnFee:0,settled:true,settledAt:shiftDate(-8),restocked:false,tracking:'AUD-TRACK-1000',notes:'Temporary completed audit order'}
   ];
   state.tasks=[{id:'audit-task',customerId:'audit-customer',orderId:'audit-order-done',title:'Audit customer check-in',due:today(),done:false,kind:'Follow-up',priority:'High',channel:'WhatsApp',notes:'Temporary live usability audit reminder',completedAt:''}];
-  state.accountOpenings=[{account:'cash',date:shiftDate(-30),balance:20000}];
+  state.accountOpenings=[{account:'cash',date:shiftDate(-30),balance:20000},{account:'bank',date:shiftDate(-30),balance:30000},{account:'bkash',date:shiftDate(-30),balance:10000},{account:'nagad',date:shiftDate(-30),balance:5000}];
   validateRelations(state,{skipOrderNumberUniqueness:true});
   const now=new Date().toISOString();
   await db.prepare('INSERT INTO crm_workspaces (owner_id,data,version,updated_at) VALUES (?,?,0,?)').bind(OWNER,JSON.stringify(state),now).run();
