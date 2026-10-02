@@ -249,3 +249,43 @@ test('management reporting is authenticated, role-bound and internally consisten
     await s.context.close();
   }
 });
+
+
+test('owner backup restore drill round-trips safely and stays owner-only',async({browser})=>{
+  const owner=await login(browser,'owner');
+  const beforeResponse=await owner.request.get('/api/workspace/backup');
+  expect(beforeResponse.status()).toBe(200);
+  const before=await beforeResponse.json();
+  const validate=await api(owner.request,'POST','/api/workspace/backup',{action:'validate',backup:before});
+  expect(validate.status()).toBe(200);
+  const validateBody=await validate.json();
+  expect(validateBody.valid).toBe(true);
+  expect(validateBody.backupWorkspace.checksum).toBe(before.integrity.checksum);
+
+  const exportRecord=await api(owner.request,'POST','/api/workspace/backup',{action:'recordExport'});
+  expect(exportRecord.status()).toBe(200);
+
+  const restore=await api(owner.request,'POST','/api/workspace/backup',{
+    action:'restore',confirmation:'RESTORE ALOYRI',backup:before
+  });
+  expect(restore.status()).toBe(200);
+  const restored=await restore.json();
+  expect(restored.atomicCommit).toBe(true);
+  expect(restored.cutoverEnabled).toBe(true);
+  expect(restored.relationalParity.ok).toBe(true);
+  expect(restored.safetySnapshot.id).toBeTruthy();
+
+  const afterResponse=await owner.request.get('/api/workspace/backup');
+  expect(afterResponse.status()).toBe(200);
+  const after=await afterResponse.json();
+  expect(after.integrity.checksum).toBe(before.integrity.checksum);
+  expect(after.integrity.counts).toEqual(before.integrity.counts);
+  expect(after.workspaceVersion).toBeGreaterThan(before.workspaceVersion);
+  await owner.context.close();
+
+  for(const role of ['admin','sales','inventory','finance','viewer']){
+    const s=await login(browser,role);
+    expect((await s.request.get('/api/workspace/backup')).status(),role+' backup remains owner-only').toBe(403);
+    await s.context.close();
+  }
+});
