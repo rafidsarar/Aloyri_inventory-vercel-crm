@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { orderSchema, initialState, today, nextStatuses } from '../lib/crm.ts';
 import { roleCanEdit, roleCanViewSection } from '../lib/roles.ts';
 import { applyRoleChanges, validateWorkspaceChange, visibleState } from '../lib/role-data.ts';
+import { orderRecordForRole } from '../db/order-records.ts';
 
 const persistence=readFileSync(new URL('../db/order-records.ts',import.meta.url),'utf8');
 const listRoute=readFileSync(new URL('../app/api/orders/route.ts',import.meta.url),'utf8');
@@ -89,4 +90,23 @@ test('mutation routes require origin checks and order edit permission',()=>{
   const proposed=structuredClone(visibleState(state,'sales'));
   proposed.orders=[];
   assert.throws(()=>applyRoleChanges(state,proposed,'sales'),/cannot delete existing orders/);
+});
+
+
+test('sales order API records redact protected cost and finance fields while preserving workflow fields',()=>{
+  const record={...sampleOrder(),recordVersion:7,collections:[{id:'col1',date:today(),amount:500,reference:'secret'}],courierCost:80,packaging:20,paymentFee:10,returnFee:5,settled:true,settledAt:today(),items:[{productId:'p1',qty:1,price:1000,allocations:[{batchId:'b1',qty:1,unitCost:400}]}]};
+  const sales=orderRecordForRole(record,'sales');
+  assert.equal(sales.recordVersion,7);
+  assert.equal(sales.status,'New');
+  assert.equal(sales.items[0].allocations[0].unitCost,0);
+  assert.equal(sales.courierCost,0);
+  assert.equal(sales.packaging,0);
+  assert.equal(sales.paymentFee,0);
+  assert.equal(sales.returnFee,0);
+  assert.deepEqual(sales.collections,[]);
+  assert.equal(sales.settled,false);
+  assert.equal(sales.settledAt,undefined);
+  assert.equal(orderRecordForRole(record,'owner').courierCost,80);
+  assert.match(listRoute,/orderRecordForRole/);
+  assert.match(detailRoute,/orderRecordForRole/);
 });
