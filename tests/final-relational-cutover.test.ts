@@ -37,7 +37,9 @@ test('Inventory and Finance core reads come from relational tables',()=>{
 
 test('Step 8B workspace uses relational core after verified cutover and blocks legacy core writes',()=>{
   assert.match(workspace,/ensureRelationalCutover/);
-  assert.match(workspace,/cutover\.enabled\?\(await relationalCoreState\(ownerId\)\)\.state:compatibility/);
+  assert.match(workspace,/const workspace=\(await relationalCoreState\(ownerId\)\)\.state/);
+  assert.match(workspace,/readSource:'relational'/);
+  assert.match(workspace,/readSource:'compatibility-recovery'/);
   assert.match(workspace,/relationalCoreKeys\.find/);
   assert.match(workspace,/core domain is relationally authoritative/);
 });

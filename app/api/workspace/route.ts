@@ -38,8 +38,21 @@ export async function GET(){
     if(!row)return response({error:'The shared workspace is not ready. Ask the owner to sign in first.'},404);
     const compatibility=fixedBusinessName(stateSchema.parse(JSON.parse(row.data)));validateRelations(compatibility,{skipOrderNumberUniqueness:true});
     const cutover=await ensureRelationalCutover(ownerId);
-    const workspace=cutover.enabled?(await relationalCoreState(ownerId)).state:compatibility;
-    return response({data:visibleState(workspace,role),version:row.version,role,userName:user.displayName,relationalCutover:cutover.enabled});
+    if(cutover.enabled){
+      try{
+        const workspace=(await relationalCoreState(ownerId)).state;
+        return response({data:visibleState(workspace,role),version:row.version,role,userName:user.displayName,relationalCutover:true,recoveryMode:false,readSource:'relational'});
+      }catch(relationalError){
+        const incidentId=crypto.randomUUID();
+        console.error('Relational workspace read failed; serving compatibility recovery snapshot',{incidentId},relationalError);
+        return response({
+          data:visibleState(compatibility,role),version:row.version,role,userName:user.displayName,relationalCutover:true,
+          recoveryMode:true,readSource:'compatibility-recovery',incidentId,
+          warning:'Relational records are temporarily unavailable. Showing the latest synchronized records in read-only recovery mode.'
+        });
+      }
+    }
+    return response({data:visibleState(compatibility,role),version:row.version,role,userName:user.displayName,relationalCutover:false,recoveryMode:false,readSource:'compatibility'});
   }catch(e){
     if(e instanceof AccessDenied)return response({error:e.message},403);
     console.error('Workspace read failed',e);
