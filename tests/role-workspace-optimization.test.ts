@@ -16,7 +16,7 @@ const auditRoute=readFileSync(new URL('../app/api/audit/route.ts',import.meta.ur
 const growthRoute=readFileSync(new URL('../app/api/growth-control/route.ts',import.meta.url),'utf8');
 
 test('every role has a dedicated Overview landing workspace',()=>{
-  for(const role of ['owner','admin','sales','inventory','viewer'] as WorkspaceRole[])
+  for(const role of ['owner','admin','sales','inventory','finance','viewer'] as WorkspaceRole[])
     assert.ok(roleCanViewSection(role,'Overview'),role+' should see Overview');
   assert.doesNotMatch(crm,/nextRole==='sales'\)setView\('Orders'\)/);
   assert.doesNotMatch(crm,/nextRole==='inventory'\)setView\('Inventory'\)/);
@@ -65,9 +65,10 @@ test('operational staff data is still privacy filtered before reaching their bro
 test('role-specific overview never links staff into forbidden sections',()=>{
   const salesStart=overview.indexOf('function SalesWorkspace');
   const inventoryStart=overview.indexOf('function InventoryWorkspace');
+  const financeStart=overview.indexOf('function FinanceWorkspace');
   const viewerStart=overview.indexOf('function ViewerWorkspace');
   const salesBlock=overview.slice(salesStart,inventoryStart);
-  const inventoryBlock=overview.slice(inventoryStart,viewerStart);
+  const inventoryBlock=overview.slice(inventoryStart,financeStart);
   assert.doesNotMatch(salesBlock,/changeView\('(Finances|Inventory|Suppliers|Reports|Automation|Activity)'\)/);
   assert.match(salesBlock,/changeView\('Orders'\)/);
   assert.match(salesBlock,/changeView\('Customers'\)/);
@@ -90,10 +91,10 @@ test('server APIs enforce the same role boundaries as the workspace UI',()=>{
   assert.match(customersRoute,/roleCanEdit\(role,'customers'\)/);
   assert.match(ordersRoute,/roleCanViewSection\(role,'Orders'\)/);
   assert.match(ordersRoute,/roleCanEdit\(role,'orders'\)/);
-  assert.match(inventoryRoute,/\['owner','admin','inventory','viewer'\]/);
+  assert.match(inventoryRoute,/\['owner','admin','inventory','finance','viewer'\]/);
   assert.match(inventoryRoute,/\['owner','admin','inventory'\]/);
-  assert.match(financeRoute,/\['owner','admin','viewer'\]/);
-  assert.match(financeRoute,/Only the owner or an admin can edit Finance/);
+  assert.match(financeRoute,/\['owner','admin','finance','viewer'\]/);
+  assert.match(financeRoute,/Only the owner, an admin or a finance manager can edit Finance/);
   assert.match(auditRoute,/roleCanViewAudit\(role\)/);
   assert.match(growthRoute,/roleCanViewAudit\(role\)/);
 });
