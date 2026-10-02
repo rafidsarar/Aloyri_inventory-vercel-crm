@@ -16,7 +16,7 @@ export default function AccountSecurity({open,onClose,onChangePassword}:{open:bo
   const [sessions,setSessions]=useState<Session[]>([]),[loading,setLoading]=useState(false),[error,setError]=useState('');
   async function load(){setLoading(true);setError('');try{const r=await fetch('/api/auth/sessions',{cache:'no-store'}),d=await r.json();if(!r.ok)throw Error(d.error||'Could not load sessions.');setSessions(d.sessions||[])}catch(e){setError(e instanceof Error?e.message:'Could not load sessions.')}finally{setLoading(false)}}
   async function action(body:unknown){setLoading(true);setError('');try{const r=await fetch('/api/auth/sessions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),d=await r.json();if(!r.ok)throw Error(d.error||'Could not update sessions.');await load()}catch(e){setError(e instanceof Error?e.message:'Could not update sessions.');setLoading(false)}}
-  useEffect(()=>{if(open)void load()},[open]);
+  useEffect(()=>{if(!open)return;let cancelled=false;(async()=>{try{const r=await fetch('/api/auth/sessions',{cache:'no-store'}),d=await r.json();if(!r.ok)throw Error(d.error||'Could not load sessions.');if(!cancelled){setSessions(d.sessions||[]);setError('')}}catch(e){if(!cancelled)setError(e instanceof Error?e.message:'Could not load sessions.')}})();return()=>{cancelled=true}},[open]);
   return <Dialog open={open} onOpenChange={v=>{if(!v&&!loading)onClose()}}>
     <DialogContent className="record-dialog account-security-dialog">
       <DialogHeader><DialogTitle>Account security</DialogTitle><DialogDescription>Review where your account is signed in and end sessions you no longer recognize.</DialogDescription></DialogHeader>
