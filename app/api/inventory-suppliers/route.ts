@@ -10,7 +10,13 @@ export async function GET(){
     const user=await getAppUser();if(!user)return response({error:'Sign in to open inventory records.'},401);
     const {ownerId,role}=await resolveWorkspace(user);
     if(!['owner','admin','inventory','finance','viewer'].includes(role))return response({error:'Your role cannot access Inventory or Suppliers.'},403);
-    return response(await getInventorySupplierDomain(ownerId));
+    const result=await getInventorySupplierDomain(ownerId);
+    if(role==='inventory'){
+      return response({...result,data:{...result.data,batches:result.data.batches.map(batch=>({
+        ...batch,payments:[],paid:false,paidAt:undefined
+      }))}});
+    }
+    return response(result);
   }catch(error){
     if(error instanceof AccessDenied)return response({error:error.message},403);
     console.error('Inventory supplier domain read failed',error);return response({error:'Could not load Inventory and Supplier records.'},503);
