@@ -4,31 +4,30 @@ const BASE='http://127.0.0.1:3100';
 const PASSWORD=process.env.E2E_PASSWORD||'Aloyri-E2E-Password-2026!';
 const roles=['owner','admin','sales','inventory','finance','viewer'];
 const email=role=>`e2e-${role}@aloyri.test`;
+let serverOrigin=BASE;
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Dhaka',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const shift=days=>{const d=new Date(today()+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+days);return d.toISOString().slice(0,10)};
 
 async function login(browser,role){
   const context=await browser.newContext({baseURL:BASE});
-  const page=await context.newPage();
-  await page.goto('/login');
-  const result=await page.evaluate(async({email,password})=>{
-    const response=await fetch('/api/auth/login',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({email,password})
-    });
-    return {status:response.status,body:await response.json()};
-  },{email:email(role),password:PASSWORD});
-  expect(result.status,role+' real login').toBe(200);
+  const fixtureResponse=await context.request.get('/api/e2e/fixture?role=viewer');
+  expect(fixtureResponse.status()).toBe(200);
+  const fixture=await fixtureResponse.json();
+  serverOrigin=fixture.requestOrigin;
+  const response=await context.request.post('/api/auth/login',{
+    headers:{Origin:serverOrigin},
+    data:{email:email(role),password:PASSWORD}
+  });
+  const body=await response.json();
+  expect(response.status(),role+' real login: '+JSON.stringify(body)).toBe(200);
   const sessionCheck=await context.request.get('/api/auth/sessions');
   expect(sessionCheck.status(),role+' authenticated session').toBe(200);
-  await page.close();
   return {context,request:context.request};
 }
 async function api(request,method,path,data){
   return request.fetch(path,{
     method,
-    headers:method==='GET'?undefined:{Origin:BASE},
+    headers:method==='GET'?undefined:{Origin:serverOrigin},
     data
   });
 }
