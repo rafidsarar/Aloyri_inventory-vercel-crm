@@ -9,13 +9,14 @@ const shift=days=>{const d=new Date(today()+'T12:00:00Z');d.setUTCDate(d.getUTCD
 
 async function login(browser,role){
   const context=await browser.newContext({baseURL:BASE});
-  const page=await context.newPage();
-  await page.goto('/login');
-  await page.getByLabel('Email address').fill(email(role));
-  await page.getByLabel('Password').fill(PASSWORD);
-  await page.getByRole('button',{name:'Sign in'}).click();
-  await page.waitForURL(BASE+'/');
-  return {context,page,request:context.request};
+  const response=await context.request.post('/api/auth/login',{
+    headers:{Origin:BASE},
+    data:{email:email(role),password:PASSWORD}
+  });
+  expect(response.status(),role+' real login').toBe(200);
+  const sessionCheck=await context.request.get('/api/auth/sessions');
+  expect(sessionCheck.status(),role+' authenticated session').toBe(200);
+  return {context,request:context.request};
 }
 async function api(request,method,path,data){
   return request.fetch(path,{
