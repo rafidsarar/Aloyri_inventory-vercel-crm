@@ -4,10 +4,11 @@ import { canonicalizeLegacyState } from '../lib/data-integrity.ts';
 
 type WorkspaceRow={owner_id:string;data:string;version:number;updated_at:string};
 
-const db=database();
-const rows=await db.prepare('SELECT owner_id,data,version,updated_at FROM crm_workspaces ORDER BY owner_id').all<WorkspaceRow>();
 const checksum=(value:unknown)=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
+export async function runLegacyDataCertification(){
+const db=database();
+const rows=await db.prepare('SELECT owner_id,data,version,updated_at FROM crm_workspaces ORDER BY owner_id').all<WorkspaceRow>();
 let normalized=0,clean=0;
 for(const row of rows.results){
   const now=new Date().toISOString();
@@ -48,3 +49,5 @@ for(const row of rows.results){
   }
 }
 console.log('Legacy data certification complete',{workspaces:rows.results.length,normalized,clean});
+return {workspaces:rows.results.length,normalized,clean};
+}
