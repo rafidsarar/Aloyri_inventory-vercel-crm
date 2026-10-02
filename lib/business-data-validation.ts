@@ -82,9 +82,7 @@ export function validateBusinessData(state:State):BusinessDataValidationReport{
   push(issues,'undated-cashflow-events','warning',generated.undated);
   push(issues,'unmatched-cash-movements','attention',generated.entries.filter(e=>!state.accountMatches.some(m=>m.entryId===e.id)).length);
 
-  for(const warning of workspaceIntegrityWarnings(state)){
-    if(!issues.some(i=>i.code===warning.key))push(issues,warning.key,'warning',1);
-  }
+  push(issues,'completed-followups-missing-completion-date','warning',state.tasks.filter(t=>t.done&&!t.completedAt).length);
 
   const criticalCount=issues.filter(i=>i.severity==='critical').reduce((n,i)=>n+i.count,0);
   const warningCount=issues.filter(i=>i.severity==='warning').reduce((n,i)=>n+i.count,0);
