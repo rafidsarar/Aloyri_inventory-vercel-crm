@@ -20,3 +20,12 @@ export async function bumpDomainVersion(ownerId:string,domain:string,expected?:n
   }
   return getDomainVersion(ownerId,domain);
 }
+
+
+export function domainVersionBumpStatements(ownerId:string,domain:string,expected:number,now=new Date().toISOString()){
+  const db=database();
+  return [
+    db.prepare('UPDATE crm_domain_versions SET version=version+1,updated_at=? WHERE owner_id=? AND domain=? AND version=?').bind(now,ownerId,domain,expected),
+    db.prepare("SELECT 1 / CASE WHEN EXISTS (SELECT 1 FROM crm_domain_versions WHERE owner_id=? AND domain=? AND version=?) THEN 1 ELSE 0 END").bind(ownerId,domain,expected+1)
+  ];
+}
