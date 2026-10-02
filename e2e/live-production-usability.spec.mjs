@@ -141,8 +141,9 @@ test('inventory daily workflow: receive a real PO, review stock, place and revie
 
   await nav(page,'Suppliers');
   await expect(page.getByRole('heading',{name:'Suppliers & purchasing'})).toBeVisible();
-  await expect(page.getByText('AUD-PO-1001',{exact:true}).first()).toBeVisible();
-  await page.getByRole('button',{name:'Receive'}).first().click();
+  const poRow=page.locator('.purchasing-desktop-table tbody tr').filter({hasText:'AUD-PO-1001'});
+  await expect(poRow).toBeVisible();
+  await poRow.getByRole('button',{name:'Receive'}).click();
   await expect(page.getByRole('heading',{name:'Receive purchase order'})).toBeVisible();
   await page.getByRole('button',{name:'Receive stock'}).click();
   await expect(page.getByText('Received',{exact:true}).first()).toBeVisible({timeout:30000});
