@@ -940,11 +940,11 @@ html,body{max-width:100%;overflow-x:hidden}
 .activity-hero-meta small{font-size:9px;text-transform:uppercase;letter-spacing:.4px;color:#8b9991}
 .activity-panel-pro{overflow:hidden}
 .activity-toolbar-pro{display:grid;gap:12px}
-.activity-filter-groups{display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:start}
+.activity-filter-groups{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:18px;align-items:start}
 .activity-filter-groups>div>small{display:block;margin:0 0 5px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#8a9990}
 .activity-section-filters{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
 .activity-section-filters::-webkit-scrollbar{display:none}
-.activity-section-filters button{white-space:nowrap}
+.activity-section-filters button{flex:0 0 auto;white-space:nowrap}
 .activity-actor-cell{display:flex;align-items:center;gap:8px;min-width:0}
 .activity-actor-cell .avatar{width:30px;height:30px;flex:0 0 auto;font-size:9px}
 .activity-actor-cell>span{min-width:0;display:flex;flex-direction:column}

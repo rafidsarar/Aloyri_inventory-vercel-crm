@@ -48,6 +48,10 @@ for (const width of [390, 650, 768, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
     await loadWorkspace(page, request);
     await assertContained(page);
+    if (width < 768) {
+      const actions = await page.locator('.mode-actions > a, .mode-actions > button').evaluateAll(nodes => nodes.map(el => el.getBoundingClientRect().y));
+      expect(Math.max(...actions) - Math.min(...actions)).toBeLessThanOrEqual(1);
+    }
     for (const section of ['Orders', 'Customers', 'Suppliers', 'Inventory', 'Finances', 'Follow-ups', 'Alerts', 'Automation', 'Activity']) {
       await openSection(page, section);
       await assertContained(page);
@@ -74,6 +78,8 @@ for (const width of [390, 650, 768, 1440]) {
         for (const button of await page.locator('.activity-section-filters button').all()) {
           const box = await button.boundingBox();
           expect(box.width).toBeGreaterThan(20);
+          const strip = await button.evaluate(el => el.parentElement.getBoundingClientRect().width);
+          expect(strip).toBeGreaterThanOrEqual(box.width - 1);
         }
       }
       if (section === 'Orders') {

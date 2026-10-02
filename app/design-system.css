@@ -203,6 +203,17 @@
 }
 
 @media (max-width: 768px) {
+  .mode-banner .mode-actions {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .mode-banner .mode-actions > a {
+    display: inline-flex;
+    align-items: center;
+  }
+
   .crm-page-header {
     flex-direction: column;
     align-items: stretch;
