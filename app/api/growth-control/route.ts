@@ -10,13 +10,13 @@ const response=(data:unknown,status=200)=>Response.json(data,{status,headers:{'C
 export async function GET(){
   try{
     const user=await getAppUser();
-    if(!user)return response({error:'Sign in to view Stage 5 management intelligence.'},401);
+    if(!user)return response({error:'Sign in to view business control intelligence.'},401);
     const {ownerId,role}=await resolveWorkspace(user);
     if(!roleCanViewAudit(role))return response({error:'Only the owner or an admin can view growth-control intelligence.'},403);
     return response(await buildGrowthControl(ownerId));
   }catch(error){
     if(error instanceof AccessDenied)return response({error:error.message},403);
-    console.error('Stage 5 growth control failed',error);
+    console.error('Business control intelligence failed',error);
     return response({error:'Could not load business operations and growth control.'},503);
   }
 }

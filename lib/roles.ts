@@ -12,12 +12,12 @@ export const roleCapabilities={
     settings:true,team:false,reset:false,backup:false,recordImport:true,starterCatalog:true,audit:true,invoice:true,finance:true,financeClose:true,dataExport:true,returnInspection:true
   },
   sales:{
-    sections:['Alerts','Orders','Customers','Follow-ups'],
+    sections:['Overview','Alerts','Orders','Customers','Follow-ups'],
     edit:['orders','customers','tasks'],
     settings:false,team:false,reset:false,backup:false,recordImport:false,starterCatalog:false,audit:false,invoice:true,finance:false,financeClose:false,dataExport:false,returnInspection:false
   },
   inventory:{
-    sections:['Alerts','Inventory','Suppliers'],
+    sections:['Overview','Alerts','Inventory','Suppliers'],
     edit:['products','productCategories','batches','suppliers','purchaseOrders','stockAdjustments','inventoryHolds'],
     settings:false,team:false,reset:false,backup:false,recordImport:false,starterCatalog:true,audit:false,invoice:false,finance:false,financeClose:false,dataExport:false,returnInspection:true
   },
@@ -73,3 +73,12 @@ export const roleCanManageFinance=(role:WorkspaceRole)=>roleCapabilities[role].f
 export const roleCanCloseFinance=(role:WorkspaceRole)=>roleCapabilities[role].financeClose;
 export const roleCanExportData=(role:WorkspaceRole)=>roleCapabilities[role].dataExport;
 export const roleCanInspectReturns=(role:WorkspaceRole)=>roleCapabilities[role].returnInspection;
+
+
+export const roleLandingView:Record<WorkspaceRole,string>={
+  owner:'Overview',
+  admin:'Overview',
+  sales:'Overview',
+  inventory:'Overview',
+  viewer:'Overview'
+};

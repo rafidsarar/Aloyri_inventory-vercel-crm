@@ -287,7 +287,7 @@ async function loadLive(showErrors=true,manageBusy=true){
     const nextRole=(['owner','admin','sales','inventory','viewer'].includes(d.role)?d.role:'viewer') as WorkspaceRole;
     const recovery=Boolean(d.recoveryMode);
     setLive(d.data);setVersion(d.version);setRole(nextRole);setRecoveryMode(recovery);
-    if(nextRole==='sales')setView('Orders');if(nextRole==='inventory')setView('Inventory');if(nextRole==='viewer')setView('Overview');
+    setView('Overview');
     setMemberName(d.userName||'Team member');setLoaded(true);setError(recovery?(d.warning||'Saved records are visible in read-only recovery mode.'):'');setAuthRequired(false);
     if(!recovery){
       try{await loadCustomerRecords(nextRole)}catch(customerError){if(showErrors)toast.error(customerError instanceof Error?customerError.message:'Could not load customer records.')}
@@ -305,7 +305,7 @@ useEffect(()=>{let active=true;(async()=>{try{
   const nextRole=(['owner','admin','sales','inventory','viewer'].includes(d.role)?d.role:'viewer') as WorkspaceRole;
   const recovery=Boolean(d.recoveryMode);
   setLive(d.data);setVersion(d.version);setRole(nextRole);setRecoveryMode(recovery);
-  if(nextRole==='sales')setView('Orders');if(nextRole==='inventory')setView('Inventory');if(nextRole==='viewer')setView('Overview');
+  setView('Overview');
   setMemberName(d.userName||'Team member');setLoaded(true);setError(recovery?(d.warning||'Saved records are visible in read-only recovery mode.'):'');
   if(!recovery&&visibleSections(nextRole).includes('Customers')){
     const customerRes=await fetch('/api/customers',{cache:'no-store'}),customerData:any=await customerRes.json();
@@ -849,6 +849,7 @@ return <SidebarProvider style={{'--sidebar-width':'clamp(196px, 20vw, 240px)'} a
   setFinanceTab={setFinanceTab}
 />}
 {view==='Overview'&&<OverviewSection
+  role={role}
   alertCritical={alertCritical}
   alertAction={alertAction}
   alertUpcoming={alertUpcoming}
