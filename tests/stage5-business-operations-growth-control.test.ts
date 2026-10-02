@@ -72,11 +72,13 @@ test('Stage 5 intelligence stays on relational core and protects management acce
   assert.match(route,/private, no-store/);
 });
 
-test('Stage 5 UI includes all requested operating-control modules',()=>{
-  for(const label of ['Customer 360','Order operations 2.0','Inventory planning 2.0','Supplier performance','Finance control 2.0','Operational alerts','Executive operating system']){
+test('production UI uses business-facing labels for operating-control modules',()=>{
+  for(const label of ['Business Control Center','Customer 360','Order operations 2.0','Inventory planning 2.0','Supplier performance','Finance control 2.0','Operational alerts','Executive operating system']){
     assert.ok(reports.toLowerCase().includes(label.toLowerCase()),label+' missing');
   }
   assert.match(reports,/fetch\('\/api\/growth-control'/);
+  assert.doesNotMatch(reports,/>Stage 5<|Stage 5 ·|Loading Stage 5|Stage 5 operating model/);
+  assert.doesNotMatch(reports,/Stage 4 · Operational intelligence/);
 });
 
 test('Stage 5 adds scale indexes for customer, order, supplier and payable workflows',()=>{
