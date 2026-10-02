@@ -1,10 +1,10 @@
 import { database } from './raw.ts';
 import { optionalRelationalDate, relationalDate } from './relational-date.ts';
-import { getDomainVersion,bumpDomainVersion } from './domain-version.ts';
+import { getDomainVersion,domainVersionBumpStatements } from './domain-version.ts';
 import { applyRoleChanges,validateWorkspaceChange } from '../lib/role-data.ts';
 import { fixedBusinessName,stateSchema,validateRelations,type State } from '../lib/crm.ts';
 import type { WorkspaceRole } from '../lib/roles.ts';
-import { ensureFinanceApiReady,FINANCE_DOMAIN,migrateFinanceShadow } from './finance-shadow.ts';
+import { ensureFinanceApiReady,FINANCE_DOMAIN,financeShadowStatements } from './finance-shadow.ts';
 
 export const financeKeys=['expenses','cashEntries','accountOpenings','accountMatches','financeCloses'] as const;
 export type FinanceKey=typeof financeKeys[number];
@@ -48,13 +48,15 @@ export async function saveFinanceDomain(ownerId:string,input:unknown,expectedDom
  const next=fixedBusinessName(applyRoleChanges(state,candidate,actor.role));validateWorkspaceChange(state,next);validateRelations(next,{skipOrderNumberUniqueness:true});
  const changed=financeKeys.filter(k=>JSON.stringify(state[k])!==JSON.stringify(next[k]));if(!changed.length)return {data:financeData(state),version:row.version};
  const now=new Date().toISOString(),db=database(),nextVersion=row.version+1;await ensureAudit();
- const result=await db.prepare('UPDATE crm_workspaces SET data=?,version=version+1,updated_at=? WHERE owner_id=? AND version=?').bind(JSON.stringify(next),now,ownerId,row.version).run();
- if(!result.meta.changes)throw new Error('WORKSPACE_VERSION_CONFLICT');
- await migrateFinanceShadow(ownerId,next,nextVersion);
- const domainVersion=await bumpDomainVersion(ownerId,FINANCE_DOMAIN,expectedDomainVersion);
- await db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)')
-   .bind(crypto.randomUUID(),ownerId,actor.userId,actor.name,actor.role,'Updated '+changed.join(', '),JSON.stringify(changed),now).run();
- return {data:financeData(next),version:nextVersion,domainVersion};
+ await db.batch([
+  db.prepare('UPDATE crm_workspaces SET data=?,version=version+1,updated_at=? WHERE owner_id=? AND version=?').bind(JSON.stringify(next),now,ownerId,row.version),
+  db.prepare("SELECT 1 / CASE WHEN EXISTS (SELECT 1 FROM crm_workspaces WHERE owner_id=? AND version=? AND updated_at=?) THEN 1 ELSE 0 END").bind(ownerId,nextVersion,now),
+  ...financeShadowStatements(ownerId,next,nextVersion,now),
+  ...domainVersionBumpStatements(ownerId,FINANCE_DOMAIN,expectedDomainVersion,now),
+  db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)')
+   .bind(crypto.randomUUID(),ownerId,actor.userId,actor.name,actor.role,'Updated '+changed.join(', '),JSON.stringify(changed),now)
+ ]);
+ return {data:financeData(next),version:nextVersion,domainVersion:expectedDomainVersion+1};
 }
 export async function markFinanceShadowStale(ownerId:string,sourceVersion:number){
  const now=new Date().toISOString();
