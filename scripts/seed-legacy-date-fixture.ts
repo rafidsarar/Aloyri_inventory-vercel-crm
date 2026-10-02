@@ -1,6 +1,7 @@
 import { database } from '../db/raw.ts';
 import { initialState,shiftDate } from '../lib/crm.ts';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const state:any=initialState();
 state.customers=[{id:'legacy-c',name:'Legacy',phone:'',address:'Dhaka',city:'Dhaka',preference:'',notes:'',consent:true,created:shiftDate(-5)+'T18:00:00.000Z'}];
 state.suppliers=[{id:'legacy-s',name:'Legacy Supplier',contact:'',phone:'',email:'',address:'Dhaka',leadDays:7,paymentTermsDays:30,notes:'',verified:true}];
