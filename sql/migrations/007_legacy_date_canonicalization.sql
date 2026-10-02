@@ -45,7 +45,7 @@ BEGIN
       END IF;
     END LOOP;
     FOREACH key IN ARRAY optional_keys LOOP
-      IF item ? key THEN
+      IF jsonb_exists(item,key) THEN
         raw:=item->>key;
         IF raw IS NULL OR btrim(raw)='' THEN
           item:=item-key;
@@ -71,7 +71,7 @@ DECLARE
 BEGIN
   IF items IS NULL OR jsonb_typeof(items)<>'array' THEN RETURN COALESCE(items,'[]'::JSONB); END IF;
   FOR item IN SELECT value FROM jsonb_array_elements(items) LOOP
-    IF item ? nested_key THEN
+    IF jsonb_exists(item,nested_key) THEN
       item:=jsonb_set(item,ARRAY[nested_key],crm_json_date_fields(item->nested_key,required_keys,optional_keys),TRUE);
     END IF;
     result:=result||jsonb_build_array(item);
