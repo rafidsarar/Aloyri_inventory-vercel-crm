@@ -43,7 +43,11 @@ export default function ReportsSection({ctx}:Props){
   const [stage4,setStage4]=useState<any>(null);
   const [stage4Error,setStage4Error]=useState('');
   const [stage4Loading,setStage4Loading]=useState(true);
+  const [stage5,setStage5]=useState<any>(null);
+  const [stage5Error,setStage5Error]=useState('');
+  const [stage5Loading,setStage5Loading]=useState(true);
   useEffect(()=>{let active=true;fetch('/api/operational-intelligence',{cache:'no-store'}).then(async response=>{const data=await response.json();if(!response.ok)throw new Error(data.error||'Could not load operational intelligence.');if(active){setStage4(data);setStage4Error('')}}).catch(error=>{if(active)setStage4Error(error instanceof Error?error.message:'Could not load operational intelligence.')}).finally(()=>{if(active)setStage4Loading(false)});return()=>{active=false}},[]);
+  useEffect(()=>{let active=true;fetch('/api/growth-control',{cache:'no-store'}).then(async response=>{const data=await response.json();if(!response.ok)throw new Error(data.error||'Could not load Stage 5 growth control.');if(active){setStage5(data);setStage5Error('')}}).catch(error=>{if(active)setStage5Error(error instanceof Error?error.message:'Could not load Stage 5 growth control.')}).finally(()=>{if(active)setStage5Loading(false)});return()=>{active=false}},[]);
   return <WorkspaceSection className="management-report-page">
 <section className="management-report-hero">
   <div className="management-report-hero-copy">
@@ -69,6 +73,7 @@ export default function ReportsSection({ctx}:Props){
 </section>
 
 <nav className="management-report-nav" aria-label="Management report sections">
+  <button onClick={()=>document.getElementById('management-stage5-control')?.scrollIntoView({behavior:'smooth',block:'start'})}>Stage 5</button>
   <button onClick={()=>document.getElementById('management-overview')?.scrollIntoView({behavior:'smooth',block:'start'})}>Overview</button>
   <button onClick={()=>document.getElementById('management-trend')?.scrollIntoView({behavior:'smooth',block:'start'})}>Trend</button>
   <button onClick={()=>document.getElementById('management-products')?.scrollIntoView({behavior:'smooth',block:'start'})}>Products</button>
@@ -76,6 +81,68 @@ export default function ReportsSection({ctx}:Props){
   <button onClick={()=>document.getElementById('management-intelligence')?.scrollIntoView({behavior:'smooth',block:'start'})}>Intelligence</button>
   <button onClick={()=>document.getElementById('management-controls')?.scrollIntoView({behavior:'smooth',block:'start'})}>Controls</button>
 </nav>
+
+<section id="management-stage5-control" className="management-intelligence-section">
+  <div className="management-section-title">
+    <div><span className="management-section-kicker">Stage 5 · Business operations & growth control</span><h2>Executive operating system</h2><p>Customer value, fulfillment exceptions, demand planning, supplier reliability and working-capital control from the relational source of truth.</p></div>
+    <span className={'management-pulse '+(stage5Error?'negative':stage5Loading?'neutral':'positive')}><span/>{stage5Loading?'Calculating':stage5Error?'Needs review':'Live intelligence'}</span>
+  </div>
+  {stage5Error?<div className="info-strip"><ShieldCheck size={17}/><span>{stage5Error}</span></div>:stage5Loading?<div className="panel loading-panel"><p className="muted">Loading Stage 5 business control…</p></div>:stage5&&<>
+    <div className="management-kpi-grid" aria-label="Stage 5 executive dashboard">
+      <button className="management-kpi-card primary" onClick={()=>changeView('Finances')}><div className="management-kpi-head"><span className="management-kpi-icon"><ArrowUpRight size={17}/></span><small>30-day revenue</small><ChevronRight size={14}/></div><strong>{taka(stage5.executive.revenue30)}</strong><div className="management-kpi-foot"><span>{taka(stage5.executive.profit30)} operating profit</span></div></button>
+      <button className="management-kpi-card" onClick={()=>changeView('Customers')}><div className="management-kpi-head"><span className="management-kpi-icon"><Users size={17}/></span><small>Repeat rate</small><ChevronRight size={14}/></div><strong>{stage5.executive.repeatRate.toFixed(0)}%</strong><div className="management-kpi-foot"><span>{stage5.customers.segments.dueBack} due back · {stage5.customers.segments.lapsed} lapsed</span></div></button>
+      <button className="management-kpi-card" onClick={()=>changeView('Orders')}><div className="management-kpi-head"><span className="management-kpi-icon"><ShoppingBag size={17}/></span><small>Order exceptions</small><ChevronRight size={14}/></div><strong>{stage5.orders.queue.length}</strong><div className="management-kpi-foot"><span>{stage5.orders.agedOpen} aged · {stage5.orders.untrackedShipments} untracked</span></div></button>
+      <button className="management-kpi-card" onClick={()=>changeView('Inventory')}><div className="management-kpi-head"><span className="management-kpi-icon"><Package size={17}/></span><small>Replenishment</small><ChevronRight size={14}/></div><strong>{stage5.inventory.reorderNow}</strong><div className="management-kpi-foot"><span>{stage5.inventory.stockOuts} stock-outs · {stage5.inventory.slowMoving} slow-moving</span></div></button>
+      <button className="management-kpi-card" onClick={()=>changeView('Finances')}><div className="management-kpi-head"><span className="management-kpi-icon"><Wallet size={17}/></span><small>Working capital</small><ChevronRight size={14}/></div><strong>{taka(stage5.finance.receivables)}</strong><div className="management-kpi-foot"><span>{taka(stage5.finance.payables)} supplier payables</span></div></button>
+      <div className="management-kpi-card"><div className="management-kpi-head"><span className="management-kpi-icon"><TrendingUp size={17}/></span><small>Calculation</small></div><strong>{stage5.performance.calculationMs} ms</strong><div className="management-kpi-foot"><span>{stage5.performance.entities.toLocaleString()} entities · indexed</span></div></div>
+    </div>
+
+    <div className="management-report-grid secondary">
+      <section className="panel management-intelligence-card">
+        <div className="panel-heading management-panel-heading"><div><span className="management-section-kicker">Customer 360</span><h2>Customer value & lifecycle</h2><p>Delivered value, contribution, recency, balances and follow-up context in one view.</p></div><button className="management-text-action" onClick={()=>changeView('Customers')}>Customers<ChevronRight size={14}/></button></div>
+        {stage5.customers.profiles.filter((row:any)=>row.deliveredOrders>0).slice(0,6).length?<div className="management-value-list">{stage5.customers.profiles.filter((row:any)=>row.deliveredOrders>0).slice(0,6).map((row:any,index:number)=><button key={row.customerId} onClick={()=>setDetail({type:'customer',id:row.customerId})}><span className="management-rank">{index+1}</span><span><strong>{row.name}</strong><small>{row.deliveredOrders} delivered · {row.segment.replaceAll('-',' ')}{row.lastPurchase?' · last '+dateLabel(row.lastPurchase):''}</small></span><strong>{taka(row.revenue)}</strong><ChevronRight size={14}/></button>)}</div>:<Empty title="No Customer 360 history" text="Customer value profiles will populate after delivered orders are recorded."/>}
+      </section>
+
+      <section className="panel management-intelligence-card">
+        <div className="panel-heading management-panel-heading"><div><span className="management-section-kicker">Order operations 2.0</span><h2>Fulfillment exception queue</h2><p>Aged orders, missing tracking and delivered balances that require staff action.</p></div><button className="management-text-action" onClick={()=>changeView('Orders')}>Orders<ChevronRight size={14}/></button></div>
+        {stage5.orders.queue.length?<div className="management-value-list">{stage5.orders.queue.slice(0,6).map((row:any)=><button key={row.kind+'-'+row.orderId} onClick={()=>setDetail({type:'order',id:row.orderId})}><span className="management-rank">{row.severity==='critical'?'!':'•'}</span><span><strong>{row.number}</strong><small>{row.detail}</small></span><strong>{taka(row.value)}</strong><ChevronRight size={14}/></button>)}</div>:<Empty title="No fulfillment exceptions" text="No aged, untracked or delivered-unpaid orders currently need attention."/>}
+      </section>
+
+      <section className="panel management-intelligence-card">
+        <div className="panel-heading management-panel-heading"><div><span className="management-section-kicker">Inventory planning 2.0</span><h2>Demand & stock cover</h2><p>30/60-day velocity, incoming supply, cover days, expiry exposure and reorder guidance.</p></div><button className="management-text-action" onClick={()=>changeView('Inventory')}>Inventory<ChevronRight size={14}/></button></div>
+        <div className="management-profit-list">{stage5.inventory.rows.filter((row:any)=>row.risk!=='healthy').slice(0,6).map((row:any)=><div className="management-profit-row" key={row.productId}><span><strong>{row.name}</strong><small>{row.available} available · {row.incoming} incoming · {row.coverDays===null?'No recent demand':row.coverDays+'d cover'}</small></span><span><strong>{row.suggestedReorder} units</strong><small>{row.risk.replaceAll('-',' ')}</small></span></div>)}</div>
+        {!stage5.inventory.rows.some((row:any)=>row.risk!=='healthy')&&<Empty title="Inventory plan is healthy" text="No active product currently has a stock-cover, expiry or slow-movement exception."/>}
+      </section>
+
+      <section className="panel management-intelligence-card">
+        <div className="panel-heading management-panel-heading"><div><span className="management-section-kicker">Supplier performance</span><h2>Supply reliability</h2><p>Purchase volume, overdue orders, observed lead time and on-time receipt rate.</p></div><button className="management-text-action" onClick={()=>changeView('Suppliers')}>Suppliers<ChevronRight size={14}/></button></div>
+        {stage5.suppliers.length?<div className="management-supplier-list">{stage5.suppliers.slice(0,6).map((row:any)=><button key={row.supplierId} onClick={()=>setDetail({type:'supplier',id:row.supplierId})}><span><strong>{row.name}</strong><small>{row.orders} POs · {row.open} open · {row.overdue} overdue</small></span><span><strong>{row.onTimeRate===null?'Building':row.onTimeRate.toFixed(0)+'% on-time'}</strong><small>{row.avgLeadDays===null?'Lead time building':row.avgLeadDays+'d lead'} · {taka(row.value)}</small></span><ChevronRight size={14}/></button>)}</div>:<Empty title="No supplier history" text="Supplier performance appears after purchase orders and receipts are recorded."/>}
+      </section>
+
+      <section className="panel management-intelligence-card">
+        <div className="panel-heading management-panel-heading"><div><span className="management-section-kicker">Finance control 2.0</span><h2>Receivable & payable ageing</h2><p>Working-capital ageing and current account position for management follow-through.</p></div><button className="management-text-action" onClick={()=>changeView('Finances')}>Finances<ChevronRight size={14}/></button></div>
+        <div className="management-ageing-list">
+          <div><span><strong>Receivables · current</strong><small>0–7 days</small></span><strong>{taka(stage5.finance.receivableBuckets.current)}</strong></div>
+          <div><span><strong>Receivables · 8–30 days</strong><small>Collection attention</small></span><strong>{taka(stage5.finance.receivableBuckets.days8to30)}</strong></div>
+          <div><span><strong>Receivables · 31+ days</strong><small>Escalated ageing</small></span><strong>{taka(stage5.finance.receivableBuckets.days31plus)}</strong></div>
+          <div><span><strong>Payables overdue 31+ days</strong><small>Supplier exposure</small></span><strong>{taka(stage5.finance.payableBuckets.days31plus)}</strong></div>
+        </div>
+        <div className="management-mini-summary"><span><small>30-day contribution</small><strong>{taka(stage5.finance.contribution30)}</strong></span><span><small>30-day profit</small><strong>{signedTaka(stage5.finance.profit30)}</strong></span></div>
+      </section>
+
+      <section className="panel management-intelligence-card">
+        <div className="panel-heading management-panel-heading"><div><span className="management-section-kicker">Operational alerts</span><h2>Prioritized staff actions</h2><p>Only actionable business exceptions are surfaced; no payments, messages or status changes are automated.</p></div><button className="management-text-action" onClick={()=>changeView('Alerts')}>Alerts<ChevronRight size={14}/></button></div>
+        <div className="management-value-list">{stage5.alerts.slice(0,6).map((alert:any,index:number)=><button key={index+'-'+alert.title} onClick={()=>changeView(alert.target)}><span className="management-rank">{alert.severity==='critical'?'!':alert.severity==='action'?'•':'✓'}</span><span><strong>{alert.title}</strong><small>{alert.detail}</small></span><strong>{alert.area}</strong><ChevronRight size={14}/></button>)}</div>
+      </section>
+    </div>
+
+    <div className="management-focus-card">
+      <span>Stage 5 operating model</span>
+      <strong>Customer value → fulfillment control → demand planning → supplier reliability → working capital.</strong>
+      <small>Relational core · {stage5.performance.entities.toLocaleString()} entities · generated {new Date(stage5.generatedAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})} · staff remain in control of all operational actions.</small>
+    </div>
+  </>}
+</section>
 
 <section id="management-stage4-control" className="management-intelligence-section">
   <div className="management-section-title">
