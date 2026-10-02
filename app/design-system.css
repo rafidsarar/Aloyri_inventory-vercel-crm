@@ -140,6 +140,13 @@
   max-width: 100%;
 }
 
+.record-dialog .section-tabs [role="tablist"] {
+  width: 100% !important;
+  min-width: 0;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
 .record-dialog .form-actions {
   margin-inline: 0;
 }

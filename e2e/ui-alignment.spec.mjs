@@ -147,8 +147,15 @@ for (const width of [390, 650, 768, 1440]) {
     await page.getByRole('button', { name: 'Business settings', exact: true }).click();
     const settings = page.getByRole('dialog', { name: 'Business settings', exact: true });
     await expect(settings).toBeVisible();
-    if (width === 390 || width === 1440) await page.screenshot({ path: testInfo.outputPath('settings.png') });
+    await settings.evaluate(el => Promise.all(el.getAnimations({ subtree: true }).map(animation => animation.finished)));
+    if (width === 390 || width === 1440) await page.screenshot({ path: testInfo.outputPath('settings.png'), animations: 'disabled' });
     expect(await settings.evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1);
+    const settingsTabs = await settings.getByRole('tablist').boundingBox();
+    for (const item of await settings.getByRole('tab').all()) {
+      const box = await item.boundingBox();
+      expect(box.x).toBeGreaterThanOrEqual(settingsTabs.x);
+      expect(box.x + box.width).toBeLessThanOrEqual(settingsTabs.x + settingsTabs.width + 1);
+    }
     const bounds = await settings.boundingBox();
     for (const field of await settings.locator('.record-form input:visible, .form-actions button:visible').all()) {
       const box = await field.boundingBox();
