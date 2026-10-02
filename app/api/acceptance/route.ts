@@ -1,4 +1,5 @@
 import { database } from '@/db/raw';
+import { validateBusinessData,type BusinessDataIssue } from '@/lib/business-data-validation';
 import { assertCanonicalState } from '@/lib/data-integrity';
 
 export const dynamic='force-dynamic';
@@ -38,7 +39,21 @@ export async function GET(){
     `).first<Row>();
     const workspaces=await database().prepare('SELECT data FROM crm_workspaces').all<{data:string}>();
     let dataIntegrityReady=true;
-    try{for(const workspace of workspaces.results)assertCanonicalState(JSON.parse(workspace.data))}catch{dataIntegrityReady=false}
+    const businessIssues=new Map<string,BusinessDataIssue>();
+    let businessCriticalCount=0,businessWarningCount=0,businessAttentionCount=0;
+    try{
+      for(const workspace of workspaces.results){
+        const state=assertCanonicalState(JSON.parse(workspace.data));
+        const report=validateBusinessData(state);
+        businessCriticalCount+=report.criticalCount;
+        businessWarningCount+=report.warningCount;
+        businessAttentionCount+=report.attentionCount;
+        for(const issue of report.issues){
+          const existing=businessIssues.get(issue.code);
+          businessIssues.set(issue.code,existing?{...existing,count:existing.count+issue.count}:issue);
+        }
+      }
+    }catch{dataIntegrityReady=false}
     const checks={
       workspaceReady:Number(row?.workspace_count||0)>0,
       cutoverReady:Number(row?.disabled_cutovers||0)===0,
@@ -49,10 +64,17 @@ export async function GET(){
       recoveryTrackingReady:Boolean(row?.backup_events),
       dataIntegrityReady:Boolean(row?.data_integrity_events)&&dataIntegrityReady
     };
+    const businessDataValidation={
+      criticalCount:businessCriticalCount,
+      warningCount:businessWarningCount,
+      attentionCount:businessAttentionCount,
+      issueCount:businessCriticalCount+businessWarningCount+businessAttentionCount,
+      issues:[...businessIssues.values()].sort((a,b)=>a.severity.localeCompare(b.severity)||a.code.localeCompare(b.code))
+    };
     const ok=Object.values(checks).every(Boolean);
-    return Response.json({status:ok?'ok':'unavailable',commit,checks},{status:ok?200:503,headers});
+    return Response.json({status:ok?'ok':'unavailable',commit,checks,businessDataValidation},{status:ok?200:503,headers});
   }catch(error){
     console.error('Production acceptance check failed',error);
-    return Response.json({status:'unavailable',commit,checks:null},{status:503,headers});
+    return Response.json({status:'unavailable',commit,checks:null,businessDataValidation:null},{status:503,headers});
   }
 }
