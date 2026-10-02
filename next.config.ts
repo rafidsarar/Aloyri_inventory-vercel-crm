@@ -14,6 +14,7 @@ const contentSecurityPolicy = [
   "font-src 'self' data:",
   "style-src 'self' 'unsafe-inline'",
   `script-src ${scriptSrc}`,
+  "script-src-attr 'none'",
   "connect-src 'self'",
   "worker-src 'self' blob:",
   "manifest-src 'self'",
