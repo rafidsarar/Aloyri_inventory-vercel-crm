@@ -292,6 +292,10 @@ export const relationalFoundationSql = [
   `CREATE INDEX IF NOT EXISTS crm_stage4_purchase_orders_status_expected_idx ON crm_rel_purchase_orders(owner_id,status,expected)`,
   `CREATE INDEX IF NOT EXISTS crm_stage4_batches_product_expiry_idx ON crm_rel_batches(owner_id,product_id,expiry)`,
   `CREATE INDEX IF NOT EXISTS crm_stage4_domain_versions_updated_idx ON crm_domain_versions(owner_id,updated_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS crm_stage5_orders_customer_status_delivered_idx ON crm_rel_orders(owner_id,customer_id,status,delivered DESC)`,
+  `CREATE INDEX IF NOT EXISTS crm_stage5_orders_status_updated_idx ON crm_rel_orders(owner_id,status,updated_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS crm_stage5_purchase_orders_supplier_status_expected_idx ON crm_rel_purchase_orders(owner_id,supplier_id,status,expected)`,
+  `CREATE INDEX IF NOT EXISTS crm_stage5_batches_due_paid_idx ON crm_rel_batches(owner_id,due_date,paid)`,
 ] as const;
 
 let ready: Promise<void> | null = null;
