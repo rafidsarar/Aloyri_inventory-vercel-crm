@@ -30,7 +30,7 @@ function canonicalDate(value:unknown,path:string,optional:boolean,report:DataInt
 function setDate(target:any,key:string,path:string,optional:boolean,report:DataIntegrityReport){
   if(!target||typeof target!=='object')return;
   const next=canonicalDate(target[key],path,optional,report);
-  if(next===undefined){if(key in target)report.changedPaths.push(path);delete target[key]}
+  if(next===undefined){if(key in target&&target[key]!==undefined)report.changedPaths.push(path);delete target[key]}
   else target[key]=next;
 }
 
