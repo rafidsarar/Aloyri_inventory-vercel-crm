@@ -172,7 +172,7 @@ export function Nav({view,onView,openOrders,onSettings,onPassword,onLogout,membe
       <div className="profile">
         <Avatar name={memberName}/>
         <div><strong>{memberName}</strong><small>{roleLabels[role]}</small></div>
-        <button className="profile-logout" title="Change password" aria-label="Change password" onClick={onPassword}>
+        <button className="profile-logout" title="Account security" aria-label="Account security" onClick={onPassword}>
           <Settings size={18}/>
         </button>
         <button className="profile-logout" title="Sign out" aria-label="Sign out" onClick={onLogout}>

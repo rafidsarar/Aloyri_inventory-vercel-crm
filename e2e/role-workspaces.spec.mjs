@@ -78,3 +78,19 @@ test('sales workspace fits a phone viewport without horizontal page overflow',as
   const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(2);
 });
+
+
+test('account security lists active sessions and allows signing out another device',async({page,request})=>{
+  await loadRole(page,request,'owner');
+  await page.route('**/api/auth/sessions',async route=>{
+    if(route.request().method()==='GET')return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({sessions:[
+      {id:'aaaaaaaaaaaaaaaa',current:true,createdAt:new Date().toISOString(),expiresAt:new Date(Date.now()+3600000).toISOString(),lastSeenAt:new Date().toISOString(),userAgent:'Mozilla/5.0 Windows Chrome/154.0'},
+      {id:'bbbbbbbbbbbbbbbb',current:false,createdAt:new Date().toISOString(),expiresAt:new Date(Date.now()+3600000).toISOString(),lastSeenAt:new Date().toISOString(),userAgent:'Mozilla/5.0 Android Chrome/154.0'}
+    ]})});
+    return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true})});
+  });
+  await page.getByRole('button',{name:'Account security'}).click();
+  await expect(page.getByRole('heading',{name:'Account security'})).toBeVisible();
+  await expect(page.getByText('This device')).toBeVisible();
+  await expect(page.getByRole('button',{name:'Sign out other devices'})).toBeEnabled();
+});

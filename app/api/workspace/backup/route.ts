@@ -92,6 +92,14 @@ export async function POST(request:Request){
     if(text.length>1900000)return response({error:'Backup is too large.'},413);
     let body:any;
     try{body=JSON.parse(text)}catch{return response({error:'Invalid backup JSON.'},400)}
+    if(body?.action==='recordExport'){
+      const current=(await relationalCoreState(ownerId)).state;
+      validateRelations(current,{skipOrderNumberUniqueness:true});
+      const counts=recordCounts(current),checksum=await sha256(current),parity=await verifyRelationalParity(ownerId);
+      await database().prepare('INSERT INTO crm_backup_events (id,owner_id,actor_id,checksum,record_counts,relational_parity_ok,created_at) VALUES (?,?,?,?,?,?,?)')
+        .bind(crypto.randomUUID(),ownerId,user.userId,checksum,JSON.stringify(counts),parity.ok?1:0,new Date().toISOString()).run();
+      return response({ok:true,checksum,counts,relationalParity:parity});
+    }
     const {restored,counts,checksum,warnings}=await parseBackup(body?.backup);
     if(body?.action==='validate'){
       const current=await database().prepare('SELECT data,version,updated_at FROM crm_workspaces WHERE owner_id=?').bind(ownerId).first<{data:string;version:number;updated_at:string}>();
