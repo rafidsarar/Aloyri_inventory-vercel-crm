@@ -141,8 +141,8 @@ test('inventory daily workflow: receive a real PO, review stock, place and revie
 
   await nav(page,'Suppliers');
   await expect(page.getByRole('heading',{name:'Suppliers & purchasing'})).toBeVisible();
-  await expect(page.getByText('AUD-PO-1001',{exact:true})).toBeVisible();
-  await page.getByRole('button',{name:'Receive'}).click();
+  await expect(page.getByText('AUD-PO-1001',{exact:true}).first()).toBeVisible();
+  await page.getByRole('button',{name:'Receive'}).first().click();
   await expect(page.getByRole('heading',{name:'Receive purchase order'})).toBeVisible();
   await page.getByRole('button',{name:'Receive stock'}).click();
   await expect(page.getByText('Received',{exact:true}).first()).toBeVisible({timeout:30000});
@@ -150,7 +150,7 @@ test('inventory daily workflow: receive a real PO, review stock, place and revie
   await nav(page,'Inventory');
   await expect(page.getByRole('heading',{name:'Control stock before it becomes a problem.'})).toBeVisible();
   await page.getByRole('tab',{name:'Holds & returns'}).click();
-  await page.getByRole('button',{name:'Hold stock'}).click();
+  await page.getByRole('button',{name:'Hold stock'}).first().click();
   await expect(page.getByRole('heading',{name:'Hold stock'})).toBeVisible();
   await page.getByLabel('Inventory hold reason').fill('Live usability audit hold');
   await page.getByRole('button',{name:'Block stock'}).click();
