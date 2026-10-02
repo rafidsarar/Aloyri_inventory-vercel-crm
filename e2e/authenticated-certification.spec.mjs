@@ -9,13 +9,20 @@ const shift=days=>{const d=new Date(today()+'T12:00:00Z');d.setUTCDate(d.getUTCD
 
 async function login(browser,role){
   const context=await browser.newContext({baseURL:BASE});
-  const response=await context.request.post('/api/auth/login',{
-    headers:{Origin:BASE},
-    data:{email:email(role),password:PASSWORD}
-  });
-  expect(response.status(),role+' real login').toBe(200);
+  const page=await context.newPage();
+  await page.goto('/login');
+  const result=await page.evaluate(async({email,password})=>{
+    const response=await fetch('/api/auth/login',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email,password})
+    });
+    return {status:response.status,body:await response.json()};
+  },{email:email(role),password:PASSWORD});
+  expect(result.status,role+' real login').toBe(200);
   const sessionCheck=await context.request.get('/api/auth/sessions');
   expect(sessionCheck.status(),role+' authenticated session').toBe(200);
+  await page.close();
   return {context,request:context.request};
 }
 async function api(request,method,path,data){
