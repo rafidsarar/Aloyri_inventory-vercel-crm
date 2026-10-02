@@ -43,7 +43,7 @@ export async function POST(request:Request){
   if(body.action==='revokeAll'){
     await db.prepare('DELETE FROM crm_sessions WHERE user_id=?').bind(user.userId).run();
     await recordSecurityEvent({ownerId:user.ownerId,userId:user.userId,type:'sessions.revoke_all'});
-    return reply({ok:true},{headers:{'Set-Cookie':clearCookie(request)}});
+    return reply({ok:true},200,{'Set-Cookie':clearCookie(request)});
   }
   return reply({error:'Unsupported session action.'},400);
 }
