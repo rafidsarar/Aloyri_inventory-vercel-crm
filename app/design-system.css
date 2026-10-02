@@ -242,6 +242,17 @@
   width: 100%;
 }
 
+.crm-action-bar.activity-toolbar-pro {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-content: stretch;
+}
+
+.activity-filter-groups,
+.activity-filter-groups > div {
+  min-width: 0;
+}
+
 @media (max-width: 768px) {
   .crm-action-bar.table-toolbar,
   .crm-action-bar.order-toolbar-pro,
@@ -365,16 +376,23 @@
 /* Keep tab strips usable at intermediate widths */
 .section-tabs [role="tablist"],
 .finance-tabs [role="tablist"],
-.purchasing-tabs [role="tablist"] {
+.purchasing-tabs [role="tablist"],
+.inventory-records [role="tablist"] {
   max-width: 100%;
+  height: auto;
+  min-height: calc(var(--crm-control-height-sm) + 6px);
   overflow-x: auto;
+  overflow-y: hidden;
   overscroll-behavior-inline: contain;
   scrollbar-width: thin;
 }
 
 .section-tabs [role="tab"],
 .finance-tabs [role="tab"],
-.purchasing-tabs [role="tab"] {
+.purchasing-tabs [role="tab"],
+.inventory-records [role="tab"] {
+  height: auto;
+  flex-shrink: 0;
   min-height: var(--crm-control-height-sm);
   white-space: nowrap;
 }
@@ -394,7 +412,7 @@
 }
 
 /* Consistent interactive sizing */
-.crm-workspace-section button:not(.icon-button):not(.text-button):not(.search-clear) {
+.crm-workspace-section button:not(.icon-button):not(.text-button):not(.search-clear):not([data-slot="checkbox"]):not([role="switch"]):not(.automation-toggle) {
   min-height: 34px;
 }
 
@@ -505,6 +523,13 @@
     grid-template-columns: 1fr;
   }
 
+  .section-tabs [role="tab"],
+  .finance-tabs [role="tab"],
+  .purchasing-tabs [role="tab"],
+.inventory-records [role="tab"] {
+    min-height: 44px;
+  }
+
   .crm-workspace-section .btn,
   .crm-workspace-section .choice {
     min-height: 42px;
@@ -520,3 +545,4 @@
     min-width: 0;
   }
 }
+
