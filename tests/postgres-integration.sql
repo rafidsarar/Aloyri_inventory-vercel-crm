@@ -43,9 +43,15 @@ BEGIN
      OR to_regclass('public.crm_audit_log') IS NULL THEN
     RAISE EXCEPTION 'restore infrastructure missing';
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM crm_schema_migrations WHERE version='004_restore_infrastructure') THEN
-    RAISE EXCEPTION 'restore migration was not recorded';
+  IF NOT EXISTS (SELECT 1 FROM crm_schema_migrations WHERE version='004_restore_infrastructure')
+     OR NOT EXISTS (SELECT 1 FROM crm_schema_migrations WHERE version='005_domain_version_backfill') THEN
+    RAISE EXCEPTION 'required migrations were not recorded';
+  END IF;
+  IF (SELECT COUNT(*) FROM crm_domain_versions WHERE owner_id='legacy-owner') <> 3 THEN
+    RAISE EXCEPTION 'legacy workspace domain versions were not backfilled';
   END IF;
 END $$;
 
 DELETE FROM crm_users WHERE owner_id='owner-test';
+DELETE FROM crm_domain_versions WHERE owner_id='legacy-owner';
+DELETE FROM crm_workspaces WHERE owner_id='legacy-owner';
