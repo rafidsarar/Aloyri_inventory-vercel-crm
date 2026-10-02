@@ -65,10 +65,16 @@ test('real authenticated RBAC matrix protects reads and writes for every role',a
     expect((await s.request.get('/api/team')).status(),role+' team').toBe(readable[role].team);
     expect((await s.request.get('/api/workspace/backup')).status(),role+' backup').toBe(readable[role].backup);
 
-    const financeSave=await api(s.request,'PUT','/api/finances',{data:financePayload.data,domainVersion:financePayload.domainVersion});
+    const financeWritePayload=financeWrite.has(role)
+      ? await s.request.get('/api/finances').then(async response=>{expect(response.status(),role+' finance refresh').toBe(200);return response.json()})
+      : financePayload;
+    const financeSave=await api(s.request,'PUT','/api/finances',{data:financeWritePayload.data,domainVersion:financeWritePayload.domainVersion});
     expect(financeSave.status(),role+' finance write').toBe(financeWrite.has(role)?200:403);
 
-    const inventorySave=await api(s.request,'PUT','/api/inventory-suppliers',{data:inventoryPayload.data,domainVersion:inventoryPayload.domainVersion});
+    const inventoryWritePayload=inventoryWrite.has(role)
+      ? await s.request.get('/api/inventory-suppliers').then(async response=>{expect(response.status(),role+' inventory refresh').toBe(200);return response.json()})
+      : inventoryPayload;
+    const inventorySave=await api(s.request,'PUT','/api/inventory-suppliers',{data:inventoryWritePayload.data,domainVersion:inventoryWritePayload.domainVersion});
     expect(inventorySave.status(),role+' inventory write').toBe(inventoryWrite.has(role)?200:403);
 
     const customer={
