@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   accountBalance,allocate,applyCancellationQuarantine,applyDeliveryFollowUps,applyPurchaseOrderReceipt,
-  batchRemaining,initialState,stock,today,shiftDate,validateRelations,type State
+  batchRemaining,initialState,stock,today,shiftDate,validateRelations
 } from '../lib/crm.ts';
 
 const orderWorkflows=readFileSync(new URL('../db/order-workflows.ts',import.meta.url),'utf8');
@@ -18,7 +18,7 @@ const domainVersion=readFileSync(new URL('../db/domain-version.ts',import.meta.u
 
 function workflowFixture(){
   const state=initialState();
-  state.accountOpenings=[{account:'Cash',date:shiftDate(-90),balance:10000}];
+  state.accountOpenings=[{account:'cash',date:shiftDate(-90),balance:10000}];
   state.suppliers=[{id:'supplier-1',name:'Supplier One',contact:'Buyer',phone:'01700000000',email:'',address:'Dhaka',leadDays:7,paymentTermsDays:30,notes:'',verified:true}];
   state.purchaseOrders=[{
     id:'po-1',number:'PO-1001',supplierId:'supplier-1',created:shiftDate(-10),expected:shiftDate(-3),status:'Sent',notes:'',
@@ -53,12 +53,12 @@ test('end-to-end core flow preserves stock, customer/order, follow-up and financ
   assert.equal(state.tasks.filter(t=>t.orderId==='order-1'&&!t.done).length,1);
 
   state.orders[0].collections.push({id:'collection-1',date:today(),amount:100,reference:'Partial COD'});
-  state.accountMatches.push({entryId:'order-collection-order-1-collection-1',account:'Cash',matched:true,reference:'Partial COD'});
-  assert.equal(accountBalance(state,'Cash'),10100);
+  state.accountMatches.push({entryId:'order-collection-order-1-collection-1',account:'cash',matched:true,reference:'Partial COD'});
+  assert.equal(accountBalance(state,'cash'),10100);
 
   state.batches[0].payments.push({id:'supplier-payment-1',date:today(),amount:200,note:'Part payment'});
-  state.accountMatches.push({entryId:'batch-payment-'+batch.id+'-supplier-payment-1',account:'Cash',matched:true,reference:'Part payment'});
-  assert.equal(accountBalance(state,'Cash'),9900);
+  state.accountMatches.push({entryId:'batch-payment-'+batch.id+'-supplier-payment-1',account:'cash',matched:true,reference:'Part payment'});
+  assert.equal(accountBalance(state,'cash'),9900);
   validateRelations(state,{skipOrderNumberUniqueness:true});
 });
 
