@@ -289,7 +289,7 @@ async function loadLive(showErrors=true,manageBusy=true){
     const nextRole=(['owner','admin','sales','inventory','finance','viewer'].includes(d.role)?d.role:'viewer') as WorkspaceRole;
     const recovery=Boolean(d.recoveryMode);
     setLive(d.data);setVersion(d.version);setRole(nextRole);setRecoveryMode(recovery);
-    setView('Overview');
+    if(manageBusy)setView('Overview');
     setMemberName(d.userName||'Team member');setLoaded(true);setError(recovery?(d.warning||'Saved records are visible in read-only recovery mode.'):'');setAuthRequired(false);
     if(!recovery){
       try{await loadCustomerRecords(nextRole)}catch(customerError){if(showErrors)toast.error(customerError instanceof Error?customerError.message:'Could not load customer records.')}
