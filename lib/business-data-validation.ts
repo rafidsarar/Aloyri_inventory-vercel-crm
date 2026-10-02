@@ -8,7 +8,6 @@ import {
   stockPosition,
   today,
   validateRelations,
-  workspaceIntegrityWarnings,
   type State
 } from './crm.ts';
 
