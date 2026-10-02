@@ -47,7 +47,7 @@ export default function ReportsSection({ctx}:Props){
   const [stage5Error,setStage5Error]=useState('');
   const [stage5Loading,setStage5Loading]=useState(true);
   useEffect(()=>{let active=true;fetch('/api/operational-intelligence',{cache:'no-store'}).then(async response=>{const data=await response.json();if(!response.ok)throw new Error(data.error||'Could not load operational intelligence.');if(active){setStage4(data);setStage4Error('')}}).catch(error=>{if(active)setStage4Error(error instanceof Error?error.message:'Could not load operational intelligence.')}).finally(()=>{if(active)setStage4Loading(false)});return()=>{active=false}},[]);
-  useEffect(()=>{let active=true;fetch('/api/growth-control',{cache:'no-store'}).then(async response=>{const data=await response.json();if(!response.ok)throw new Error(data.error||'Could not load Stage 5 growth control.');if(active){setStage5(data);setStage5Error('')}}).catch(error=>{if(active)setStage5Error(error instanceof Error?error.message:'Could not load Stage 5 growth control.')}).finally(()=>{if(active)setStage5Loading(false)});return()=>{active=false}},[]);
+  useEffect(()=>{let active=true;fetch('/api/growth-control',{cache:'no-store'}).then(async response=>{const data=await response.json();if(!response.ok)throw new Error(data.error||'Could not load business control intelligence.');if(active){setStage5(data);setStage5Error('')}}).catch(error=>{if(active)setStage5Error(error instanceof Error?error.message:'Could not load business control intelligence.')}).finally(()=>{if(active)setStage5Loading(false)});return()=>{active=false}},[]);
   return <WorkspaceSection className="management-report-page">
 <section className="management-report-hero">
   <div className="management-report-hero-copy">
@@ -73,7 +73,7 @@ export default function ReportsSection({ctx}:Props){
 </section>
 
 <nav className="management-report-nav" aria-label="Management report sections">
-  <button onClick={()=>document.getElementById('management-stage5-control')?.scrollIntoView({behavior:'smooth',block:'start'})}>Stage 5</button>
+  <button onClick={()=>document.getElementById('management-stage5-control')?.scrollIntoView({behavior:'smooth',block:'start'})}>Business Control</button>
   <button onClick={()=>document.getElementById('management-overview')?.scrollIntoView({behavior:'smooth',block:'start'})}>Overview</button>
   <button onClick={()=>document.getElementById('management-trend')?.scrollIntoView({behavior:'smooth',block:'start'})}>Trend</button>
   <button onClick={()=>document.getElementById('management-products')?.scrollIntoView({behavior:'smooth',block:'start'})}>Products</button>
@@ -84,11 +84,11 @@ export default function ReportsSection({ctx}:Props){
 
 <section id="management-stage5-control" className="management-intelligence-section">
   <div className="management-section-title">
-    <div><span className="management-section-kicker">Stage 5 · Business operations & growth control</span><h2>Executive operating system</h2><p>Customer value, fulfillment exceptions, demand planning, supplier reliability and working-capital control from the relational source of truth.</p></div>
+    <div><span className="management-section-kicker">Business Control Center</span><h2>Executive operating system</h2><p>Customer value, fulfillment exceptions, demand planning, supplier reliability and working-capital control from the relational source of truth.</p></div>
     <span className={'management-pulse '+(stage5Error?'negative':stage5Loading?'neutral':'positive')}><span/>{stage5Loading?'Calculating':stage5Error?'Needs review':'Live intelligence'}</span>
   </div>
-  {stage5Error?<div className="info-strip"><ShieldCheck size={17}/><span>{stage5Error}</span></div>:stage5Loading?<div className="panel loading-panel"><p className="muted">Loading Stage 5 business control…</p></div>:stage5&&<>
-    <div className="management-kpi-grid" aria-label="Stage 5 executive dashboard">
+  {stage5Error?<div className="info-strip"><ShieldCheck size={17}/><span>{stage5Error}</span></div>:stage5Loading?<div className="panel loading-panel"><p className="muted">Loading business control…</p></div>:stage5&&<>
+    <div className="management-kpi-grid" aria-label="Business control executive dashboard">
       <button className="management-kpi-card primary" onClick={()=>changeView('Finances')}><div className="management-kpi-head"><span className="management-kpi-icon"><ArrowUpRight size={17}/></span><small>30-day revenue</small><ChevronRight size={14}/></div><strong>{taka(stage5.executive.revenue30)}</strong><div className="management-kpi-foot"><span>{taka(stage5.executive.profit30)} operating profit</span></div></button>
       <button className="management-kpi-card" onClick={()=>changeView('Customers')}><div className="management-kpi-head"><span className="management-kpi-icon"><Users size={17}/></span><small>Repeat rate</small><ChevronRight size={14}/></div><strong>{stage5.executive.repeatRate.toFixed(0)}%</strong><div className="management-kpi-foot"><span>{stage5.customers.segments.dueBack} due back · {stage5.customers.segments.lapsed} lapsed</span></div></button>
       <button className="management-kpi-card" onClick={()=>changeView('Orders')}><div className="management-kpi-head"><span className="management-kpi-icon"><ShoppingBag size={17}/></span><small>Order exceptions</small><ChevronRight size={14}/></div><strong>{stage5.orders.queue.length}</strong><div className="management-kpi-foot"><span>{stage5.orders.agedOpen} aged · {stage5.orders.untrackedShipments} untracked</span></div></button>
@@ -137,7 +137,7 @@ export default function ReportsSection({ctx}:Props){
     </div>
 
     <div className="management-focus-card">
-      <span>Stage 5 operating model</span>
+      <span>Operating model</span>
       <strong>Customer value → fulfillment control → demand planning → supplier reliability → working capital.</strong>
       <small>Relational core · {stage5.performance.entities.toLocaleString()} entities · generated {new Date(stage5.generatedAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})} · staff remain in control of all operational actions.</small>
     </div>
@@ -146,7 +146,7 @@ export default function ReportsSection({ctx}:Props){
 
 <section id="management-stage4-control" className="management-intelligence-section">
   <div className="management-section-title">
-    <div><span className="management-section-kicker">Stage 4 · Operational intelligence</span><h2>Operational control center</h2><p>Server-calculated management controls, retention signals and scale health from the relational source of truth.</p></div>
+    <div><span className="management-section-kicker">Operational intelligence</span><h2>Operational control center</h2><p>Server-calculated management controls, retention signals and scale health from the relational source of truth.</p></div>
     <span className={'management-pulse '+(stage4?.hardening?.ok?'positive':'neutral')}><span/>{stage4Loading?'Refreshing':stage4?.hardening?.ok?'Controls healthy':'Review controls'}</span>
   </div>
   {stage4Error?<div className="info-strip"><ShieldCheck size={17}/><span>{stage4Error}</span></div>:stage4Loading?<div className="panel loading-panel"><p className="muted">Loading operational intelligence…</p></div>:stage4&&<>
