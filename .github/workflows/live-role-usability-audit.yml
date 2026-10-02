@@ -1,0 +1,48 @@
+name: Live Role Usability Audit
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  live-role-usability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      LIVE_CRM_URL: https://aloyriinventory-vercel-crm.vercel.app
+      EXPECTED_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Wait for exact production commit
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 40); do
+            body="$(curl -fsS --max-time 10 "$LIVE_CRM_URL/api/health" 2>/dev/null || true)"
+            echo "Attempt $attempt: $body"
+            if BODY="$body" EXPECTED_SHA="$EXPECTED_SHA" node -e 'try{const d=JSON.parse(process.env.BODY||"{}");process.exit(d.status==="ok"&&d.commit===process.env.EXPECTED_SHA?0:1)}catch{process.exit(1)}'; then
+              exit 0
+            fi
+            sleep 15
+          done
+          exit 1
+      - name: Install Playwright runner
+        run: pnpm add --save-dev --lockfile=false @playwright/test@1.55.0
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run role-by-role live usability audit
+        run: pnpm exec playwright test e2e/live-production-usability.spec.mjs --config=playwright.live.config.mjs
+      - name: Remove temporary production audit workspace
+        if: always()
+        run: curl -fsS --max-time 20 "$LIVE_CRM_URL/api/internal/live-usability-audit?action=cleanup" || true
