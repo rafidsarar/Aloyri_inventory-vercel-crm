@@ -85,6 +85,37 @@ function InventoryWorkspace(p:Props){
   </WorkspaceSection>;
 }
 
+function FinanceWorkspace(p:Props){
+  return <WorkspaceSection>
+    <section className="overview-command-hero">
+      <div className="overview-command-copy"><span className="orders-eyebrow"><Wallet size={15}/>Finance workspace</span><h2>Work from collections, payables and account control.</h2><p>Financial actions are prioritized here while sales, inventory and supplier records stay available as read-only supporting context.</p></div>
+      <div className="overview-command-status"><span className={p.alertCritical?'needs-attention':'clear'}><i/>{p.alertCritical?p.alertCritical+' critical finance alert'+(p.alertCritical===1?'':'s'):'Finance queue is clear'}</span><button onClick={()=>p.changeView('Alerts')}>Open alert center<ArrowRight size={15}/></button></div>
+    </section>
+    <div className="overview-priority-grid">
+      <button onClick={()=>{p.changeView('Finances');p.setFinanceTab('Collections')}}><span className="overview-priority-icon"><Wallet size={19}/></span><span><small>Collections pending</small><strong>{taka(p.pendingCollections)}</strong><em>{p.pendingCollectionOrders} orders with balance</em></span><ChevronRight size={16}/></button>
+      <button onClick={()=>{p.changeView('Finances');p.setFinanceTab('Payables')}}><span className="overview-priority-icon"><Truck size={19}/></span><span><small>Supplier payables</small><strong>{taka(p.unpaidStock)}</strong><em>Open supplier obligations</em></span><ChevronRight size={16}/></button>
+      <button onClick={()=>{p.changeView('Finances');p.setFinanceTab('Overview')}}><span className="overview-priority-icon"><LayoutDashboard size={19}/></span><span><small>Operating result</small><strong>{signedTaka(p.profit)}</strong><em>Current CRM result</em></span><ChevronRight size={16}/></button>
+      <button onClick={()=>{p.changeView('Finances');p.setFinanceTab('Reconciliation')}}><span className="overview-priority-icon"><CalendarCheck size={19}/></span><span><small>Accounts & reconciliation</small><strong>Review</strong><em>Cash, bank, bKash and Nagad</em></span><ChevronRight size={16}/></button>
+    </div>
+    <SectionPanel className="overview-work-queue">
+      <div className="panel-heading"><div><h2>Finance work queue</h2><p>Money movements and supporting records that should be reviewed first.</p></div><span className={'overview-work-count '+(p.alertCritical||p.pendingCollectionOrders?'active':'')}>{p.alertCritical+p.pendingCollectionOrders} signals</span></div>
+      <div className="overview-work-grid">
+        <button onClick={()=>p.changeView('Alerts')} className={p.alertCritical?'urgent':''}><span className="attention-icon rose"><Bell size={18}/></span><span><strong>{p.alertCritical?p.alertCritical+' critical finance alerts':'No critical finance alerts'}</strong><small>{p.alertAction} action-needed · {p.alertUpcoming} upcoming</small></span><ChevronRight size={16}/></button>
+        <button onClick={()=>{p.changeView('Finances');p.setFinanceTab('Collections')}} className={p.pendingCollectionOrders?'urgent':''}><span className="attention-icon blue"><Wallet size={18}/></span><span><strong>{p.pendingCollectionOrders} customer balances pending</strong><small>{taka(p.pendingCollections)} outstanding</small></span><ChevronRight size={16}/></button>
+        <button onClick={()=>{p.changeView('Finances');p.setFinanceTab('Payables')}}><span className="attention-icon amber"><Truck size={18}/></span><span><strong>{taka(p.unpaidStock)} supplier payables</strong><small>Review due and overdue supplier balances</small></span><ChevronRight size={16}/></button>
+        <button onClick={()=>{p.changeView('Finances');p.setFinanceTab('Cashflow')}}><span className="attention-icon blue"><Wallet size={18}/></span><span><strong>Cashflow & account posting</strong><small>Record expenses, cash movements and reconcile accounts</small></span><ChevronRight size={16}/></button>
+      </div>
+    </SectionPanel>
+    <div className="dashboard-middle overview-insight-grid"><SalesTrend {...p}/><SectionPanel className="overview-health-panel"><div className="panel-heading"><div><h2>Finance handoff</h2><p>Read-only supporting records for transaction verification.</p></div></div><div className="overview-health-list">
+      <button onClick={()=>p.changeView('Orders')}><span><small>Orders</small><strong>{p.openOrderCount} open</strong></span><ChevronRight size={16}/></button>
+      <button onClick={()=>p.changeView('Customers')}><span><small>Customers</small><strong>{p.customerCount} records</strong></span><ChevronRight size={16}/></button>
+      <button onClick={()=>p.changeView('Suppliers')}><span><small>Suppliers & purchasing</small><strong>{p.purchasingIncomingUnits} units incoming</strong></span><ChevronRight size={16}/></button>
+      <button onClick={()=>p.changeView('Inventory')}><span><small>Inventory</small><strong>{p.inventoryUnits} units available</strong></span><ChevronRight size={16}/></button>
+    </div></SectionPanel></div>
+    <RecentOrders {...p}/>
+  </WorkspaceSection>;
+}
+
 function ViewerWorkspace(p:Props){
   return <WorkspaceSection>
     <section className="overview-command-hero">
@@ -115,6 +146,7 @@ function RecentOrders(p:Props){return <div className="dashboard-bottom"><Section
 export default function OverviewSection(p:Props){
   if(p.role==='sales')return <SalesWorkspace {...p}/>;
   if(p.role==='inventory')return <InventoryWorkspace {...p}/>;
+  if(p.role==='finance')return <FinanceWorkspace {...p}/>;
   if(p.role==='viewer')return <ViewerWorkspace {...p}/>;
   return <WorkspaceSection>
     <section className="overview-command-hero"><div className="overview-command-copy"><span className="orders-eyebrow"><LayoutDashboard size={15}/>Today&apos;s operations</span><h2>Run the business from what needs attention now.</h2><p>Orders, money, stock and customer work are prioritized here. Detailed analysis stays in the specialist sections.</p></div><div className="overview-command-status"><span className={p.alertCritical?'needs-attention':'clear'}><i/>{p.alertCritical?p.alertCritical+' critical '+(p.alertCritical===1?'alert':'alerts'):'No critical alerts'}</span><button onClick={()=>p.changeView('Alerts')}>Open alert center<ArrowRight size={15}/></button></div></section>
