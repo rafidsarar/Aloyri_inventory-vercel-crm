@@ -1,12 +1,11 @@
 import { getAppUser, checkOrigin, normalizeEmail, randomToken, tokenHash } from '@/app/local-auth';
 import { database } from '@/db/raw';
-import { ensureWorkspaceRoleConstraint } from '@/db/auth-foundation';
 import { roleCanManageTeam } from '@/lib/roles';
 export const dynamic='force-dynamic';
 const response=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
 async function owner(){const user=await getAppUser();if(!user)return {error:response({error:'Sign in to manage staff.'},401)};if(!roleCanManageTeam(user.role))return {error:response({error:'Only the owner can manage staff.'},403)};return {user}}
 type StaffRow={id:string;email:string;role:string;password_hash:string|null;created_at:string};
-export async function GET(){try{const access=await owner();if(access.error)return access.error;await ensureWorkspaceRoleConstraint();const rows=await database().prepare("SELECT id,email,role,password_hash,created_at FROM crm_users WHERE owner_id=? AND role!='owner' AND active=1 ORDER BY created_at ASC").bind(access.user!.userId).all<StaffRow>();return response({staff:rows.results.map(r=>({email:r.email,role:r.role,joined:!!r.password_hash,created:r.created_at}))})}catch(e){console.error('Team read failed',e);return response({error:'Could not load staff.'},503)}}
+export async function GET(){try{const access=await owner();if(access.error)return access.error;const rows=await database().prepare("SELECT id,email,role,password_hash,created_at FROM crm_users WHERE owner_id=? AND role!='owner' AND active=1 ORDER BY created_at ASC").bind(access.user!.userId).all<StaffRow>();return response({staff:rows.results.map(r=>({email:r.email,role:r.role,joined:!!r.password_hash,created:r.created_at}))})}catch(e){console.error('Team read failed',e);return response({error:'Could not load staff.'},503)}}
 export async function POST(request:Request){
   try{
     if(!checkOrigin(request))return response({error:'Invalid request origin.'},403);
