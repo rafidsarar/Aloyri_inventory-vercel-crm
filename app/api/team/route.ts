@@ -23,7 +23,7 @@ export async function POST(request:Request){
       return response({ok:true});
     }
     if(body.action!=='save'&&body.action!=='invite')return response({error:'Invalid action.'},400);
-    if(body.action==='save'&&!['admin','sales','inventory','viewer'].includes(body.role))return response({error:'Choose a staff role.'},400);
+    if(body.action==='save'&&!['admin','sales','inventory','finance','viewer'].includes(body.role))return response({error:'Choose a staff role.'},400);
     if(body.action==='invite'&&(!existing||existing.role==='owner'))return response({error:'Staff account not found.'},404);
     if(!existing){
       const count=await db.prepare("SELECT COUNT(*) AS n FROM crm_users WHERE owner_id=? AND role!='owner'").bind(access.user!.userId).first<{n:number}>();

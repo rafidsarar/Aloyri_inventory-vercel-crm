@@ -4,7 +4,7 @@ import { roleCanEdit } from './roles.ts';
 
 /** The CRM sends one state document; keep its shape while removing fields outside a role's work. */
 export function visibleState(source:State,role:WorkspaceRole):State {
-  if(role==='owner'||role==='admin'||role==='viewer')return source;
+  if(role==='owner'||role==='admin'||role==='finance'||role==='viewer')return source;
   const state=structuredClone(source);
 
   // Operational staff never need the finance ledger or month-close records in their browser.

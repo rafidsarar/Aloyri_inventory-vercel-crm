@@ -25,13 +25,13 @@ test('finance shadow migration is tracked and verified',()=>{
  assert.match(shadow,/crm_rel_finance_account_matches/);
  assert.match(shadow,/status=\?/);
 });
-test('Step 7B Finance API is owner admin write protected and versioned',()=>{
+test('Finance API is role protected and versioned',()=>{
  assert.match(records,/financeKeys=\['expenses','cashEntries','accountOpenings','accountMatches','financeCloses'\]/);
  assert.match(records,/SELECT 1 \/ CASE WHEN EXISTS/);
  assert.match(records,/financeShadowStatements/);
  assert.match(records,/domainVersionBumpStatements/);
- assert.match(records,/\['owner','admin'\]/);
- assert.match(route,/Only the owner or an admin can edit Finance/);
+ assert.match(records,/\['owner','admin','finance'\]/);
+ assert.match(route,/Only the owner, an admin or a finance manager can edit Finance/);
 });
 test('Step 7C frontend loads and saves Finance through dedicated API',()=>{
  assert.match(crm,/fetch\('\/api\/finances'/);

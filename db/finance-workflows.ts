@@ -39,7 +39,7 @@ export async function postOwnerMoney(ownerId:string,input:{kind:'capital'|'drawi
  return {...result,id};
 }
 export async function reverseManualCashEntry(ownerId:string,input:{id:string;reason:string;domainVersion:number},actor:Actor){
- if(!['owner','admin'].includes(actor.role))throw new Error('FINANCE_FORBIDDEN');
+ if(!['owner','admin','finance'].includes(actor.role))throw new Error('FINANCE_FORBIDDEN');
  const reason=input.reason.trim();if(!reason)throw new Error('A reversal reason is required.');
  const {row,state}=await ensureFinanceApiReady(ownerId);if(await getDomainVersion(ownerId,FINANCE_DOMAIN)!==input.domainVersion)throw new Error('DOMAIN_VERSION_CONFLICT');
  const entry=state.cashEntries.find(e=>e.id===input.id);if(!entry)throw new Error('Cash movement not found.');

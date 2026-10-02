@@ -174,7 +174,7 @@ const autoAlerts:AutoAlert[]=automationLive.map(signal=>({id:signal.key,level:si
 s.tasks.filter(t=>!t.done&&t.due<=shiftDate(2)).forEach(t=>autoAlerts.push({id:'task-'+t.id,level:t.due<today()||t.priority==='High'?'Critical':'Upcoming',title:t.title,detail:t.priority+' priority · '+(t.due<today()?'overdue · ':'due ')+dateLabel(t.due),view:'Follow-ups',role:'sales'}));
 if(unassignedMovements)autoAlerts.push({id:'reconcile',level:unassignedMovements>5?'Critical':'Action needed',title:'Reconcile '+unassignedMovements+' cash movements',detail:'Assign recorded movements to Cash, Bank, bKash or Nagad.',view:'Finances',role:'finance'});
 if(projected30<0)autoAlerts.push({id:'liquidity',level:'Critical',title:'Negative 30-day planning position',detail:'Projected shortfall '+taka(Math.abs(projected30))+' based on current CRM assumptions.',view:'Finances',role:'finance'});
-const alertRank:Record<AutoAlert['level'],number>={Critical:0,'Action needed':1,Upcoming:2};const roleAlerts=autoAlerts.filter(a=>role==='owner'||role==='admin'||role==='viewer'||a.role==='all'||(role==='sales'&&a.role==='sales')||(role==='inventory'&&a.role==='inventory')).sort((a,b)=>alertRank[a.level]-alertRank[b.level]);
+const alertRank:Record<AutoAlert['level'],number>={Critical:0,'Action needed':1,Upcoming:2};const roleAlerts=autoAlerts.filter(a=>role==='owner'||role==='admin'||role==='viewer'||a.role==='all'||(role==='sales'&&a.role==='sales')||(role==='inventory'&&a.role==='inventory')||(role==='finance'&&a.role==='finance')).sort((a,b)=>alertRank[a.level]-alertRank[b.level]);
 const alertCritical=roleAlerts.filter(a=>a.level==='Critical').length,alertAction=roleAlerts.filter(a=>a.level==='Action needed').length,alertUpcoming=roleAlerts.filter(a=>a.level==='Upcoming').length;
 const shownAlerts=alertFilter==='All'?roleAlerts:roleAlerts.filter(a=>a.level===alertFilter);
 const alertFocus=roleAlerts[0];
@@ -207,6 +207,7 @@ const auditTime=(iso:string)=>new Date(iso).toLocaleTimeString('en-GB',{timeZone
 const auditRelative=(iso:string)=>{const diff=Math.max(0,Date.now()-new Date(iso).getTime()),mins=Math.floor(diff/60000);if(mins<1)return'Just now';if(mins<60)return mins+'m ago';const hours=Math.floor(mins/60);if(hours<24)return hours+'h ago';const days=Math.floor(hours/24);return days<7?days+'d ago':auditDate(iso)};
 const canEdit=(key:string)=>!recoveryMode&&roleCanEdit(role,key);
 const canFinance=!recoveryMode&&roleCanManageFinance(role);
+const canOwnerMoney=!recoveryMode&&(role==='owner'||role==='admin');
 const canCloseFinance=!recoveryMode&&roleCanCloseFinance(role);
 const canExport=roleCanExportData(role);
 const canImport=!recoveryMode&&roleCanImport(role);
@@ -284,7 +285,7 @@ async function loadLive(showErrors=true,manageBusy=true){
   try{
     const res=await fetch('/api/workspace',{cache:'no-store'}),d:any=await res.json();
     if(!res.ok){setAuthRequired(res.status===401);throw Error(d.error||'Could not load records.')}
-    const nextRole=(['owner','admin','sales','inventory','viewer'].includes(d.role)?d.role:'viewer') as WorkspaceRole;
+    const nextRole=(['owner','admin','sales','inventory','finance','viewer'].includes(d.role)?d.role:'viewer') as WorkspaceRole;
     const recovery=Boolean(d.recoveryMode);
     setLive(d.data);setVersion(d.version);setRole(nextRole);setRecoveryMode(recovery);
     setView('Overview');
@@ -302,7 +303,7 @@ async function loadLive(showErrors=true,manageBusy=true){
 useEffect(()=>{let active=true;(async()=>{try{
   const res=await fetch('/api/workspace',{cache:'no-store'}),d:any=await res.json();if(!active)return;
   if(!res.ok){setAuthRequired(res.status===401);setError(d.error||'Could not load your saved records.');return}
-  const nextRole=(['owner','admin','sales','inventory','viewer'].includes(d.role)?d.role:'viewer') as WorkspaceRole;
+  const nextRole=(['owner','admin','sales','inventory','finance','viewer'].includes(d.role)?d.role:'viewer') as WorkspaceRole;
   const recovery=Boolean(d.recoveryMode);
   setLive(d.data);setVersion(d.version);setRole(nextRole);setRecoveryMode(recovery);
   setView('Overview');
@@ -454,7 +455,7 @@ function financeOnlyMutation(next:State){
 async function saveFinanceDomain(next:State):Promise<boolean>{
   if(!financeOnlyMutation(next))return save(next);
   if(!loaded){toast.error('Load your workspace before saving.');return false}
-  if(!canFinance){toast.error('Only the owner or an admin can edit Finance.');return false}
+  if(!canFinance){toast.error('Your role cannot edit Finance.');return false}
   if(saving.current)return false;saving.current=true;setBusy(true);
   try{
     const data=Object.fromEntries(financeKeys.map(key=>[key,next[key]]));
@@ -593,11 +594,11 @@ async function createPurchaseOrder(){if(!canEdit('purchaseOrders')){toast.error(
 async function setPurchaseOrderStatus(id:string,status:State['purchaseOrders'][number]['status']){if(!canEdit('purchaseOrders')){toast.error('Your role cannot update purchase orders.');return}const next=structuredClone(s),po=next.purchaseOrders.find(p=>p.id===id);if(!po)return;po.status=status;await saveInventorySupplierDomain(next)}
 function openPurchaseOrderReceipt(id:string){if(!canEdit('purchaseOrders')||!canEdit('batches')){toast.error('Your role cannot receive purchase orders into stock.');return}const po=s.purchaseOrders.find(p=>p.id===id);if(!po)return;if(!['Sent','Part received'].includes(po.status)){toast.error('Mark the purchase order sent before receiving stock.');return}const lines=po.items.filter(item=>item.qty>item.receivedQty).map(item=>({productId:item.productId,qty:item.qty-item.receivedQty,expiry:shiftDate(365)}));if(!lines.length){toast.error('Nothing remains to receive on this PO.');return}const supplier=s.suppliers.find(x=>x.id===po.supplierId);setPoReceiveId(id);setPoReceiveDate(today());setPoReceiveInvoice(po.number);setPoReceiveDue(shiftDate(supplier?.paymentTermsDays??30));setPoReceiveLines(lines)}
 async function submitPurchaseOrderReceipt(){if(!poReceiveId)return;if(!canEdit('purchaseOrders')||!canEdit('batches')){toast.error('Your role cannot receive purchase orders into stock.');return}setBusy(true);try{const received=poReceiveLines.reduce((n,line)=>n+line.qty,0);const res=await fetch('/api/purchase-orders/'+encodeURIComponent(poReceiveId)+'/receive',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({received:poReceiveDate,invoice:poReceiveInvoice,dueDate:poReceiveDue||undefined,lines:poReceiveLines,domainVersion:inventorySupplierVersion})}),data:any=await res.json();if(!res.ok){if(res.status===409)await loadLive(false,false);throw Error(data.error||'Could not receive this purchase order.')}await loadLive(false,false);setPoReceiveId(null);toast.success(received+' units received into inventory.')}catch(e){toast.error(e instanceof Error?e.message:'Could not receive this purchase order.')}finally{setBusy(false)}}
-function openOwnerMoney(kind:'capital'|'drawing'){if(!canFinance){toast.error('Only the owner or an admin can post finance movements.');return}setOwnerMoneyKind(kind);setOwnerMoneyAmount('');setOwnerMoneyDate(today());setOwnerMoneyAccount('bank');setOwnerMoneyReference('');setOwnerMoneyOpen(true)}
-async function submitOwnerMoney(){if(!canFinance){toast.error('Only the owner or an admin can post finance movements.');return}const amount=Number(ownerMoneyAmount);if(!Number.isFinite(amount)||amount<=0){toast.error('Enter an amount above zero.');return}setBusy(true);try{const res=await fetch('/api/finances/owner-money',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:ownerMoneyKind,amount,date:ownerMoneyDate,account:ownerMoneyAccount,reference:ownerMoneyReference.trim(),domainVersion:financeDomainVersion})}),data:any=await res.json();if(!res.ok){if(res.status===409)await loadLive(false,false);throw Error(data.error||'Could not post owner money.')}await loadLive(false,false);setOwnerMoneyOpen(false);toast.success((ownerMoneyKind==='capital'?'Owner capital':'Owner drawing')+' posted and reconciled.')}catch(e){toast.error(e instanceof Error?e.message:'Could not post owner money.')}finally{setBusy(false)}}
-function openPaymentDialog(kind:'collection'|'supplier',id:string,max:number,label:string){if(!canFinance){toast.error('Only the owner or an admin can post finance payments.');return}setPaymentDialog({kind,id,max,label});setPaymentAmount(String(Math.round(max)));setPaymentDate(today());setPaymentAccount(kind==='collection'?'bkash':'bank');setPaymentReference('')}
+function openOwnerMoney(kind:'capital'|'drawing'){if(!canOwnerMoney){toast.error('Only the owner or an admin can post owner capital or drawings.');return}setOwnerMoneyKind(kind);setOwnerMoneyAmount('');setOwnerMoneyDate(today());setOwnerMoneyAccount('bank');setOwnerMoneyReference('');setOwnerMoneyOpen(true)}
+async function submitOwnerMoney(){if(!canOwnerMoney){toast.error('Only the owner or an admin can post owner capital or drawings.');return}const amount=Number(ownerMoneyAmount);if(!Number.isFinite(amount)||amount<=0){toast.error('Enter an amount above zero.');return}setBusy(true);try{const res=await fetch('/api/finances/owner-money',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:ownerMoneyKind,amount,date:ownerMoneyDate,account:ownerMoneyAccount,reference:ownerMoneyReference.trim(),domainVersion:financeDomainVersion})}),data:any=await res.json();if(!res.ok){if(res.status===409)await loadLive(false,false);throw Error(data.error||'Could not post owner money.')}await loadLive(false,false);setOwnerMoneyOpen(false);toast.success((ownerMoneyKind==='capital'?'Owner capital':'Owner drawing')+' posted and reconciled.')}catch(e){toast.error(e instanceof Error?e.message:'Could not post owner money.')}finally{setBusy(false)}}
+function openPaymentDialog(kind:'collection'|'supplier',id:string,max:number,label:string){if(!canFinance){toast.error('Your role cannot post finance payments.');return}setPaymentDialog({kind,id,max,label});setPaymentAmount(String(Math.round(max)));setPaymentDate(today());setPaymentAccount(kind==='collection'?'bkash':'bank');setPaymentReference('')}
 async function submitPayment(){
- if(!paymentDialog)return;if(!canFinance){toast.error('Only the owner or an admin can post finance payments.');return}const amount=Number(paymentAmount);
+ if(!paymentDialog)return;if(!canFinance){toast.error('Your role cannot post finance payments.');return}const amount=Number(paymentAmount);
  if(!Number.isFinite(amount)||amount<=0||amount>paymentDialog.max+.001){toast.error('Enter an amount above zero and no more than '+taka(paymentDialog.max)+'.');return}
  if(!/^\d{4}-\d{2}-\d{2}$/.test(paymentDate)||paymentDate>today()){toast.error('Choose a valid payment date that is not in the future.');return}
  const opening=s.accountOpenings.find(a=>a.account===paymentAccount);if(!opening){toast.error('Configure the '+accountNames[paymentAccount]+' opening balance before posting payments to it.');return}
@@ -953,7 +954,7 @@ return <SidebarProvider style={{'--sidebar-width':'clamp(196px, 20vw, 240px)'} a
   role,openModal
 }}/>}
 {view==='Finances'&&<FinancesSection ctx={{
-  s,busy,canCloseFinance,canEdit,canExport,canFinance,cashRange,closeBlockers,closeMissingAccounts,
+  s,busy,canCloseFinance,canEdit,canExport,canFinance,canOwnerMoney,cashRange,closeBlockers,closeMissingAccounts,
   closeMonth,closePayables,closeReceivables,closeRecord,closeUnassigned,allCashIn,allCashOut,
   availableCash,configuredBalances,exportFinance,financeTab,forecastPayables30,forecastReceivables,
   m,memberName,monthlyTrend,netCashMovement,openModal,openOwnerMoney,openPaymentDialog,
