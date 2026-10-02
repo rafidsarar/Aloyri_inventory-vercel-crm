@@ -24,12 +24,12 @@ jobs:
             if BODY="$body" EXPECTED_SHA="$EXPECTED_SHA" node -e '
               try {
                 const body = JSON.parse(process.env.BODY || "{}");
-                process.exit(body.status === "ok" && body.commit === process.env.EXPECTED_SHA ? 0 : 1);
+                process.exit(body.status === "ok" && body.commit === process.env.EXPECTED_SHA && body.database?.status === "ok" && body.database?.relationalSchema === "ok" && body.database?.migrationVersion ? 0 : 1);
               } catch {
                 process.exit(1);
               }
             '; then
-              echo "Production is healthy on commit $EXPECTED_SHA"
+              echo "Production code, database migrations and relational schema are healthy on commit $EXPECTED_SHA"
               exit 0
             fi
             sleep 15
