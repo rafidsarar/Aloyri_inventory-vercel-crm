@@ -25,7 +25,7 @@ state.purchaseOrders=[{
 }];
 state.batches=[{
   id:'batch-1',productId:'simple-wash',qty:20,unitCost:500,expiry:shiftDate(365),received:shiftDate(-20),
-  supplierId:'supplier-1',invoice:'INV-E2E-BASE',dueDate:shiftDate(20),payments:[],paid:false
+  supplierId:'supplier-1',invoice:'INV-E2E-BASE',dueDate:shiftDate(20),payments:[{id:'payment-seed',date:shiftDate(-5),amount:100,note:'Protected finance fixture'}],paid:false
 }];
 state.accountOpenings=[{account:'cash',date:shiftDate(-90),balance:10000}];
 validateRelations(state,{skipOrderNumberUniqueness:true});
