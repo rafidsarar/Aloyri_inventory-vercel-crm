@@ -16,6 +16,10 @@ type Row={
   security_events:string|null;
   backup_events:string|null;
   data_integrity_events:string|null;
+  invalid_staff_accounts:string|number;
+  orphaned_sessions:string|number;
+  orphaned_invites:string|number;
+  missing_owner_accounts:string|number;
 };
 
 export async function GET(){
@@ -35,7 +39,11 @@ export async function GET(){
         to_regclass('public.crm_audit_log')::text AS audit_log,
         to_regclass('public.crm_security_events')::text AS security_events,
         to_regclass('public.crm_backup_events')::text AS backup_events,
-        to_regclass('public.crm_data_integrity_events')::text AS data_integrity_events
+        to_regclass('public.crm_data_integrity_events')::text AS data_integrity_events,
+        (SELECT COUNT(*) FROM crm_users WHERE role<>'owner' AND (active<>1 OR role NOT IN ('admin','sales','inventory','finance','viewer') OR owner_id IS NULL)) AS invalid_staff_accounts,
+        (SELECT COUNT(*) FROM crm_sessions s LEFT JOIN crm_users u ON u.id=s.user_id WHERE u.id IS NULL OR u.active<>1) AS orphaned_sessions,
+        (SELECT COUNT(*) FROM crm_invites i LEFT JOIN crm_users u ON u.id=i.user_id WHERE u.id IS NULL OR u.active<>1) AS orphaned_invites,
+        (SELECT COUNT(*) FROM crm_workspaces w LEFT JOIN crm_users u ON u.id=w.owner_id AND u.owner_id=w.owner_id AND u.role='owner' AND u.active=1 WHERE u.id IS NULL) AS missing_owner_accounts
     `).first<Row>();
     const workspaces=await database().prepare('SELECT data FROM crm_workspaces').all<{data:string}>();
     let dataIntegrityReady=true;
@@ -62,7 +70,8 @@ export async function GET(){
       restoreInfrastructureReady:Boolean(row?.restore_snapshots&&row?.audit_log),
       securityInfrastructureReady:Boolean(row?.security_events),
       recoveryTrackingReady:Boolean(row?.backup_events),
-      dataIntegrityReady:Boolean(row?.data_integrity_events)&&dataIntegrityReady
+      dataIntegrityReady:Boolean(row?.data_integrity_events)&&dataIntegrityReady,
+      staffAccessReady:Number(row?.invalid_staff_accounts||0)===0&&Number(row?.orphaned_sessions||0)===0&&Number(row?.orphaned_invites||0)===0&&Number(row?.missing_owner_accounts||0)===0
     };
     const businessDataValidation={
       criticalCount:businessCriticalCount,
@@ -71,10 +80,16 @@ export async function GET(){
       issueCount:businessCriticalCount+businessWarningCount+businessAttentionCount,
       issues:[...businessIssues.values()].sort((a,b)=>a.severity.localeCompare(b.severity)||a.code.localeCompare(b.code))
     };
-    const ok=Object.values(checks).every(Boolean);
-    return Response.json({status:ok?'ok':'unavailable',commit,checks,businessDataValidation},{status:ok?200:503,headers});
+    const dailyUseAcceptance={
+      infrastructureReady:Object.values(checks).every(Boolean),
+      noCriticalBusinessData:businessCriticalCount===0,
+      businessAttentionCount:businessWarningCount+businessAttentionCount,
+      ready:Object.values(checks).every(Boolean)&&businessCriticalCount===0
+    };
+    const ok=dailyUseAcceptance.infrastructureReady;
+    return Response.json({status:ok?'ok':'unavailable',commit,checks,businessDataValidation,dailyUseAcceptance},{status:ok?200:503,headers});
   }catch(error){
     console.error('Production acceptance check failed',error);
-    return Response.json({status:'unavailable',commit,checks:null,businessDataValidation:null},{status:503,headers});
+    return Response.json({status:'unavailable',commit,checks:null,businessDataValidation:null,dailyUseAcceptance:null},{status:503,headers});
   }
 }
