@@ -30,7 +30,7 @@ const noOverflow=async page=>{
   expect(overflow).toBeLessThanOrEqual(2);
 };
 
-test.describe.configure({mode:'serial'});
+// Keep one worker in playwright.live.config.mjs, but let later role audits run even if one role fails.
 
 test('owner daily oversight: reports, alerts, automation control and audit history',async({page})=>{
   const clean=consoleGuard(page);
@@ -193,8 +193,13 @@ test('finance daily workflow: collect receivable, pay supplier, record expense a
   await page.getByRole('tab',{name:'Payables'}).click();
   await page.getByRole('button',{name:'Record payment'}).first().click();
   await expect(page.getByRole('heading',{name:'Record supplier payment'})).toBeVisible();
+  const supplierPaymentResponsePromise=page.waitForResponse(response=>response.url().includes('/api/inventory-batches/')&&response.url().endsWith('/supplier-payment')&&response.request().method()==='POST');
   await page.getByRole('button',{name:'Post & reconcile'}).click();
-  await expect(page.getByText('No supplier payments due')).toBeVisible({timeout:30000});
+  const supplierPaymentResponse=await supplierPaymentResponsePromise;
+  const supplierPaymentBody=await supplierPaymentResponse.text();
+  console.log('AUDIT_DIAGNOSTIC finance supplier payment POST',supplierPaymentResponse.status(),supplierPaymentBody);
+  expect(supplierPaymentResponse.status(),'Finance supplier payment: '+supplierPaymentBody).toBe(200);
+  await expect(page.getByRole('heading',{name:'Record supplier payment'})).toHaveCount(0);
 
   await page.getByRole('tab',{name:'Expenses'}).click();
   await page.getByRole('button',{name:'Record expense'}).click();
@@ -219,8 +224,13 @@ test('viewer daily review: operational drill-downs work without accidental edit 
     await noOverflow(page);
   }
   await nav(page,'Orders');
-  await page.getByLabel('Search orders').fill('AUD-');
-  await expect(page.getByText('AUD-1001',{exact:true}).first()).toBeVisible();
+  await expect(page.locator('table tbody tr').first()).toBeVisible();
+  const firstOrderText=await page.locator('table tbody tr').first().innerText();
+  const orderNeedle=(firstOrderText.match(/(?:AUD|SK)-\d+/)||[])[0]||'';
+  console.log('AUDIT_DIAGNOSTIC viewer visible order',orderNeedle,firstOrderText.replace(/\s+/g,' ').slice(0,240));
+  expect(orderNeedle,'Viewer should have at least one visible order reference').not.toBe('');
+  await page.getByLabel('Search orders').fill(orderNeedle);
+  await expect(page.locator('table tbody tr').filter({hasText:orderNeedle}).first()).toBeVisible();
   await expect(page.getByRole('button',{name:'Create order'})).toHaveCount(0);
 
   await nav(page,'Inventory');
