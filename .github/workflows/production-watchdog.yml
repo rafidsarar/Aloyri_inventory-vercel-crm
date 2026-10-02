@@ -1,0 +1,37 @@
+name: Production Watchdog
+
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  watchdog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify live production health, acceptance and security headers
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+          BASE_URL: https://aloyriinventory-vercel-crm.vercel.app
+        run: |
+          set -euo pipefail
+          health="$(curl -fsS --max-time 15 "$BASE_URL/api/health")"
+          acceptance="$(curl -fsS --max-time 15 "$BASE_URL/api/acceptance")"
+          headers="$(curl -fsSI --max-time 15 "$BASE_URL/login")"
+          HEALTH="$health" ACCEPTANCE="$acceptance" EXPECTED_SHA="$EXPECTED_SHA" node -e '
+            const h=JSON.parse(process.env.HEALTH||"{}");
+            const a=JSON.parse(process.env.ACCEPTANCE||"{}");
+            const c=a.checks||{};
+            if(h.status!=="ok"||h.commit!==process.env.EXPECTED_SHA||h.database?.status!=="ok"||h.database?.relationalSchema!=="ok")process.exit(1);
+            if(a.status!=="ok"||a.commit!==process.env.EXPECTED_SHA||!c.workspaceReady||!c.cutoverReady||!c.relationalDomainsReady||!c.domainVersionsReady||!c.restoreInfrastructureReady||!c.securityInfrastructureReady||!c.recoveryTrackingReady)process.exit(1);
+          '
+          printf '%s\n' "$headers" | grep -qi '^content-security-policy:'
+          printf '%s\n' "$headers" | grep -qi '^x-content-type-options: nosniff'
+          printf '%s\n' "$headers" | grep -qi '^x-frame-options: DENY'
+          printf '%s\n' "$headers" | grep -qi '^cross-origin-resource-policy: same-origin'
+          echo "Production watchdog passed for $EXPECTED_SHA"
