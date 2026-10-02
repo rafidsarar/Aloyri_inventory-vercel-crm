@@ -1,7 +1,7 @@
 import { getAppUser, checkOrigin } from '@/app/local-auth';
 import { AccessDenied, resolveWorkspace } from '@/app/team-access';
 import { roleCanEdit, roleCanViewSection } from '@/lib/roles';
-import { deleteOrderRecord, getOrderRecord, updateOrderRecord } from '@/db/order-records';
+import { deleteOrderRecord, getOrderRecord, updateOrderRecord, orderRecordForRole } from '@/db/order-records';
 
 export const dynamic='force-dynamic';
 const response=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
@@ -14,7 +14,7 @@ export async function GET(_request:Request,{params}:{params:Promise<{id:string}>
     if(!roleCanViewSection(role,'Orders'))return response({error:'You do not have access to orders.'},403);
     const {id}=await params;
     const result=await getOrderRecord(ownerId,id);
-    return result.order?response({order:result.order,version:result.workspaceVersion}):response({error:'Order not found.'},404);
+    return result.order?response({order:orderRecordForRole(result.order,role),version:result.workspaceVersion}):response({error:'Order not found.'},404);
   }catch(error){
     if(error instanceof AccessDenied)return response({error:error.message},403);
     console.error('Order read failed',error);
@@ -33,7 +33,7 @@ export async function PUT(request:Request,{params}:{params:Promise<{id:string}>}
     let body:{order?:unknown;recordVersion?:number};
     try{body=await request.json()}catch{return response({error:'Invalid request.'},400)}
     const result=await updateOrderRecord(ownerId,id,body.order,Number(body.recordVersion),{userId:user.userId,name:user.displayName||user.email,role});
-    return response({order:result.order,version:result.workspaceVersion});
+    return response({order:orderRecordForRole(result.order,role),version:result.workspaceVersion});
   }catch(error){
     if(error instanceof AccessDenied)return response({error:error.message},403);
     const message=error instanceof Error?error.message:'Could not update order.';
