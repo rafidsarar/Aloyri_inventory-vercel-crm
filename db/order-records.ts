@@ -5,8 +5,8 @@ import { CUSTOMER_ORDER_DOMAIN } from './customer-order-shadow.ts';
 import { applyRoleChanges, validateWorkspaceChange, visibleState } from '../lib/role-data.ts';
 import type { WorkspaceRole } from '../lib/roles.ts';
 import { applyCancellationQuarantine, applyDeliveryFollowUps, nextStatuses, orderSchema, type Order, type State } from '../lib/crm.ts';
-import { migrateInventorySupplierShadow,INVENTORY_SUPPLIER_DOMAIN } from './inventory-supplier-shadow.ts';
-import { bumpDomainVersion } from './domain-version.ts';
+import { inventorySupplierShadowStatements,INVENTORY_SUPPLIER_DOMAIN } from './inventory-supplier-shadow.ts';
+import { getDomainVersion,domainVersionBumpStatements } from './domain-version.ts';
 
 export type OrderRecord=Order&{recordVersion:number};
 export type OrderActor={userId:string;name:string;role:WorkspaceRole};
@@ -109,22 +109,20 @@ export async function createOrderRecord(ownerId:string,input:unknown,actor:Order
   const order=merged.orders.find(item=>item.id===parsed.id)!;
   const now=new Date().toISOString(),nextWorkspaceVersion=row.version+1,auditId=crypto.randomUUID();
   await ensureAuditTable();
-  const db=database();
-  const statements=[
+  const db=database(),inventoryChanged=JSON.stringify(state.inventoryHolds)!==JSON.stringify(merged.inventoryHolds);
+  const expectedInventoryVersion=inventoryChanged?await getDomainVersion(ownerId,INVENTORY_SUPPLIER_DOMAIN):undefined;
+  const statements:any[]=[
     db.prepare('INSERT INTO crm_rel_orders (owner_id,id,number,customer_id,created,delivered,returned_at,settled_at,channel,payment,status,discount,delivery_charge,courier_cost,packaging,payment_fee,return_fee,settled,restocked,tracking,notes,record_version,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING')
       .bind(ownerId,order.id,order.number,order.customerId,order.created,order.delivered||null,order.returnedAt||null,order.settledAt||null,order.channel,order.payment,order.status,order.discount,order.deliveryCharge,order.courierCost,order.packaging,order.paymentFee,order.returnFee,order.settled,order.restocked,order.tracking,order.notes,0,now,now),
     db.prepare("SELECT 1 / CASE WHEN EXISTS (SELECT 1 FROM crm_rel_orders WHERE owner_id=? AND id=? AND created_at=? AND record_version=0) THEN 1 ELSE 0 END").bind(ownerId,order.id,now),
     ...orderStatements(ownerId,order,false),
     db.prepare('UPDATE crm_workspaces SET data=?,version=version+1,updated_at=? WHERE owner_id=? AND version=?').bind(JSON.stringify(merged),now,ownerId,row.version),
     db.prepare("SELECT 1 / CASE WHEN EXISTS (SELECT 1 FROM crm_workspaces WHERE owner_id=? AND version=? AND updated_at=?) THEN 1 ELSE 0 END").bind(ownerId,nextWorkspaceVersion,now),
-    db.prepare('UPDATE crm_relational_migrations SET status=?,source_version=?,verified_at=?,updated_at=? WHERE owner_id=? AND domain=?').bind('verified',nextWorkspaceVersion,now,now,ownerId,CUSTOMER_ORDER_DOMAIN),
-    db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)').bind(auditId,ownerId,actor.userId,actor.name,actor.role,'Created order '+order.number,JSON.stringify(['orders']),now)
+    db.prepare('UPDATE crm_relational_migrations SET status=?,source_version=?,verified_at=?,updated_at=? WHERE owner_id=? AND domain=?').bind('verified',nextWorkspaceVersion,now,now,ownerId,CUSTOMER_ORDER_DOMAIN)
   ];
+  if(inventoryChanged&&expectedInventoryVersion!==undefined)statements.push(...inventorySupplierShadowStatements(ownerId,merged,nextWorkspaceVersion,now),...domainVersionBumpStatements(ownerId,INVENTORY_SUPPLIER_DOMAIN,expectedInventoryVersion,now));
+  statements.push(db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)').bind(auditId,ownerId,actor.userId,actor.name,actor.role,'Created order '+order.number,JSON.stringify(['orders',...(inventoryChanged?['inventoryHolds']:[])]),now));
   await db.batch(statements);
-  if(JSON.stringify(state.inventoryHolds)!==JSON.stringify(merged.inventoryHolds)){
-    await migrateInventorySupplierShadow(ownerId,merged,nextWorkspaceVersion);
-    await bumpDomainVersion(ownerId,INVENTORY_SUPPLIER_DOMAIN);
-  }
   return {order:{...order,recordVersion:0} satisfies OrderRecord,workspaceVersion:nextWorkspaceVersion};
 }
 
@@ -142,22 +140,20 @@ export async function updateOrderRecord(ownerId:string,id:string,input:unknown,e
   const order=merged.orders.find(item=>item.id===id)!;
   const now=new Date().toISOString(),nextRecordVersion=expectedVersion+1,nextWorkspaceVersion=row.version+1,auditId=crypto.randomUUID();
   await ensureAuditTable();
-  const db=database();
-  const statements=[
+  const db=database(),inventoryChanged=JSON.stringify(state.inventoryHolds)!==JSON.stringify(merged.inventoryHolds);
+  const expectedInventoryVersion=inventoryChanged?await getDomainVersion(ownerId,INVENTORY_SUPPLIER_DOMAIN):undefined;
+  const statements:any[]=[
     db.prepare('UPDATE crm_rel_orders SET number=?,customer_id=?,created=?,delivered=?,returned_at=?,settled_at=?,channel=?,payment=?,status=?,discount=?,delivery_charge=?,courier_cost=?,packaging=?,payment_fee=?,return_fee=?,settled=?,restocked=?,tracking=?,notes=?,record_version=record_version+1,updated_at=? WHERE owner_id=? AND id=? AND record_version=?')
       .bind(order.number,order.customerId,order.created,order.delivered||null,order.returnedAt||null,order.settledAt||null,order.channel,order.payment,order.status,order.discount,order.deliveryCharge,order.courierCost,order.packaging,order.paymentFee,order.returnFee,order.settled,order.restocked,order.tracking,order.notes,now,ownerId,id,expectedVersion),
     db.prepare("SELECT 1 / CASE WHEN EXISTS (SELECT 1 FROM crm_rel_orders WHERE owner_id=? AND id=? AND record_version=? AND updated_at=?) THEN 1 ELSE 0 END").bind(ownerId,id,nextRecordVersion,now),
     ...orderStatements(ownerId,order,true),
     db.prepare('UPDATE crm_workspaces SET data=?,version=version+1,updated_at=? WHERE owner_id=? AND version=?').bind(JSON.stringify(merged),now,ownerId,row.version),
     db.prepare("SELECT 1 / CASE WHEN EXISTS (SELECT 1 FROM crm_workspaces WHERE owner_id=? AND version=? AND updated_at=?) THEN 1 ELSE 0 END").bind(ownerId,nextWorkspaceVersion,now),
-    db.prepare('UPDATE crm_relational_migrations SET status=?,source_version=?,verified_at=?,updated_at=? WHERE owner_id=? AND domain=?').bind('verified',nextWorkspaceVersion,now,now,ownerId,CUSTOMER_ORDER_DOMAIN),
-    db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)').bind(auditId,ownerId,actor.userId,actor.name,actor.role,'Updated order '+order.number,JSON.stringify(['orders']),now)
+    db.prepare('UPDATE crm_relational_migrations SET status=?,source_version=?,verified_at=?,updated_at=? WHERE owner_id=? AND domain=?').bind('verified',nextWorkspaceVersion,now,now,ownerId,CUSTOMER_ORDER_DOMAIN)
   ];
+  if(inventoryChanged&&expectedInventoryVersion!==undefined)statements.push(...inventorySupplierShadowStatements(ownerId,merged,nextWorkspaceVersion,now),...domainVersionBumpStatements(ownerId,INVENTORY_SUPPLIER_DOMAIN,expectedInventoryVersion,now));
+  statements.push(db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)').bind(auditId,ownerId,actor.userId,actor.name,actor.role,'Updated order '+order.number,JSON.stringify(['orders',...(inventoryChanged?['inventoryHolds']:[])]),now));
   await db.batch(statements);
-  if(JSON.stringify(state.inventoryHolds)!==JSON.stringify(merged.inventoryHolds)){
-    await migrateInventorySupplierShadow(ownerId,merged,nextWorkspaceVersion);
-    await bumpDomainVersion(ownerId,INVENTORY_SUPPLIER_DOMAIN);
-  }
   return {order:{...order,recordVersion:nextRecordVersion} satisfies OrderRecord,workspaceVersion:nextWorkspaceVersion};
 }
 
