@@ -38,7 +38,7 @@ export async function getFinanceDomain(ownerId:string){
  return {data:parsed,version:row.version,domainVersion:await getDomainVersion(ownerId,FINANCE_DOMAIN)};
 }
 export async function saveFinanceDomain(ownerId:string,input:unknown,expectedDomainVersion:number,actor:Actor){
- if(!['owner','admin'].includes(actor.role))throw new Error('FINANCE_FORBIDDEN');
+ if(!['owner','admin','finance'].includes(actor.role))throw new Error('FINANCE_FORBIDDEN');
  if(!Number.isInteger(expectedDomainVersion)||expectedDomainVersion<0)throw new Error('DOMAIN_VERSION_REQUIRED');
  const parsed=stateSchema.pick({expenses:true,cashEntries:true,accountOpenings:true,accountMatches:true,financeCloses:true}).safeParse(input);
  if(!parsed.success)throw new Error('INVALID_FINANCE_DATA');
