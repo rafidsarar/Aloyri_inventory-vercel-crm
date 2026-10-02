@@ -20,12 +20,13 @@ async function ensureAudit(){
 }
 export async function getFinanceDomain(ownerId:string){
  const {row}=await ensureFinanceApiReady(ownerId),db=database();
- const [expenses,cashEntries,openings,matches,closes]=await Promise.all([
+ const [expenses,cashEntries,openings,matches,closes,domainVersion]=await Promise.all([
   db.prepare('SELECT id,category,amount,date,notes,vendor,reference,recurring,account FROM crm_rel_finance_expenses WHERE owner_id=? ORDER BY date DESC,id').bind(ownerId).all<any>(),
   db.prepare('SELECT id,date,kind,category,description,amount,transfer_id,reversal_of,reversal_reason FROM crm_rel_finance_cash_entries WHERE owner_id=? ORDER BY date DESC,id').bind(ownerId).all<any>(),
   db.prepare('SELECT account,date,balance,statement_date,statement_balance FROM crm_rel_finance_account_openings WHERE owner_id=? ORDER BY account').bind(ownerId).all<any>(),
   db.prepare('SELECT entry_id,account,matched,reference FROM crm_rel_finance_account_matches WHERE owner_id=? ORDER BY entry_id').bind(ownerId).all<any>(),
-  db.prepare('SELECT month,closed_at,closed_by,notes FROM crm_rel_finance_closes WHERE owner_id=? ORDER BY month DESC').bind(ownerId).all<any>()
+  db.prepare('SELECT month,closed_at,closed_by,notes FROM crm_rel_finance_closes WHERE owner_id=? ORDER BY month DESC').bind(ownerId).all<any>(),
+  getDomainVersion(ownerId,FINANCE_DOMAIN)
  ]);
  const data={
   expenses:expenses.results.map((x:any)=>({id:x.id,category:x.category,amount:Number(x.amount),date:relationalDate(x.date),notes:x.notes,vendor:x.vendor,reference:x.reference,recurring:x.recurring,account:x.account||undefined})),
@@ -35,7 +36,7 @@ export async function getFinanceDomain(ownerId:string){
   financeCloses:closes.results.map((x:any)=>({month:x.month,closedAt:relationalDate(x.closed_at),closedBy:x.closed_by,notes:x.notes}))
  };
  const parsed=stateSchema.pick({expenses:true,cashEntries:true,accountOpenings:true,accountMatches:true,financeCloses:true}).parse(data);
- return {data:parsed,version:row.version,domainVersion:await getDomainVersion(ownerId,FINANCE_DOMAIN)};
+ return {data:parsed,version:row.version,domainVersion};
 }
 export async function saveFinanceDomain(ownerId:string,input:unknown,expectedDomainVersion:number,actor:Actor){
  if(!['owner','admin','finance'].includes(actor.role))throw new Error('FINANCE_FORBIDDEN');
