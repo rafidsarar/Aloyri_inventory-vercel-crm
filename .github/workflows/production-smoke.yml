@@ -43,7 +43,9 @@ jobs:
                   && checks.restoreInfrastructureReady===true
                   && checks.securityInfrastructureReady===true
                   && checks.recoveryTrackingReady===true
-                  && checks.dataIntegrityReady===true;
+                  && checks.dataIntegrityReady===true
+                  && checks.staffAccessReady===true
+                  && acceptance.dailyUseAcceptance?.ready===true;
                 process.exit(healthOk&&acceptanceOk?0:1);
               } catch {
                 process.exit(1);
