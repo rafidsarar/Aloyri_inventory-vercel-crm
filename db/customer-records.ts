@@ -1,4 +1,5 @@
 import { database } from './raw.ts';
+import { relationalDate } from './relational-date.ts';
 import { ensureRelationalFoundation } from './relational-foundation.ts';
 import { getCustomersOrdersMigrationStatus, migrateCustomersOrdersShadow, CUSTOMER_ORDER_DOMAIN } from './customer-order-shadow.ts';
 import { customerSchema, fixedBusinessName, stateSchema, validateRelations, type Customer, type State } from '../lib/crm.ts';
@@ -15,7 +16,7 @@ type CustomerRow={
 const mapCustomer=(row:CustomerRow):CustomerRecord=>({
   id:row.id,name:row.name,phone:row.phone,address:row.address,city:row.city,
   preference:row.preference,notes:row.notes,consent:Boolean(row.consent),
-  created:row.created,recordVersion:Number(row.record_version)
+  created:relationalDate(row.created),recordVersion:Number(row.record_version)
 });
 
 async function loadWorkspace(ownerId:string){
