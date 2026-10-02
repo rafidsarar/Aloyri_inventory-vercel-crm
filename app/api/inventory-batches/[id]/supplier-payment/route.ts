@@ -13,7 +13,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
  }catch(error){
   if(error instanceof AccessDenied)return response({error:error.message},403);
   const message=error instanceof Error?error.message:'Could not post supplier payment.';
-  if(message==='FINANCE_FORBIDDEN')return response({error:'Only the owner or an admin can post supplier payments.'},403);
+  if(message==='FINANCE_FORBIDDEN')return response({error:'Only the owner, an admin or a finance manager can post supplier payments.'},403);
   if(message==='DOMAIN_VERSION_CONFLICT'||message==='WORKSPACE_VERSION_CONFLICT')return response({error:'Supplier records changed in another window. Refresh and try again.'},409);
   if(message==='Inventory batch not found.')return response({error:message},404);
   if(message.includes('exceed')||message.includes('amount')||message.includes('date')||message.includes('account'))return response({error:message},400);
