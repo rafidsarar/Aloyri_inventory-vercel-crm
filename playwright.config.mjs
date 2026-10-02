@@ -2,6 +2,7 @@ import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
   testDir:'./e2e',
+  testIgnore:['**/live-production-usability.spec.mjs'],
   fullyParallel:false,
   retries:0,
   timeout:120000,
