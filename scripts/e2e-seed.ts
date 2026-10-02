@@ -5,7 +5,19 @@ import { migrateInventorySupplierShadow } from '../db/inventory-supplier-shadow.
 import { migrateFinanceShadow } from '../db/finance-shadow.ts';
 import { getDomainVersion } from '../db/domain-version.ts';
 import { initialState,stateSchema } from '../lib/crm.ts';
-import { newSalt,passwordHash } from '../app/local-auth.ts';
+
+const enc=new TextEncoder();
+const hex=(bytes:Uint8Array)=>Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
+const newSalt=()=>hex(crypto.getRandomValues(new Uint8Array(16)));
+async function passwordHash(password:string,salt:string){
+  const key=await crypto.subtle.importKey('raw',enc.encode(password),'PBKDF2',false,['deriveBits']);
+  return hex(new Uint8Array(await crypto.subtle.deriveBits({
+    name:'PBKDF2',
+    salt:Uint8Array.from(salt.match(/../g)!.map(x=>parseInt(x,16))),
+    iterations:310000,
+    hash:'SHA-256'
+  },key,256)));
+}
 
 const ownerId='e2e-owner';
 const password=process.env.E2E_PASSWORD||'Aloyri-E2E-Password-2026!';
