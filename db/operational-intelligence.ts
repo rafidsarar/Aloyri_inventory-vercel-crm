@@ -5,6 +5,7 @@ import { accountBalance,accountIds,automationSignals,batchRemaining,cashflow,con
 
 const round=(n:number)=>Math.round(n*100)/100;
 const daysBetween=(from:string,to:string)=>Math.max(0,Math.round((Date.parse(to+'T12:00:00Z')-Date.parse(from+'T12:00:00Z'))/86400000));
+const signedDaysBetween=(from:string,to:string)=>Math.round((Date.parse(to+'T12:00:00Z')-Date.parse(from+'T12:00:00Z'))/86400000);
 const addDays=(date:string,days:number)=>shiftDate(days,date);
 const deliveredDate=(order:State['orders'][number])=>order.delivered||order.created;
 const isDelivered=(order:State['orders'][number])=>order.status==='Delivered';
@@ -45,7 +46,7 @@ function customerRetention(state:State){
     const dates=orders.map(deliveredDate);
     const gaps=dates.slice(1).map((date,index)=>daysBetween(dates[index],date));
     const avgGap=gaps.length?Math.max(14,Math.min(180,Math.round(gaps.reduce((n,v)=>n+v,0)/gaps.length))):60;
-    const last=dates[dates.length-1],predicted=addDays(last,avgGap),daysTo=daysBetween(today(),predicted)*(predicted<today()?-1:1);
+    const last=dates[dates.length-1],predicted=addDays(last,avgGap),daysTo=signedDaysBetween(today(),predicted);
     const revenue=round(orders.reduce((n,o)=>n+subtotal(o),0));
     const activeOrder=state.orders.some(o=>o.customerId===customer.id&&isOpenOrder(o));
     const openTask=state.tasks.some(t=>t.customerId===customer.id&&!t.done);
@@ -96,8 +97,11 @@ export async function buildOperationalIntelligence(ownerId:string){
   const retention=customerRetention(state);
   const products=replenishment(state);
   const automation=automationSignals(state);
-  const audit=await database().prepare('SELECT id,actor_name,role,summary,sections,created_at FROM crm_audit_log WHERE owner_id=? ORDER BY created_at DESC LIMIT 20').bind(ownerId).all<{id:string;actor_name:string;role:string;summary:string;sections:string;created_at:string}>();
-  const domainVersions=await database().prepare('SELECT domain,version,updated_at FROM crm_domain_versions WHERE owner_id=? ORDER BY domain').bind(ownerId).all<{domain:string;version:number;updated_at:string}>();
+  const db=database();
+  await db.prepare('CREATE TABLE IF NOT EXISTS crm_audit_log (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, actor_id TEXT NOT NULL, actor_name TEXT NOT NULL, role TEXT NOT NULL, summary TEXT NOT NULL, sections TEXT NOT NULL, created_at TEXT NOT NULL)').run();
+  await db.prepare('CREATE INDEX IF NOT EXISTS crm_audit_owner_created_idx ON crm_audit_log(owner_id,created_at DESC)').run();
+  const audit=await db.prepare('SELECT id,actor_name,role,summary,sections,created_at FROM crm_audit_log WHERE owner_id=? ORDER BY created_at DESC LIMIT 20').bind(ownerId).all<{id:string;actor_name:string;role:string;summary:string;sections:string;created_at:string}>();
+  const domainVersions=await db.prepare('SELECT domain,version,updated_at FROM crm_domain_versions WHERE owner_id=? ORDER BY domain').bind(ownerId).all<{domain:string;version:number;updated_at:string}>();
   const cutover=await getCutoverState(ownerId);
   const control=controls(state);
   const lowStock=state.products.filter(p=>p.active&&stock(state,p.id)<=p.reorderAt);
