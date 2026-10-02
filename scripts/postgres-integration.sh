@@ -15,6 +15,8 @@ for file in $(find sql/migrations -maxdepth 1 -type f -name '*.sql' | sort); do
   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "INSERT INTO crm_schema_migrations(version,applied_at) VALUES ('$version',now()::text);"
 done
 node --experimental-strip-types scripts/print-relational-foundation.ts | psql "$DATABASE_URL" -v ON_ERROR_STOP=1
+node --experimental-strip-types scripts/seed-legacy-date-fixture.ts
+node --experimental-strip-types -e "import('./scripts/canonicalize-legacy-data.ts').then(m=>m.runLegacyDataCertification())"
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "INSERT INTO crm_workspaces(owner_id,data,version,updated_at) VALUES ('legacy-owner','{}',0,now()::text);"
 tmp="$(mktemp)"
 sed '/^[[:space:]]*-- statement-break[[:space:]]*$/d' sql/migrations/005_domain_version_backfill.sql > "$tmp"
