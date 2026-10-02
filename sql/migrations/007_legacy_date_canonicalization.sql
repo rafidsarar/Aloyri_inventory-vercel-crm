@@ -11,7 +11,7 @@ DECLARE
   d INTEGER;
 BEGIN
   IF raw IS NULL OR raw='' THEN RETURN raw; END IF;
-  IF raw ~ '^\\d{4}-\\d{2}-\\d{2}' THEN
+  IF raw ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN
     y:=substring(raw,1,4)::INTEGER;
     m:=substring(raw,6,2)::INTEGER;
     d:=substring(raw,9,2)::INTEGER;
