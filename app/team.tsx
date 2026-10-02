@@ -7,7 +7,7 @@ import { Choice } from './forms';
 import { roleDescriptions, roleLabels, type WorkspaceRole } from '@/lib/roles';
 
 type Staff={email:string;role:Exclude<WorkspaceRole,'owner'>;joined:boolean;created:string};
-const staffRoles=['admin','sales','inventory','viewer'] as const;
+const staffRoles=['admin','sales','inventory','finance','viewer'] as const;
 const roleOptions=staffRoles.map(value=>({value,label:roleLabels[value]}));
 export default function Team({open,onClose}:{open:boolean;onClose:()=>void}){
   const [staff,setStaff]=useState<Staff[]>([]),[email,setEmail]=useState(''),[role,setRole]=useState<Exclude<WorkspaceRole,'owner'>>('sales'),[busy,setBusy]=useState(false),[error,setError]=useState(''),[ready,setReady]=useState(false),[inviteLink,setInviteLink]=useState('');
