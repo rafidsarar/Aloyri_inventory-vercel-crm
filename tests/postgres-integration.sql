@@ -58,8 +58,32 @@ BEGIN
   END IF;
   IF NOT EXISTS (SELECT 1 FROM crm_schema_migrations WHERE version='004_restore_infrastructure')
      OR NOT EXISTS (SELECT 1 FROM crm_schema_migrations WHERE version='005_domain_version_backfill')
-     OR NOT EXISTS (SELECT 1 FROM crm_schema_migrations WHERE version='006_session_security_recovery') THEN
+     OR NOT EXISTS (SELECT 1 FROM crm_schema_migrations WHERE version='006_session_security_recovery')
+     OR NOT EXISTS (SELECT 1 FROM crm_schema_migrations WHERE version='007_data_integrity_certification') THEN
     RAISE EXCEPTION 'required migrations were not recorded';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM crm_data_integrity_events
+    WHERE owner_id='legacy-date-owner' AND status='normalized' AND changed_paths>0
+  ) THEN
+    RAISE EXCEPTION 'legacy date canonicalization was not recorded';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM crm_restore_snapshots WHERE owner_id='legacy-date-owner' AND workspace_version=3
+  ) THEN
+    RAISE EXCEPTION 'legacy date canonicalization did not create a safety snapshot';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM crm_workspaces
+    WHERE owner_id='legacy-date-owner'
+      AND (
+        data::jsonb #>> '{customers,0,created}' LIKE '%T%'
+        OR data::jsonb #>> '{purchaseOrders,0,created}' LIKE '%T%'
+        OR data::jsonb #>> '{batches,0,expiry}' LIKE '%T%'
+        OR data::jsonb #>> '{inventoryHolds,0,date}' LIKE '%T%'
+      )
+  ) THEN
+    RAISE EXCEPTION 'legacy timestamp values were not canonicalized';
   END IF;
   IF (SELECT COUNT(*) FROM crm_domain_versions WHERE owner_id='legacy-owner') <> 3 THEN
     RAISE EXCEPTION 'legacy workspace domain versions were not backfilled';
@@ -67,5 +91,8 @@ BEGIN
 END $$;
 
 DELETE FROM crm_users WHERE owner_id='owner-test';
+DELETE FROM crm_data_integrity_events WHERE owner_id='legacy-date-owner';
+DELETE FROM crm_restore_snapshots WHERE owner_id='legacy-date-owner';
+DELETE FROM crm_workspaces WHERE owner_id='legacy-date-owner';
 DELETE FROM crm_domain_versions WHERE owner_id='legacy-owner';
 DELETE FROM crm_workspaces WHERE owner_id='legacy-owner';

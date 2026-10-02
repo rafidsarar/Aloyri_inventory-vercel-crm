@@ -1,7 +1,7 @@
 import { database } from './raw.ts';
 import { optionalRelationalDate, relationalDate } from './relational-date.ts';
 import { getDomainVersion,domainVersionBumpStatements } from './domain-version.ts';
-import { applyRoleChanges, validateWorkspaceChange } from '../lib/role-data.ts';
+import { applyRoleChanges, validateWorkspaceChange, visibleState } from '../lib/role-data.ts';
 import { fixedBusinessName, stateSchema, validateRelations, type State } from '../lib/crm.ts';
 import type { WorkspaceRole } from '../lib/roles.ts';
 import { ensureInventorySupplierApiReady, INVENTORY_SUPPLIER_DOMAIN, inventorySupplierShadowStatements } from './inventory-supplier-shadow.ts';
@@ -59,7 +59,7 @@ export async function saveInventorySupplierDomain(ownerId:string,input:unknown,e
   const {row,state}=await ensureInventorySupplierApiReady(ownerId);
   const currentDomainVersion=await getDomainVersion(ownerId,INVENTORY_SUPPLIER_DOMAIN);
   if(currentDomainVersion!==expectedDomainVersion)throw new Error('DOMAIN_VERSION_CONFLICT');
-  const candidate=structuredClone(state);
+  const candidate=structuredClone(visibleState(state,actor.role));
   for(const key of inventorySupplierKeys)(candidate[key] as any)=parsed.data[key] as any;
   let next:State;
   try{next=fixedBusinessName(applyRoleChanges(state,candidate,actor.role));}catch(error){throw new Error(error instanceof Error?error.message:'ROLE_FORBIDDEN')}

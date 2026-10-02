@@ -1,4 +1,5 @@
 import { database } from '@/db/raw';
+import { assertCanonicalState } from '@/lib/data-integrity';
 
 export const dynamic='force-dynamic';
 
@@ -13,6 +14,7 @@ type Row={
   audit_log:string|null;
   security_events:string|null;
   backup_events:string|null;
+  data_integrity_events:string|null;
 };
 
 export async function GET(){
@@ -31,8 +33,12 @@ export async function GET(){
         to_regclass('public.crm_restore_snapshots')::text AS restore_snapshots,
         to_regclass('public.crm_audit_log')::text AS audit_log,
         to_regclass('public.crm_security_events')::text AS security_events,
-        to_regclass('public.crm_backup_events')::text AS backup_events
+        to_regclass('public.crm_backup_events')::text AS backup_events,
+        to_regclass('public.crm_data_integrity_events')::text AS data_integrity_events
     `).first<Row>();
+    const workspaces=await database().prepare('SELECT data FROM crm_workspaces').all<{data:string}>();
+    let dataIntegrityReady=true;
+    try{for(const workspace of workspaces.results)assertCanonicalState(JSON.parse(workspace.data))}catch{dataIntegrityReady=false}
     const checks={
       workspaceReady:Number(row?.workspace_count||0)>0,
       cutoverReady:Number(row?.disabled_cutovers||0)===0,
@@ -40,7 +46,8 @@ export async function GET(){
       domainVersionsReady:Number(row?.missing_domain_versions||0)===0,
       restoreInfrastructureReady:Boolean(row?.restore_snapshots&&row?.audit_log),
       securityInfrastructureReady:Boolean(row?.security_events),
-      recoveryTrackingReady:Boolean(row?.backup_events)
+      recoveryTrackingReady:Boolean(row?.backup_events),
+      dataIntegrityReady:Boolean(row?.data_integrity_events)&&dataIntegrityReady
     };
     const ok=Object.values(checks).every(Boolean);
     return Response.json({status:ok?'ok':'unavailable',commit,checks},{status:ok?200:503,headers});

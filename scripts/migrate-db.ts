@@ -2,6 +2,7 @@ import { readFileSync,readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { database } from '../db/raw.ts';
 import { ensureRelationalFoundation } from '../db/relational-foundation.ts';
+import { runLegacyDataCertification } from './canonicalize-legacy-data.ts';
 
 const db=database();
 const now=()=>new Date().toISOString();
@@ -34,6 +35,7 @@ for(const file of migrationFiles()){
 // Relational foundation is idempotent and is prepared during deployment so
 // request handlers do not need to be the first place schema is discovered.
 await ensureRelationalFoundation();
+await runLegacyDataCertification();
 
 const latest=await db.prepare('SELECT version FROM crm_schema_migrations ORDER BY version DESC LIMIT 1').first<{version:string}>();
 console.log('Database migrations ready',latest?.version||'baseline');
