@@ -19,7 +19,7 @@ function canonicalDate(value:unknown,path:string,optional:boolean,report:DataInt
     const parsed=new Date(raw);
     if(!Number.isNaN(parsed.getTime()))canonical=parsed.toISOString().slice(0,10);
   }
-  if(!canonical||!dateOnly.test(canonical)||Number.isNaN(Date.parse(canonical+'T00:00:00Z'))){
+  if(!canonical||!dateOnly.test(canonical)||Number.isNaN(Date.parse(canonical+'T00:00:00Z'))||new Date(canonical+'T00:00:00Z').toISOString().slice(0,10)!==canonical){
     report.invalidPaths.push(path);
     return value;
   }
@@ -30,7 +30,7 @@ function canonicalDate(value:unknown,path:string,optional:boolean,report:DataInt
 function setDate(target:any,key:string,path:string,optional:boolean,report:DataIntegrityReport){
   if(!target||typeof target!=='object')return;
   const next=canonicalDate(target[key],path,optional,report);
-  if(next===undefined){if(key in target&&target[key]!=='')report.changedPaths.push(path);delete target[key]}
+  if(next===undefined){if(key in target)report.changedPaths.push(path);delete target[key]}
   else target[key]=next;
 }
 
