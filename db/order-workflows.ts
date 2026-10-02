@@ -61,7 +61,7 @@ async function commitWorkflow(ownerId:string,before:State,next:State,rowVersion:
 }
 
 export async function postOrderCollection(ownerId:string,input:{orderId:string;recordVersion:number;date:string;amount:number;reference:string;account:string},actor:Actor){
-  if(!['owner','admin'].includes(actor.role))throw new Error('FINANCE_FORBIDDEN');
+  if(!['owner','admin','finance'].includes(actor.role))throw new Error('FINANCE_FORBIDDEN');
   if(!accountIds.includes(input.account as any))throw new Error('Choose a valid account.');
   if(!Number.isInteger(input.recordVersion)||input.recordVersion<0)throw new Error('A valid order record version is required.');
   if(!/^\d{4}-\d{2}-\d{2}$/.test(input.date)||input.date>today())throw new Error('Choose a valid payment date that is not in the future.');
