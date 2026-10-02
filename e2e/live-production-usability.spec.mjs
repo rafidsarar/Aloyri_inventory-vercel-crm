@@ -100,9 +100,10 @@ test('sales daily workflow: create customer/order, progress order, create and co
   await page.getByLabel('New customer city').fill('Dhaka');
   await page.getByLabel('New customer delivery address').fill('Dhanmondi, Dhaka');
   await page.getByRole('button',{name:'Create order'}).click();
-  await expect(page.getByRole('button',{name:/View invoice · Print \/ Save PDF/})).toBeVisible({timeout:30000});
-  await expect(page.getByRole('button',{name:'Mark confirmed'})).toBeVisible();
-  await page.getByRole('button',{name:'Mark confirmed'}).click();
+  await expect(page.getByRole('heading',{name:/^Invoice for /})).toBeVisible({timeout:30000});
+  await page.getByRole('button',{name:'Close'}).click();
+  await expect(page.getByRole('button',{name:'Confirm'}).first()).toBeVisible();
+  await page.getByRole('button',{name:'Confirm'}).first().click();
   await expect(page.getByText('Confirmed',{exact:true}).first()).toBeVisible({timeout:30000});
 
   await nav(page,'Follow-ups');
