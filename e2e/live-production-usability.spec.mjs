@@ -120,7 +120,7 @@ test('sales daily workflow: create customer/order, progress order, create and co
   await expect(page.getByText('Confirmed',{exact:true}).first()).toBeVisible({timeout:30000});
 
   await nav(page,'Follow-ups');
-  await expect(page.getByRole('heading',{name:'Follow-ups'})).toBeVisible();
+  await expect(page.locator('h1').filter({hasText:'Follow-ups'})).toBeVisible();
   await page.getByRole('button',{name:'Add follow-up'}).click();
   await page.getByLabel('title').fill('Live audit sales follow-up');
   await page.getByRole('button',{name:'Save changes'}).click();
