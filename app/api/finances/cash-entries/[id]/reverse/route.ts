@@ -12,7 +12,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
  }catch(error){
   if(error instanceof AccessDenied)return response({error:error.message},403);
   const message=error instanceof Error?error.message:'Could not reverse cash movement.';
-  if(message==='FINANCE_FORBIDDEN')return response({error:'Only the owner or an admin can reverse cash movements.'},403);
+  if(message==='FINANCE_FORBIDDEN')return response({error:'Only the owner, an admin or a finance manager can reverse cash movements.'},403);
   if(message==='DOMAIN_VERSION_CONFLICT'||message==='WORKSPACE_VERSION_CONFLICT')return response({error:'Finance changed in another window. Refresh and try again.'},409);
   if(message==='Cash movement not found.')return response({error:message},404);
   if(message.includes('reversal'))return response({error:message},409);
