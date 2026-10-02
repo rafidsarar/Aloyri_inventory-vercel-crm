@@ -52,5 +52,9 @@ test('production acceptance verifies cutover relational domains versions and res
   assert.match(acceptance,/missing_domain_versions/);
   assert.match(acceptance,/restoreInfrastructureReady/);
   assert.match(smoke,/ACCEPTANCE_URL/);
+  assert.match(acceptance,/staffAccessReady/);
+  assert.match(acceptance,/dailyUseAcceptance/);
   assert.match(smoke,/restoreInfrastructureReady/);
+  assert.match(smoke,/staffAccessReady/);
+  assert.match(smoke,/dailyUseAcceptance/);
 });
