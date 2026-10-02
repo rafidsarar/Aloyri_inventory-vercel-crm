@@ -12,6 +12,7 @@ export async function GET(request:Request){
   const role=requested&&roles.has(requested)?requested:'viewer';
   const data=visibleState(initialState(),role);
   return Response.json({
+    requestOrigin:new URL(request.url).origin,
     workspace:{data,version:1,role,userName:'E2E '+role,recoveryMode:false},
     customers:{customers:data.customers.map(customer=>({...customer,recordVersion:0}))},
     orders:{orders:data.orders.map(order=>({...order,recordVersion:0}))},
