@@ -45,7 +45,17 @@ export async function saveFinanceDomain(ownerId:string,input:unknown,expectedDom
  const {row,state}=await ensureFinanceApiReady(ownerId);
  const currentDomainVersion=await getDomainVersion(ownerId,FINANCE_DOMAIN);if(currentDomainVersion!==expectedDomainVersion)throw new Error('DOMAIN_VERSION_CONFLICT');
  const candidate=structuredClone(state);for(const key of financeKeys)(candidate[key] as any)=parsed.data[key] as any;
- const next=fixedBusinessName(applyRoleChanges(state,candidate,actor.role));validateWorkspaceChange(state,next);validateRelations(next,{skipOrderNumberUniqueness:true});
+ const next=fixedBusinessName(applyRoleChanges(state,candidate,actor.role));
+ if(actor.role==='finance'){
+  const before=new Map(state.cashEntries.map(entry=>[entry.id,entry]));
+  const ownerCategories=new Set(['owner capital','owner drawing','owner drawings']);
+  for(const entry of next.cashEntries){
+   const prior=before.get(entry.id);
+   if((!prior||JSON.stringify(prior)!==JSON.stringify(entry))&&ownerCategories.has(entry.category.trim().toLowerCase()))
+    throw new Error('FINANCE_OWNER_MONEY_FORBIDDEN');
+  }
+ }
+ validateWorkspaceChange(state,next);validateRelations(next,{skipOrderNumberUniqueness:true});
  const changed=financeKeys.filter(k=>JSON.stringify(state[k])!==JSON.stringify(next[k]));if(!changed.length)return {data:financeData(state),version:row.version};
  const now=new Date().toISOString(),db=database(),nextVersion=row.version+1;await ensureAudit();
  await db.batch([
