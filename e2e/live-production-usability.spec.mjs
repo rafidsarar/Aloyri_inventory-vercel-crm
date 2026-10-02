@@ -113,11 +113,14 @@ test('sales daily workflow: create customer/order, progress order, create and co
   await orderDialog.getByRole('combobox').first().click();
   await page.getByRole('option',{name:/Live Audit Sales Customer/}).click();
   await page.getByRole('button',{name:'Create order'}).click();
-  await expect(page.getByRole('heading',{name:/^Invoice for /})).toBeVisible({timeout:30000});
+  const invoiceHeading=page.getByRole('heading',{name:/^Invoice for /});
+  await expect(invoiceHeading).toBeVisible({timeout:30000});
+  const createdOrderNumber=(await invoiceHeading.textContent()||'').replace(/^Invoice for /,'').trim();
   await page.locator('.invoice-actions').getByRole('button',{name:'Close'}).click();
-  await expect(page.getByRole('button',{name:'Confirm'}).first()).toBeVisible();
-  await page.getByRole('button',{name:'Confirm'}).first().click();
-  await expect(page.getByText('Confirmed',{exact:true}).first()).toBeVisible({timeout:30000});
+  const createdOrderRow=page.locator('table tbody tr').filter({hasText:createdOrderNumber}).first();
+  await expect(createdOrderRow).toBeVisible();
+  await createdOrderRow.getByRole('button',{name:'Confirm'}).click();
+  await expect(createdOrderRow.getByText('Confirmed',{exact:true})).toBeVisible({timeout:30000});
 
   await nav(page,'Follow-ups');
   await expect(page.locator('h1').filter({hasText:'Follow-ups'})).toBeVisible();
@@ -173,8 +176,9 @@ test('finance daily workflow: collect receivable, pay supplier, record expense a
   await expect(page.getByRole('heading',{name:'Know where the money is—and what needs attention.'})).toBeVisible();
 
   await page.getByRole('tab',{name:'Collections'}).click();
-  await expect(page.getByText('AUD-1001',{exact:true})).toBeVisible();
-  await page.getByRole('button',{name:'Record collection'}).first().click();
+  const receivableRow=page.locator('table tbody tr').filter({hasText:'AUD-1001'}).first();
+  await expect(receivableRow).toBeVisible();
+  await receivableRow.getByRole('button',{name:'Record collection'}).click();
   await expect(page.getByRole('heading',{name:'Record customer collection'})).toBeVisible();
   await page.locator('.payment-dialog input').filter({has:page.locator('')}).count().catch(()=>0);
   await page.getByRole('button',{name:'Post & reconcile'}).click();
