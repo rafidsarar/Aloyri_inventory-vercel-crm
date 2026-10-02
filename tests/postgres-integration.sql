@@ -43,8 +43,22 @@ BEGIN
      OR to_regclass('public.crm_audit_log') IS NULL THEN
     RAISE EXCEPTION 'restore infrastructure missing';
   END IF;
+  IF to_regclass('public.crm_security_events') IS NULL
+     OR to_regclass('public.crm_backup_events') IS NULL THEN
+    RAISE EXCEPTION 'security/recovery metadata tables missing';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name='crm_sessions' AND column_name='user_agent'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name='crm_sessions' AND column_name='last_seen_at'
+  ) THEN
+    RAISE EXCEPTION 'session metadata columns missing';
+  END IF;
   IF NOT EXISTS (SELECT 1 FROM crm_schema_migrations WHERE version='004_restore_infrastructure')
-     OR NOT EXISTS (SELECT 1 FROM crm_schema_migrations WHERE version='005_domain_version_backfill') THEN
+     OR NOT EXISTS (SELECT 1 FROM crm_schema_migrations WHERE version='005_domain_version_backfill')
+     OR NOT EXISTS (SELECT 1 FROM crm_schema_migrations WHERE version='006_session_security_recovery') THEN
     RAISE EXCEPTION 'required migrations were not recorded';
   END IF;
   IF (SELECT COUNT(*) FROM crm_domain_versions WHERE owner_id='legacy-owner') <> 3 THEN
