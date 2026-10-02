@@ -9,18 +9,23 @@ async function login(browser,role){
   const context=await browser.newContext();
   const page=await context.newPage();
   await page.goto('/login');
-  const requestOrigin=new URL(page.url()).origin;
-  const authenticated=await context.request.post('/api/auth/login',{
-    headers:{Origin:requestOrigin},
+  const base=new URL(page.url()).origin;
+  const api={
+    get:(path,options)=>context.request.get(base+path,options),
+    post:(path,options={})=>context.request.post(base+path,{...options,headers:{Origin:base,...(options.headers||{})}}),
+    put:(path,options={})=>context.request.put(base+path,{...options,headers:{Origin:base,...(options.headers||{})}}),
+    delete:(path,options={})=>context.request.delete(base+path,{...options,headers:{Origin:base,...(options.headers||{})}})
+  };
+  const authenticated=await api.post('/api/auth/login',{
     data:{email:email(role),password:PASSWORD}
   });
   expect(authenticated.status(),role+' authentication').toBe(200);
-  const workspace=await context.request.get('/api/workspace');
+  const workspace=await api.get('/api/workspace');
   expect(workspace.status(),role+' workspace login').toBe(200);
   const data=await workspace.json();
   expect(data.role).toBe(role);
   expect(data.recoveryMode).toBe(false);
-  return {context,page,request:context.request,workspace:data};
+  return {context,page,request:api,workspace:data};
 }
 
 const origin={Origin:BASE};
