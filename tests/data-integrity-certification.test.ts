@@ -4,6 +4,7 @@ import { canonicalizeLegacyState,assertCanonicalState } from '../lib/data-integr
 import { initialState,shiftDate } from '../lib/crm.ts';
 
 test('legacy timestamp dates are canonicalized across nested CRM domains',()=>{
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const state:any=initialState();
   state.customers=[{id:'c',name:'C',phone:'',address:'Dhaka',city:'Dhaka',preference:'',notes:'',consent:true,created:shiftDate(-2)+'T18:00:00.000Z'}];
   state.suppliers=[{id:'s',name:'S',contact:'',phone:'',email:'',address:'',leadDays:1,paymentTermsDays:1,notes:'',verified:true}];
@@ -21,6 +22,7 @@ test('legacy timestamp dates are canonicalized across nested CRM domains',()=>{
 });
 
 test('unparseable required legacy dates fail closed',()=>{
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const state:any=initialState();
   state.customers=[{id:'c',name:'C',phone:'',address:'',city:'',preference:'',notes:'',consent:true,created:'not-a-date'}];
   assert.throws(()=>canonicalizeLegacyState(state),/Unparseable legacy date fields/);
