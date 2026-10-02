@@ -74,8 +74,8 @@ export default function FollowUpsSection({
           const linkedOrder=orders.find(order=>order.id===task.orderId);
           const dateState=task.done?'done':task.due<today()?'overdue':task.due===today()?'today':'upcoming';
           return <div className={'task-row task-row-pro '+(task.done?'task-done':'')} key={task.id}>
-            {canEdit('tasks')&&<label className="task-bulk-select"><Checkbox aria-label={'Select '+task.title} checked={selectedTaskIds.includes(task.id)} onCheckedChange={checked=>setSelectedTaskIds(checked===true?[...selectedTaskIds.filter(id=>id!==task.id),task.id]:selectedTaskIds.filter(id=>id!==task.id))}/><span className="sr-only">Select</span></label>}
-            <Checkbox aria-label={'Complete '+task.title} checked={task.done} disabled={busy||!canEdit('tasks')} onCheckedChange={checked=>void updateFollowUp(task,{done:checked===true})}/>
+            <div className="task-controls">{canEdit('tasks')&&<label className="task-bulk-select"><Checkbox aria-label={'Select '+task.title} checked={selectedTaskIds.includes(task.id)} onCheckedChange={checked=>setSelectedTaskIds(checked===true?[...selectedTaskIds.filter(id=>id!==task.id),task.id]:selectedTaskIds.filter(id=>id!==task.id))}/><span className="sr-only">Select</span></label>}
+            <Checkbox aria-label={'Complete '+task.title} checked={task.done} disabled={busy||!canEdit('tasks')} onCheckedChange={checked=>void updateFollowUp(task,{done:checked===true})}/></div>
             <div className="task-main">
               <div className="task-heading-line"><span className="task-title task-title-static">{task.title}</span><span className={'task-date '+dateState}>{followUpDueLabel(task)}</span></div>
               <div className="task-links">{customer?<button onClick={()=>setDetail({type:'customer',id:customer.id})}><Users size={13}/>{customer.name}{customer.phone?' · '+customer.phone:''}</button>:<span><Users size={13}/>Business task</span>}{linkedOrder&&<button onClick={()=>setDetail({type:'order',id:linkedOrder.id})}><ShoppingBag size={13}/>#{linkedOrder.number}</button>}</div>
@@ -97,3 +97,4 @@ export default function FollowUpsSection({
     </div>
   </WorkspaceSection>;
 }
+
