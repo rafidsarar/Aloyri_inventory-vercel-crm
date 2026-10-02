@@ -17,7 +17,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
   }catch(error){
     if(error instanceof AccessDenied)return response({error:error.message},403);
     const message=error instanceof Error?error.message:'Could not post collection.';
-    if(message==='FINANCE_FORBIDDEN')return response({error:'Only the owner or an admin can post customer collections.'},403);
+    if(message==='FINANCE_FORBIDDEN')return response({error:'Only the owner, an admin or a finance manager can post customer collections.'},403);
     if(message==='ORDER_VERSION_CONFLICT')return response({error:'This order changed in another window. Refresh and try again.'},409);
     if(message==='Order not found.')return response({error:message},404);
     if(message.includes('exceed')||message.includes('not ready')||message.includes('opening')||message.includes('date')||message.includes('amount')||message.includes('valid'))return response({error:message},400);
