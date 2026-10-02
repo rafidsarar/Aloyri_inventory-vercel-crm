@@ -41,6 +41,7 @@ type CustomerApiRecord=Customer&{recordVersion:number};
 type OrderApiRecord=Order&{recordVersion:number};
 const inventorySupplierKeys=['products','productCategories','suppliers','purchaseOrders','batches','stockAdjustments','inventoryHolds'] as const;
 const financeKeys=['expenses','cashEntries','accountOpenings','accountMatches','financeCloses'] as const;
+const compatibilityKeys=['tasks','businessName','businessProfile','automationSettings'] as const;
 const modalCollection:Record<Modal['type'],string>={order:'orders',orderEdit:'orders',customer:'customers',task:'tasks',product:'products',category:'productCategories',batch:'batches',stockAdjust:'stockAdjustments',stockHold:'inventoryHolds',supplier:'suppliers',expense:'expenses',cashEntry:'cashEntries',settings:'businessName'};
 const titles:Record<View,string>={Overview:'Business overview',Reports:'Management reports',Alerts:'Alert center',Automation:'Automation center',Orders:'Orders',Inventory:'Inventory',Customers:'Customers',Suppliers:'Suppliers',Finances:'Finances', 'Follow-ups':'Follow-ups',Activity:'Activity log'};
 const descriptions:Record<View,string>={Overview:'Monitor sales, stock and actions that need attention.',Reports:'Review management performance, customer quality, channels, products and trends.',Alerts:'Automatic business alerts, prioritized for your role.',Automation:'Control safe internal automations and review the signals they are producing.',Orders:'Track fulfillment, delivery and payment from one workspace.',Inventory:'Monitor stock health, batches, expiry and purchasing from one workspace.',Customers:'View contact details, preferences and order history.',Suppliers:'Manage supplier relationships, purchase orders, receiving and sourcing performance.',Finances:'Review sales, expenses, cashflow and collections in BDT.', 'Follow-ups':'Track customer follow-ups and replenishment tasks.',Activity:'Review protected employee and administrator change history.'};
@@ -219,7 +220,7 @@ async function updateAutomationRule<K extends keyof AutomationSettings>(rule:K,p
   if(!canEdit('automationSettings')){toast.error('Only the owner or an admin can change automation rules.');return}
   const next=structuredClone(s);
   Object.assign(next.automationSettings[rule],patch);
-  await save(next);
+  await saveRecordAware(next);
 }
 async function updateFollowUp(task:Task,patch:Partial<Task>){
   if(!canEdit('tasks')){toast.error('Your role cannot update follow-ups.');return}
@@ -227,11 +228,11 @@ async function updateFollowUp(task:Task,patch:Partial<Task>){
   Object.assign(record,patch);
   if(patch.done===true)record.completedAt=patch.completedAt||today();
   if(patch.done===false)record.completedAt='';
-  await save(next);
+  await saveRecordAware(next);
 }
 function deleteFollowUp(task:Task){
   if(!canEdit('tasks')){toast.error('Your role cannot delete follow-ups.');return}
-  setConfirm({title:'Delete follow-up?',text:'Remove “'+task.title+'” from the follow-up history? This cannot be undone.',confirmLabel:'Delete',action:()=>{const next=structuredClone(s);next.tasks=next.tasks.filter(t=>t.id!==task.id);void save(next)}});
+  setConfirm({title:'Delete follow-up?',text:'Remove “'+task.title+'” from the follow-up history? This cannot be undone.',confirmLabel:'Delete',action:()=>{const next=structuredClone(s);next.tasks=next.tasks.filter(t=>t.id!==task.id);void saveRecordAware(next)}});
 }
 const followUpDueLabel=(task:Task)=>task.done?'Completed':task.due<today()?'Overdue · '+dateLabel(task.due):task.due===today()?'Today':task.due===shiftDate(1)?'Tomorrow':dateLabel(task.due);
 const openModal=(record:Modal)=>{if(record.type==='settings'&&!canManageBusinessSettings(role)){toast.error('Only the owner or an admin can access Business settings.');return}if(!canEdit(modalCollection[record.type])){toast.error('Your role cannot edit this section.');return}setModal(record)};
@@ -464,6 +465,35 @@ async function saveFinanceDomain(next:State):Promise<boolean>{
   }catch(e){const message=e instanceof Error?e.message:'Could not save Finance.';setError(message);toast.error(message);return false}
   finally{saving.current=false;setBusy(false)}
 }
+function compatibilityOnlyMutation(next:State){
+  const changed=(Object.keys(s) as (keyof State)[]).filter(key=>JSON.stringify(s[key])!==JSON.stringify(next[key]));
+  return changed.length>0&&changed.every(key=>(compatibilityKeys as readonly string[]).includes(String(key)))?changed.filter((key):key is typeof compatibilityKeys[number] => (compatibilityKeys as readonly string[]).includes(String(key))):null;
+}
+async function saveCompatibilityPreferences(next:State):Promise<boolean>{
+  const changed=compatibilityOnlyMutation(next);
+  if(!changed)return save(next);
+  if(!loaded){toast.error('Load your workspace before saving.');return false}
+  if(recoveryMode){toast.error('Recovery mode is read-only. Refresh records after the relational connection recovers.');return false}
+  if(saving.current)return false;
+  saving.current=true;setBusy(true);
+  try{
+    const patch=Object.fromEntries(changed.map(key=>[key,next[key]]));
+    const res=await fetch('/api/workspace/preferences',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({patch,version})}),result:any=await res.json();
+    if(!res.ok){
+      if(res.status===409)await loadLive(false,false);
+      throw Error(result.error||'Could not save this CRM action.');
+    }
+    setLive(current=>({...current,...result.patch}));
+    setVersion(Number(result.version));
+    setError('');
+    toast.success(changed.includes('tasks')?'Follow-ups saved':changed.includes('automationSettings')?'Automation settings saved':'Business settings saved');
+    return true;
+  }catch(e){
+    const message=e instanceof Error?e.message:'Could not save this CRM action.';
+    setError(message);toast.error(message);return false;
+  }finally{saving.current=false;setBusy(false)}
+}
+
 function newCustomerOrderMutation(next:State){
   const changedKeys=(Object.keys(s) as (keyof State)[]).filter(key=>JSON.stringify(s[key])!==JSON.stringify(next[key]));
   if(changedKeys.length!==2||!changedKeys.includes('customers')||!changedKeys.includes('orders'))return null;
@@ -486,6 +516,7 @@ async function saveNewCustomerOrder(next:State):Promise<boolean>{
 }
 async function saveRecordAware(next:State):Promise<boolean>{
   if(newCustomerOrderMutation(next))return saveNewCustomerOrder(next);
+  if(compatibilityOnlyMutation(next))return saveCompatibilityPreferences(next);
   if(inventorySupplierOnlyMutation(next))return saveInventorySupplierDomain(next);
   if(financeOnlyMutation(next))return saveFinanceDomain(next);
   if(customerOnlyMutation(next))return saveCustomerRecord(next);
@@ -761,9 +792,9 @@ async function bulkAdvanceSelectedOrders(){
    }catch(e){toast.error(e instanceof Error?e.message:'Could not advance orders.')}finally{setBusy(false)}
  })()}})
 }
-async function bulkCreateCustomerFollowUps(){if(!canEdit('tasks')||!selectedCustomerIds.length)return;const next=structuredClone(s);let created=0;for(const id of selectedCustomerIds){const customer=next.customers.find(c=>c.id===id);if(!customer||next.tasks.some(t=>t.customerId===id&&!t.done))continue;next.tasks.push({id:uid(),customerId:id,orderId:'',title:'Customer follow-up · '+customer.name,due:shiftDate(7),done:false,kind:'Follow-up',priority:'Normal',channel:'WhatsApp',notes:'Created from bulk customer action.',completedAt:''});created++;}if(!created){toast.error('Every selected customer already has an open follow-up.');return}if(await save(next)){setSelectedCustomerIds([]);toast.success(created+' follow-ups created.');}}
+async function bulkCreateCustomerFollowUps(){if(!canEdit('tasks')||!selectedCustomerIds.length)return;const next=structuredClone(s);let created=0;for(const id of selectedCustomerIds){const customer=next.customers.find(c=>c.id===id);if(!customer||next.tasks.some(t=>t.customerId===id&&!t.done))continue;next.tasks.push({id:uid(),customerId:id,orderId:'',title:'Customer follow-up · '+customer.name,due:shiftDate(7),done:false,kind:'Follow-up',priority:'Normal',channel:'WhatsApp',notes:'Created from bulk customer action.',completedAt:''});created++;}if(!created){toast.error('Every selected customer already has an open follow-up.');return}if(await saveRecordAware(next)){setSelectedCustomerIds([]);toast.success(created+' follow-ups created.');}}
 async function bulkSendPurchaseOrders(){if(!canEdit('purchaseOrders')||!selectedPurchaseOrderIds.length)return;const next=structuredClone(s);const eligible=next.purchaseOrders.filter(po=>selectedPurchaseOrderIds.includes(po.id)&&po.status==='Draft');if(!eligible.length){toast.error('Only draft purchase orders can be marked sent in bulk.');return}setConfirm({title:'Mark '+eligible.length+' purchase orders sent?',text:'Only selected Draft purchase orders will move to Sent. Receiving and cancellation still require individual review.',confirmLabel:'Mark sent',action:()=>{eligible.forEach(po=>{po.status='Sent'});void saveInventorySupplierDomain(next).then(ok=>{if(ok)setSelectedPurchaseOrderIds([])})}})}
-async function bulkCompleteFollowUps(){if(!canEdit('tasks')||!selectedTaskIds.length)return;const next=structuredClone(s);const eligible=next.tasks.filter(task=>selectedTaskIds.includes(task.id)&&!task.done);if(!eligible.length){toast.error('The selected follow-ups are already completed.');return}setConfirm({title:'Complete '+eligible.length+' follow-ups?',text:'Selected open reminders will be marked complete today. No customer message will be sent.',confirmLabel:'Complete follow-ups',action:()=>{eligible.forEach(task=>{task.done=true;task.completedAt=today()});void save(next).then(ok=>{if(ok)setSelectedTaskIds([])})}})}
+async function bulkCompleteFollowUps(){if(!canEdit('tasks')||!selectedTaskIds.length)return;const next=structuredClone(s);const eligible=next.tasks.filter(task=>selectedTaskIds.includes(task.id)&&!task.done);if(!eligible.length){toast.error('The selected follow-ups are already completed.');return}setConfirm({title:'Complete '+eligible.length+' follow-ups?',text:'Selected open reminders will be marked complete today. No customer message will be sent.',confirmLabel:'Complete follow-ups',action:()=>{eligible.forEach(task=>{task.done=true;task.completedAt=today()});void saveRecordAware(next).then(ok=>{if(ok)setSelectedTaskIds([])})}})}
 const order=s.orders.find(o=>detail?.type==='order'&&o.id===detail.id);const customer=s.customers.find(c=>detail?.type==='customer'&&c.id===detail.id);const supplier=s.suppliers.find(x=>detail?.type==='supplier'&&x.id===detail.id);const supplierDetail=supplier?supplierInsight(s,supplier.id):null;const receivingPurchaseOrder=s.purchaseOrders.find(po=>po.id===poReceiveId);
 function orderTable(list:Order[]){if(!list.length)return <Empty title={query||filter!=='All'?"No matching orders":"No orders yet"} text={query||filter!=='All'?"Clear the search or choose another status to see more orders.":"Add a customer and receive stock to create your first order."} action={query||filter!=='All'?<button className="btn secondary" onClick={()=>{setQuery('');setFilter('All')}}>Clear filters</button>:undefined}/>;
 const nextActionLabel=(status:Order['status'])=>({Confirmed:'Confirm','Ready to pack':'Ready to pack',Packed:'Mark packed',Shipped:'Mark shipped','Out for delivery':'Out for delivery',Delivered:'Mark delivered'} as Partial<Record<Order['status'],string>>)[status]||status;

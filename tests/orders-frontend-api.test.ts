@@ -38,9 +38,10 @@ test('direct order status updates use record-level save',()=>{
   assert.match(crm,/function changeStatus[\s\S]*updateOrder/);
 });
 
-test('bulk order and finance collection changes remain atomic workspace saves',()=>{
-  assert.match(crm,/async function bulkAdvanceSelectedOrders[\s\S]*void save\(next\)/);
-  assert.match(crm,/async function submitPayment\(\)[\s\S]*if\(await save\(next\)\)/);
+test('bulk order and finance collection changes use dedicated APIs',()=>{
+  assert.match(crm,/async function bulkAdvanceSelectedOrders[\s\S]*fetch\('\/api\/orders\/bulk-advance'/);
+  assert.match(crm,/async function submitPayment\(\)[\s\S]*fetch\('\/api\/orders\/'\+encodeURIComponent\(paymentDialog\.id\)\+'\/collection'/);
+  assert.match(crm,/supplier-payment/);
 });
 
 test('order APIs return workspace versions for post-mutation resync',()=>{
