@@ -1,7 +1,7 @@
 import { getAppUser, checkOrigin } from '@/app/local-auth';
 import { AccessDenied, resolveWorkspace } from '@/app/team-access';
 import { roleCanEdit, roleCanViewSection } from '@/lib/roles';
-import { createOrderRecord, listOrderRecords } from '@/db/order-records';
+import { createOrderRecord, listOrderRecords, orderRecordForRole } from '@/db/order-records';
 
 export const dynamic='force-dynamic';
 const response=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
@@ -13,7 +13,7 @@ export async function GET(){
     const {ownerId,role}=await resolveWorkspace(user);
     if(!roleCanViewSection(role,'Orders'))return response({error:'You do not have access to orders.'},403);
     const result=await listOrderRecords(ownerId);
-    return response({orders:result.orders,version:result.workspaceVersion});
+    return response({orders:result.orders.map(order=>orderRecordForRole(order,role)),version:result.workspaceVersion});
   }catch(error){
     if(error instanceof AccessDenied)return response({error:error.message},403);
     console.error('Order list failed',error);
@@ -31,7 +31,7 @@ export async function POST(request:Request){
     let body:unknown;
     try{body=await request.json()}catch{return response({error:'Invalid request.'},400)}
     const result=await createOrderRecord(ownerId,body,{userId:user.userId,name:user.displayName||user.email,role});
-    return response({order:result.order,version:result.workspaceVersion},201);
+    return response({order:orderRecordForRole(result.order,role),version:result.workspaceVersion},201);
   }catch(error){
     if(error instanceof AccessDenied)return response({error:error.message},403);
     const message=error instanceof Error?error.message:'Could not create order.';
