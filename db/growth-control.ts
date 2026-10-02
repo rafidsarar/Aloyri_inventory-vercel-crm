@@ -8,7 +8,7 @@ const isOpen=(order:State['orders'][number])=>!['Delivered','Returned','Cancelle
 const isDelivered=(order:State['orders'][number])=>order.status==='Delivered';
 const orderAge=(order:State['orders'][number])=>daysBetween(order.created,today());
 
-function customer360(state:State){
+export function customer360(state:State){
   return state.customers.map(customer=>{
     const all=state.orders.filter(order=>order.customerId===customer.id);
     const delivered=all.filter(isDelivered).sort((a,b)=>deliveredDate(a).localeCompare(deliveredDate(b)));
@@ -29,7 +29,7 @@ function customer360(state:State){
   }).sort((a,b)=>b.revenue-a.revenue||a.name.localeCompare(b.name));
 }
 
-function orderOperations(state:State){
+export function orderOperations(state:State){
   const open=state.orders.filter(isOpen);
   const aged=open.filter(order=>orderAge(order)>=3);
   const untracked=state.orders.filter(order=>['Shipped','Out for delivery'].includes(order.status)&&!order.tracking.trim());
@@ -48,7 +48,7 @@ function orderOperations(state:State){
   };
 }
 
-function inventoryPlanning(state:State){
+export function inventoryPlanning(state:State){
   const since30=shiftDate(-29),since60=shiftDate(-59);
   const rows=state.products.filter(product=>product.active).map(product=>{
     const delivered=state.orders.filter(order=>isDelivered(order));
@@ -74,7 +74,7 @@ function inventoryPlanning(state:State){
   };
 }
 
-function supplierPerformance(state:State){
+export function supplierPerformance(state:State){
   return state.suppliers.map(supplier=>{
     const pos=state.purchaseOrders.filter(po=>po.supplierId===supplier.id);
     const received=pos.filter(po=>po.status==='Received');
@@ -98,7 +98,7 @@ function supplierPerformance(state:State){
   }).filter(row=>row.orders>0).sort((a,b)=>b.value-a.value);
 }
 
-function financeControl(state:State){
+export function financeControl(state:State){
   const receivables=state.orders.filter(order=>orderBalance(order)>.001).map(order=>{
     const base=order.delivered||order.created;
     return {orderId:order.id,number:order.number,age:daysBetween(base,today()),balance:round(orderBalance(order))};
@@ -134,7 +134,7 @@ function financeControl(state:State){
   };
 }
 
-function prioritizeAlerts(state:State,orders:ReturnType<typeof orderOperations>,inventory:ReturnType<typeof inventoryPlanning>,finance:ReturnType<typeof financeControl>){
+export function prioritizeAlerts(state:State,orders:ReturnType<typeof orderOperations>,inventory:ReturnType<typeof inventoryPlanning>,finance:ReturnType<typeof financeControl>){
   const alerts:{severity:'critical'|'action'|'watch';area:string;title:string;detail:string;target:string}[]=[];
   if(inventory.stockOuts)alerts.push({severity:'critical',area:'Inventory',title:inventory.stockOuts+' active product(s) out of stock',detail:'Resolve active-demand stock-outs before accepting avoidable backorders.','target':'Inventory'});
   if(orders.agedOpen)alerts.push({severity:orders.agedOpen>=5?'critical':'action',area:'Orders',title:orders.agedOpen+' order(s) open for 3+ days',detail:'Review fulfillment blockers and move eligible orders forward.','target':'Orders'});
