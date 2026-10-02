@@ -59,13 +59,29 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Verify versioned migrations against PostgreSQL
+      - name: Verify versioned migrations and legacy data canonicalization against PostgreSQL
         run: bash scripts/postgres-integration.sh
-
 
   browser-e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: crm
+          POSTGRES_PASSWORD: crm
+          POSTGRES_DB: aloyri_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U crm -d aloyri_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://crm:crm@localhost:5432/aloyri_e2e
+      E2E_LOCAL_POSTGRES: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -77,9 +93,13 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Apply production database migrations
+        run: pnpm db:migrate
+      - name: Seed real authenticated role accounts and operational records
+        run: node --experimental-strip-types scripts/e2e-seed.ts
       - name: Install Playwright test runner
         run: pnpm add --save-dev --lockfile=false @playwright/test@1.55.0
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
-      - name: Run role and mobile browser workflows
+      - name: Run mocked UI checks and real authenticated workflow certification
         run: pnpm exec playwright test

@@ -28,7 +28,7 @@ jobs:
             const a=JSON.parse(process.env.ACCEPTANCE||"{}");
             const c=a.checks||{};
             if(h.status!=="ok"||h.commit!==process.env.EXPECTED_SHA||h.database?.status!=="ok"||h.database?.relationalSchema!=="ok")process.exit(1);
-            if(a.status!=="ok"||a.commit!==process.env.EXPECTED_SHA||!c.workspaceReady||!c.cutoverReady||!c.relationalDomainsReady||!c.domainVersionsReady||!c.restoreInfrastructureReady||!c.securityInfrastructureReady||!c.recoveryTrackingReady)process.exit(1);
+            if(a.status!=="ok"||a.commit!==process.env.EXPECTED_SHA||!c.workspaceReady||!c.cutoverReady||!c.relationalDomainsReady||!c.domainVersionsReady||!c.restoreInfrastructureReady||!c.securityInfrastructureReady||!c.recoveryTrackingReady||!c.dataCanonicalizationReady)process.exit(1);
           '
           printf '%s\n' "$headers" | grep -qi '^content-security-policy:'
           printf '%s\n' "$headers" | grep -qi '^x-content-type-options: nosniff'

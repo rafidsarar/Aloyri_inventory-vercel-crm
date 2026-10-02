@@ -3,16 +3,19 @@ import { database } from '@/db/raw';
 export const dynamic='force-dynamic';
 
 const headers={'Cache-Control':'no-store, max-age=0','Content-Type':'application/json; charset=utf-8'};
+const MIN_DATA_MIGRATION='007_legacy_date_canonicalization';
 
 type Row={
   workspace_count:string|number;
   disabled_cutovers:string|number;
   unverified_domains:string|number;
   missing_domain_versions:string|number;
+  migration_version:string|null;
   restore_snapshots:string|null;
   audit_log:string|null;
   security_events:string|null;
   backup_events:string|null;
+  integrity_certifications:string|null;
 };
 
 export async function GET(){
@@ -28,10 +31,12 @@ export async function GET(){
              OR NOT EXISTS (SELECT 1 FROM crm_domain_versions d WHERE d.owner_id=w.owner_id AND d.domain='inventory-suppliers')
              OR NOT EXISTS (SELECT 1 FROM crm_domain_versions d WHERE d.owner_id=w.owner_id AND d.domain='finances')
         ) AS missing_domain_versions,
+        (SELECT version FROM crm_schema_migrations ORDER BY version DESC LIMIT 1) AS migration_version,
         to_regclass('public.crm_restore_snapshots')::text AS restore_snapshots,
         to_regclass('public.crm_audit_log')::text AS audit_log,
         to_regclass('public.crm_security_events')::text AS security_events,
-        to_regclass('public.crm_backup_events')::text AS backup_events
+        to_regclass('public.crm_backup_events')::text AS backup_events,
+        to_regclass('public.crm_data_integrity_certifications')::text AS integrity_certifications
     `).first<Row>();
     const checks={
       workspaceReady:Number(row?.workspace_count||0)>0,
@@ -40,7 +45,10 @@ export async function GET(){
       domainVersionsReady:Number(row?.missing_domain_versions||0)===0,
       restoreInfrastructureReady:Boolean(row?.restore_snapshots&&row?.audit_log),
       securityInfrastructureReady:Boolean(row?.security_events),
-      recoveryTrackingReady:Boolean(row?.backup_events)
+      recoveryTrackingReady:Boolean(row?.backup_events),
+      dataCanonicalizationReady:Boolean(
+        row?.integrity_certifications&&row?.migration_version&&row.migration_version.localeCompare(MIN_DATA_MIGRATION)>=0
+      )
     };
     const ok=Object.values(checks).every(Boolean);
     return Response.json({status:ok?'ok':'unavailable',commit,checks},{status:ok?200:503,headers});
