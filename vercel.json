@@ -5,5 +5,6 @@
       "feature/*": false,
       "fix/*": false
     }
-  }
+  },
+  "buildCommand": "pnpm db:migrate && pnpm build"
 }

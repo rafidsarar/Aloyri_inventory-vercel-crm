@@ -1,0 +1,36 @@
+\set ON_ERROR_STOP on
+
+DO $$
+DECLARE definition text;
+BEGIN
+  SELECT pg_get_constraintdef(oid)
+    INTO definition
+    FROM pg_constraint
+   WHERE conrelid='crm_users'::regclass
+     AND conname='crm_users_role_check';
+
+  IF definition IS NULL OR position('finance' in lower(definition))=0 THEN
+    RAISE EXCEPTION 'crm_users_role_check does not allow finance';
+  END IF;
+END $$;
+
+INSERT INTO crm_users (id,owner_id,email,name,role,created_at)
+VALUES
+ ('owner-test','owner-test','owner@test.local','Owner','owner',now()::text),
+ ('finance-test','owner-test','finance@test.local','Finance','finance',now()::text),
+ ('inventory-test','owner-test','inventory@test.local','Inventory','inventory',now()::text);
+
+DO $$
+BEGIN
+  IF (SELECT count(*) FROM crm_users WHERE owner_id='owner-test') <> 3 THEN
+    RAISE EXCEPTION 'role inserts failed';
+  END IF;
+  IF to_regclass('public.crm_workspaces') IS NULL
+     OR to_regclass('public.crm_sessions') IS NULL
+     OR to_regclass('public.crm_invites') IS NULL
+     OR to_regclass('public.crm_login_attempts') IS NULL THEN
+    RAISE EXCEPTION 'baseline auth/workspace tables missing';
+  END IF;
+END $$;
+
+DELETE FROM crm_users WHERE owner_id='owner-test';
