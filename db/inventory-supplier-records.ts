@@ -1,4 +1,5 @@
 import { database } from './raw.ts';
+import { optionalRelationalDate, relationalDate } from './relational-date.ts';
 import { getDomainVersion,bumpDomainVersion } from './domain-version.ts';
 import { applyRoleChanges, validateWorkspaceChange } from '../lib/role-data.ts';
 import { fixedBusinessName, stateSchema, validateRelations, type State } from '../lib/crm.ts';
@@ -40,10 +41,10 @@ export async function getInventorySupplierDomain(ownerId:string){
     productCategories:categories.results.map((x:any)=>x.name),
     products:products.results.map((x:any)=>({id:x.id,name:x.name,brand:x.brand,size:x.size,category:x.category,price:Number(x.price),cost:Number(x.cost),targetQty:Number(x.target_qty),reorderAt:Number(x.reorder_at),active:Boolean(x.active)})),
     suppliers:suppliers.results.map((x:any)=>({id:x.id,name:x.name,contact:x.contact,phone:x.phone,email:x.email,address:x.address,leadDays:Number(x.lead_days),paymentTermsDays:Number(x.payment_terms_days),notes:x.notes,verified:Boolean(x.verified)})),
-    purchaseOrders:pos.results.map((x:any)=>({id:x.id,number:x.number,supplierId:x.supplier_id,created:String(x.created),expected:String(x.expected),status:x.status,notes:x.notes,items:poItems.results.filter((i:any)=>i.purchase_order_id===x.id).map((i:any)=>({productId:i.product_id,qty:Number(i.qty),unitCost:Number(i.unit_cost),receivedQty:Number(i.received_qty)}))})),
-    batches:batches.results.map((x:any)=>({id:x.id,productId:x.product_id,qty:Number(x.qty),unitCost:Number(x.unit_cost),expiry:String(x.expiry),received:String(x.received),supplierId:x.supplier_id,invoice:x.invoice,dueDate:x.due_date?String(x.due_date):undefined,paid:Boolean(x.paid),paidAt:x.paid_at?String(x.paid_at):undefined,payments:payments.results.filter((p:any)=>p.batch_id===x.id).map((p:any)=>({id:p.id,date:String(p.date),amount:Number(p.amount),note:p.note}))})),
-    stockAdjustments:adjustments.results.map((x:any)=>({id:x.id,batchId:x.batch_id,delta:Number(x.delta),date:String(x.date),reason:x.reason})),
-    inventoryHolds:holds.results.map((x:any)=>({id:x.id,batchId:x.batch_id,qty:Number(x.qty),date:String(x.date),type:x.type,reason:x.reason,source:x.source,sourceOrderId:x.source_order_id||undefined,releasedAt:x.released_at?String(x.released_at):undefined}))
+    purchaseOrders:pos.results.map((x:any)=>({id:x.id,number:x.number,supplierId:x.supplier_id,created:relationalDate(x.created),expected:relationalDate(x.expected),status:x.status,notes:x.notes,items:poItems.results.filter((i:any)=>i.purchase_order_id===x.id).map((i:any)=>({productId:i.product_id,qty:Number(i.qty),unitCost:Number(i.unit_cost),receivedQty:Number(i.received_qty)}))})),
+    batches:batches.results.map((x:any)=>({id:x.id,productId:x.product_id,qty:Number(x.qty),unitCost:Number(x.unit_cost),expiry:relationalDate(x.expiry),received:relationalDate(x.received),supplierId:x.supplier_id,invoice:x.invoice,dueDate:optionalRelationalDate(x.due_date),paid:Boolean(x.paid),paidAt:optionalRelationalDate(x.paid_at),payments:payments.results.filter((p:any)=>p.batch_id===x.id).map((p:any)=>({id:p.id,date:relationalDate(p.date),amount:Number(p.amount),note:p.note}))})),
+    stockAdjustments:adjustments.results.map((x:any)=>({id:x.id,batchId:x.batch_id,delta:Number(x.delta),date:relationalDate(x.date),reason:x.reason})),
+    inventoryHolds:holds.results.map((x:any)=>({id:x.id,batchId:x.batch_id,qty:Number(x.qty),date:relationalDate(x.date),type:x.type,reason:x.reason,source:x.source,sourceOrderId:x.source_order_id||undefined,releasedAt:optionalRelationalDate(x.released_at)}))
   };
   const parsed=stateSchema.pick({products:true,productCategories:true,suppliers:true,purchaseOrders:true,batches:true,stockAdjustments:true,inventoryHolds:true}).parse(data);
   return {data:parsed,version:row.version,domainVersion:await getDomainVersion(ownerId,INVENTORY_SUPPLIER_DOMAIN)};

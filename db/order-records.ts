@@ -1,4 +1,5 @@
 import { database } from './raw.ts';
+import { optionalRelationalDate, relationalDate } from './relational-date.ts';
 import { ensureCustomerRecordApiReady } from './customer-records.ts';
 import { CUSTOMER_ORDER_DOMAIN } from './customer-order-shadow.ts';
 import { applyRoleChanges, validateWorkspaceChange, visibleState } from '../lib/role-data.ts';
@@ -28,9 +29,9 @@ async function ensureAuditTable(){
 
 function mapOrder(row:OrderRow,items:ItemRow[],allocations:AllocationRow[],collections:CollectionRow[]):OrderRecord{
   return {
-    id:row.id,number:row.number,customerId:row.customer_id,created:row.created,
-    delivered:row.delivered||undefined,returnedAt:row.returned_at||undefined,settledAt:row.settled_at||undefined,
-    collections:collections.filter(c=>c.order_id===row.id).map(c=>({id:c.id,date:c.date,amount:Number(c.amount),reference:c.reference})),
+    id:row.id,number:row.number,customerId:row.customer_id,created:relationalDate(row.created),
+    delivered:optionalRelationalDate(row.delivered),returnedAt:optionalRelationalDate(row.returned_at),settledAt:optionalRelationalDate(row.settled_at),
+    collections:collections.filter(c=>c.order_id===row.id).map(c=>({id:c.id,date:relationalDate(c.date),amount:Number(c.amount),reference:c.reference})),
     channel:row.channel,payment:row.payment,status:row.status,
     items:items.filter(i=>i.order_id===row.id).sort((a,b)=>a.line_no-b.line_no).map(i=>({
       productId:i.product_id,qty:Number(i.qty),price:Number(i.price),
