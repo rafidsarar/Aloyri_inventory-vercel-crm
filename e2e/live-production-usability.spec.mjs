@@ -30,8 +30,6 @@ const noOverflow=async page=>{
   expect(overflow).toBeLessThanOrEqual(2);
 };
 
-test.describe.configure({mode:'serial'});
-
 test('owner daily oversight: reports, alerts, automation control and audit history',async({page})=>{
   const clean=consoleGuard(page);
   await login(page,'owner');
@@ -100,6 +98,7 @@ test('sales daily workflow: create customer/order, progress order, create and co
   await page.getByLabel('New customer city').fill('Dhaka');
   await page.getByLabel('New customer delivery address').fill('Dhanmondi, Dhaka');
   await page.getByRole('button',{name:'Create order'}).click();
+  await page.keyboard.press('Escape');
   await nav(page,'Customers');
   await page.getByLabel('Search customers').fill('Live Audit Sales Customer');
   await expect(page.getByText('Live Audit Sales Customer',{exact:true}).first()).toBeVisible({timeout:30000});
