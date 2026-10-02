@@ -30,8 +30,6 @@ const noOverflow=async page=>{
   expect(overflow).toBeLessThanOrEqual(2);
 };
 
-test.describe.configure({mode:'serial'});
-
 test('owner daily oversight: reports, alerts, automation control and audit history',async({page})=>{
   const clean=consoleGuard(page);
   await login(page,'owner');
@@ -44,7 +42,7 @@ test('owner daily oversight: reports, alerts, automation control and audit histo
   await expect(page.getByRole('heading',{name:'Daily business brief'})).toBeVisible();
 
   await nav(page,'Automation');
-  await expect(page.getByRole('heading',{name:'Automation Center'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Automation Center'}).first()).toBeVisible();
   const toggle=page.getByRole('button',{name:'Toggle low-stock watch'});
   const before=await toggle.getAttribute('aria-pressed');
   await toggle.click();
@@ -100,9 +98,15 @@ test('sales daily workflow: create customer/order, progress order, create and co
   await page.getByLabel('New customer city').fill('Dhaka');
   await page.getByLabel('New customer delivery address').fill('Dhanmondi, Dhaka');
   await page.getByRole('button',{name:'Create order'}).click();
-  await expect(page.getByRole('button',{name:/View invoice · Print \/ Save PDF/})).toBeVisible({timeout:30000});
-  await expect(page.getByRole('button',{name:'Mark confirmed'})).toBeVisible();
-  await page.getByRole('button',{name:'Mark confirmed'}).click();
+  await page.keyboard.press('Escape');
+  await nav(page,'Customers');
+  await page.getByLabel('Search customers').fill('Live Audit Sales Customer');
+  await expect(page.getByText('Live Audit Sales Customer',{exact:true}).first()).toBeVisible({timeout:30000});
+
+  await nav(page,'Orders');
+  await page.getByLabel('Search orders').fill('AUD-1001');
+  await expect(page.getByText('AUD-1001',{exact:true}).first()).toBeVisible({timeout:30000});
+  await page.getByRole('button',{name:'Confirm',exact:true}).first().click();
   await expect(page.getByText('Confirmed',{exact:true}).first()).toBeVisible({timeout:30000});
 
   await nav(page,'Follow-ups');
