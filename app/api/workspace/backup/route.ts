@@ -3,10 +3,11 @@ import { AccessDenied, resolveWorkspace } from '@/app/team-access';
 import { database } from '@/db/raw';
 import { fixedBusinessName, stateSchema, validateRelations, workspaceIntegrityWarnings, type State } from '@/lib/crm';
 import { roleCanBackup } from '@/lib/roles';
-import { getCutoverState,relationalCoreState,setRelationalCutover,verifyRelationalParity } from '@/db/relational-cutover';
-import { migrateCustomersOrdersShadow,CUSTOMER_ORDER_DOMAIN } from '@/db/customer-order-shadow';
-import { migrateInventorySupplierShadow,INVENTORY_SUPPLIER_DOMAIN } from '@/db/inventory-supplier-shadow';
-import { migrateFinanceShadow,FINANCE_DOMAIN } from '@/db/finance-shadow';
+import { relationalCoreState,verifyRelationalParity } from '@/db/relational-cutover';
+import { customerOrderShadowStatements,CUSTOMER_ORDER_DOMAIN } from '@/db/customer-order-shadow';
+import { inventorySupplierShadowStatements,INVENTORY_SUPPLIER_DOMAIN } from '@/db/inventory-supplier-shadow';
+import { financeShadowStatements,FINANCE_DOMAIN } from '@/db/finance-shadow';
+import { getDomainVersion,domainVersionBumpStatements } from '@/db/domain-version';
 
 export const dynamic='force-dynamic';
 const response=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
@@ -115,33 +116,46 @@ export async function POST(request:Request){
     const db=database();
     const row=await db.prepare('SELECT data,version,updated_at FROM crm_workspaces WHERE owner_id=?').bind(ownerId).first<{data:string;version:number;updated_at:string}>();
     if(!row)return response({error:'Workspace not found.'},404);
-    const now=new Date().toISOString(),snapshotId=crypto.randomUUID();
-    const currentData=(await relationalCoreState(ownerId)).state,currentChecksum=await sha256(currentData);
-    await db.prepare('CREATE TABLE IF NOT EXISTS crm_restore_snapshots (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, workspace_version INTEGER NOT NULL, workspace_updated_at TEXT NOT NULL, checksum TEXT NOT NULL, data TEXT NOT NULL, created_at TEXT NOT NULL)').run();
-    await db.prepare('CREATE INDEX IF NOT EXISTS crm_restore_snapshots_owner_created_idx ON crm_restore_snapshots(owner_id,created_at DESC)').run();
-    await db.prepare('INSERT INTO crm_restore_snapshots (id,owner_id,workspace_version,workspace_updated_at,checksum,data,created_at) VALUES (?,?,?,?,?,?,?)').bind(snapshotId,ownerId,row.version,row.updated_at,currentChecksum,JSON.stringify(currentData),now).run();
-    await db.prepare('DELETE FROM crm_restore_snapshots WHERE owner_id=? AND id NOT IN (SELECT id FROM crm_restore_snapshots WHERE owner_id=? ORDER BY created_at DESC LIMIT 5)').bind(ownerId,ownerId).run();
-    const priorCutover=await getCutoverState(ownerId);
-    await setRelationalCutover(ownerId,false,user.displayName||user.email);
-    const result=await db.prepare('UPDATE crm_workspaces SET data=?,version=version+1,updated_at=? WHERE owner_id=? AND version=?').bind(JSON.stringify(restored),now,ownerId,row.version).run();
-    if(!result.meta.changes){if(priorCutover.enabled)await setRelationalCutover(ownerId,true,user.displayName||user.email);return response({error:'Workspace changed while restoring. Try again.'},409);}
+    const now=new Date().toISOString(),snapshotId=crypto.randomUUID(),auditId=crypto.randomUUID();
     const restoredVersion=row.version+1;
-    await migrateCustomersOrdersShadow(ownerId,restored,restoredVersion);
-    await migrateInventorySupplierShadow(ownerId,restored,restoredVersion);
-    await migrateFinanceShadow(ownerId,restored,restoredVersion);
-    await db.prepare('INSERT INTO crm_domain_versions (owner_id,domain,version,updated_at) VALUES (?,?,1,?) ON CONFLICT(owner_id,domain) DO UPDATE SET version=crm_domain_versions.version+1,updated_at=EXCLUDED.updated_at').bind(ownerId,CUSTOMER_ORDER_DOMAIN,now).run();
-    await db.prepare('INSERT INTO crm_domain_versions (owner_id,domain,version,updated_at) VALUES (?,?,1,?) ON CONFLICT(owner_id,domain) DO UPDATE SET version=crm_domain_versions.version+1,updated_at=EXCLUDED.updated_at').bind(ownerId,INVENTORY_SUPPLIER_DOMAIN,now).run();
-    await db.prepare('INSERT INTO crm_domain_versions (owner_id,domain,version,updated_at) VALUES (?,?,1,?) ON CONFLICT(owner_id,domain) DO UPDATE SET version=crm_domain_versions.version+1,updated_at=EXCLUDED.updated_at').bind(ownerId,FINANCE_DOMAIN,now).run();
+    const currentData=(await relationalCoreState(ownerId)).state,currentChecksum=await sha256(currentData);
+    const [customerOrderVersion,inventoryVersion,financeVersion]=await Promise.all([
+      getDomainVersion(ownerId,CUSTOMER_ORDER_DOMAIN),
+      getDomainVersion(ownerId,INVENTORY_SUPPLIER_DOMAIN),
+      getDomainVersion(ownerId,FINANCE_DOMAIN)
+    ]);
+    const actor=user.displayName||user.email;
+    const statements:any[]=[
+      db.prepare('INSERT INTO crm_restore_snapshots (id,owner_id,workspace_version,workspace_updated_at,checksum,data,created_at) VALUES (?,?,?,?,?,?,?)')
+        .bind(snapshotId,ownerId,row.version,row.updated_at,currentChecksum,JSON.stringify(currentData),now),
+      db.prepare('UPDATE crm_workspaces SET data=?,version=version+1,updated_at=? WHERE owner_id=? AND version=?')
+        .bind(JSON.stringify(restored),now,ownerId,row.version),
+      db.prepare("SELECT 1 / CASE WHEN EXISTS (SELECT 1 FROM crm_workspaces WHERE owner_id=? AND version=? AND updated_at=?) THEN 1 ELSE 0 END")
+        .bind(ownerId,restoredVersion,now),
+      ...customerOrderShadowStatements(ownerId,restored,restoredVersion,now),
+      ...inventorySupplierShadowStatements(ownerId,restored,restoredVersion,now),
+      ...financeShadowStatements(ownerId,restored,restoredVersion,now),
+      ...domainVersionBumpStatements(ownerId,CUSTOMER_ORDER_DOMAIN,customerOrderVersion,now),
+      ...domainVersionBumpStatements(ownerId,INVENTORY_SUPPLIER_DOMAIN,inventoryVersion,now),
+      ...domainVersionBumpStatements(ownerId,FINANCE_DOMAIN,financeVersion,now),
+      db.prepare('INSERT INTO crm_relational_cutover (owner_id,enabled,enabled_at,enabled_by,last_verified_at,last_verification,updated_at) VALUES (?,TRUE,?,?,NULL,?,?) ON CONFLICT(owner_id) DO UPDATE SET enabled=TRUE,enabled_at=EXCLUDED.enabled_at,enabled_by=EXCLUDED.enabled_by,last_verified_at=NULL,last_verification=EXCLUDED.last_verification,updated_at=EXCLUDED.updated_at')
+        .bind(ownerId,now,actor,JSON.stringify({status:'pending-post-restore-verification',workspaceVersion:restoredVersion}),now),
+      db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)')
+        .bind(auditId,ownerId,user.userId,actor,role,'Restored validated workspace backup · safety snapshot '+snapshotId.slice(0,8),JSON.stringify(['backup restore']),now)
+    ];
+    await db.batch(statements);
+    await db.prepare('DELETE FROM crm_restore_snapshots WHERE owner_id=? AND id NOT IN (SELECT id FROM crm_restore_snapshots WHERE owner_id=? ORDER BY created_at DESC LIMIT 5)').bind(ownerId,ownerId).run();
     const parity=await verifyRelationalParity(ownerId);
-    if(!parity.ok)throw new Error('Restore completed but relational verification failed. Cutover remains disabled.');
-    await setRelationalCutover(ownerId,true,user.displayName||user.email);
-    await db.prepare('CREATE TABLE IF NOT EXISTS crm_audit_log (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, actor_id TEXT NOT NULL, actor_name TEXT NOT NULL, role TEXT NOT NULL, summary TEXT NOT NULL, sections TEXT NOT NULL, created_at TEXT NOT NULL)').run();
-    await db.prepare('CREATE INDEX IF NOT EXISTS crm_audit_owner_created_idx ON crm_audit_log(owner_id,created_at DESC)').run();
-    await db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)').bind(crypto.randomUUID(),ownerId,user.userId,user.displayName||user.email,role,'Restored validated workspace backup · safety snapshot '+snapshotId.slice(0,8),JSON.stringify(['backup restore']),now).run();
-    return response({ok:true,version:row.version+1,safetySnapshot:{id:snapshotId,checksum:currentChecksum},integrity:{checksum,counts,warnings},relationalParity:parity,cutoverEnabled:true});
+    if(!parity.ok){
+      await db.prepare('UPDATE crm_relational_cutover SET enabled=FALSE,updated_at=? WHERE owner_id=?').bind(new Date().toISOString(),ownerId).run();
+      throw new Error('RESTORE_PARITY_FAILED');
+    }
+    return response({ok:true,version:restoredVersion,safetySnapshot:{id:snapshotId,checksum:currentChecksum},integrity:{checksum,counts,warnings},relationalParity:parity,cutoverEnabled:true,atomicCommit:true});
   }catch(e){
     if(e instanceof AccessDenied)return response({error:e.message},403);
     console.error('Backup validation/restore failed',e);
+    if(e instanceof Error&&e.message==='RESTORE_PARITY_FAILED')return response({error:'Restore committed but relational verification failed. Recovery mode is enabled for safety.'},503);
+    if(e instanceof Error&&/WORKSPACE_VERSION_CONFLICT|division by zero/i.test(e.message))return response({error:'Workspace changed while restoring. Try again.'},409);
     return response({error:e instanceof Error?e.message:'Could not validate or restore backup.'},400);
   }
 }

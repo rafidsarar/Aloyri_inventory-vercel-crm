@@ -6,7 +6,7 @@ const headers={
   'Cache-Control':'no-store, max-age=0',
   'Content-Type':'application/json; charset=utf-8'
 };
-const MIN_MIGRATION='003_finance_manager_role';
+const MIN_MIGRATION='004_restore_infrastructure';
 
 type SchemaHealth={
   ok:number;
