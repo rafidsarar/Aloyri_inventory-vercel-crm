@@ -119,8 +119,14 @@ test('sales daily workflow: create customer/order, progress order, create and co
   await page.locator('.invoice-actions').getByRole('button',{name:'Close'}).click();
   const createdOrderRow=page.locator('table tbody tr').filter({hasText:createdOrderNumber}).first();
   await expect(createdOrderRow).toBeVisible();
+  const confirmResponsePromise=page.waitForResponse(response=>response.url().includes('/api/orders/')&&response.request().method()==='PUT');
   await createdOrderRow.getByRole('button',{name:'Confirm'}).click();
-  await expect(createdOrderRow.getByText('Confirmed',{exact:true})).toBeVisible({timeout:30000});
+  const confirmResponse=await confirmResponsePromise;
+  const confirmBody=await confirmResponse.text();
+  console.log('AUDIT_DIAGNOSTIC sales order confirm PUT',confirmResponse.status(),confirmBody);
+  expect(confirmResponse.status(),'Sales order confirm: '+confirmBody).toBe(200);
+  const refreshedCreatedOrderRow=page.locator('table tbody tr').filter({hasText:createdOrderNumber}).first();
+  await expect(refreshedCreatedOrderRow.getByText('Confirmed',{exact:true})).toBeVisible({timeout:30000});
 
   await nav(page,'Follow-ups');
   await expect(page.locator('h1').filter({hasText:'Follow-ups'})).toBeVisible();
