@@ -34,7 +34,7 @@ test.describe.configure({mode:'serial'});
 
 test('owner daily oversight: reports, alerts, automation control and audit history',async({page})=>{
   const clean=consoleGuard(page);
-  await login(page,'owner',true);
+  await login(page,'owner');
   await noOverflow(page);
 
   await nav(page,'Reports');
