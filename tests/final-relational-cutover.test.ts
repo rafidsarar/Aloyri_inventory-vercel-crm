@@ -91,13 +91,14 @@ test('inventory return restock no longer falls back to generic workspace save',(
   assert.doesNotMatch(block,/else await save\(next\)/);
 });
 
-test('Step 8E backup schema 4 exports relational authority and rebuilds relational domains on restore',()=>{
+test('backup schema 4 exports relational authority and atomically rebuilds relational domains on restore',()=>{
   assert.match(backup,/schemaVersion:4/);
   assert.match(backup,/source:'relational-core\+compatibility'/);
   assert.match(backup,/relationalCoreState\(ownerId\)/);
-  assert.match(backup,/migrateCustomersOrdersShadow/);
-  assert.match(backup,/migrateInventorySupplierShadow/);
-  assert.match(backup,/migrateFinanceShadow/);
+  assert.match(backup,/customerOrderShadowStatements/);
+  assert.match(backup,/inventorySupplierShadowStatements/);
+  assert.match(backup,/financeShadowStatements/);
+  assert.match(backup,/await db\.batch\(statements\)/);
   assert.match(backup,/verifyRelationalParity/);
   assert.match(backup,/cutoverEnabled:true/);
 });
