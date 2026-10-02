@@ -288,6 +288,10 @@ export const relationalFoundationSql = [
     last_verification TEXT NOT NULL DEFAULT '{}',
     updated_at TEXT NOT NULL
   )`,
+  `CREATE INDEX IF NOT EXISTS crm_stage4_orders_status_created_idx ON crm_rel_orders(owner_id,status,created DESC)`,
+  `CREATE INDEX IF NOT EXISTS crm_stage4_purchase_orders_status_expected_idx ON crm_rel_purchase_orders(owner_id,status,expected)`,
+  `CREATE INDEX IF NOT EXISTS crm_stage4_batches_product_expiry_idx ON crm_rel_inventory_batches(owner_id,product_id,expiry)`,
+  `CREATE INDEX IF NOT EXISTS crm_stage4_domain_versions_updated_idx ON crm_domain_versions(owner_id,updated_at DESC)`,
 ] as const;
 
 let ready: Promise<void> | null = null;
