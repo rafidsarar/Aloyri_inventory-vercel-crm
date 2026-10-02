@@ -1,10 +1,10 @@
 import { database } from './raw.ts';
 import { optionalRelationalDate, relationalDate } from './relational-date.ts';
-import { getDomainVersion,bumpDomainVersion } from './domain-version.ts';
+import { getDomainVersion,domainVersionBumpStatements } from './domain-version.ts';
 import { applyRoleChanges, validateWorkspaceChange } from '../lib/role-data.ts';
 import { fixedBusinessName, stateSchema, validateRelations, type State } from '../lib/crm.ts';
 import type { WorkspaceRole } from '../lib/roles.ts';
-import { ensureInventorySupplierApiReady, INVENTORY_SUPPLIER_DOMAIN, migrateInventorySupplierShadow } from './inventory-supplier-shadow.ts';
+import { ensureInventorySupplierApiReady, INVENTORY_SUPPLIER_DOMAIN, inventorySupplierShadowStatements } from './inventory-supplier-shadow.ts';
 
 export const inventorySupplierKeys=['products','productCategories','suppliers','purchaseOrders','batches','stockAdjustments','inventoryHolds'] as const;
 export type InventorySupplierKey=typeof inventorySupplierKeys[number];
@@ -68,14 +68,15 @@ export async function saveInventorySupplierDomain(ownerId:string,input:unknown,e
   if(!changed.length)return {data:inventorySupplierData(state),version:row.version,domainVersion:currentDomainVersion};
   const now=new Date().toISOString(),db=database(),nextVersion=row.version+1;
   await ensureAudit();
-  const result=await db.prepare('UPDATE crm_workspaces SET data=?,version=version+1,updated_at=? WHERE owner_id=? AND version=?')
-    .bind(JSON.stringify(next),now,ownerId,row.version).run();
-  if(!result.meta.changes)throw new Error('WORKSPACE_VERSION_CONFLICT');
-  await migrateInventorySupplierShadow(ownerId,next,nextVersion);
-  const domainVersion=await bumpDomainVersion(ownerId,INVENTORY_SUPPLIER_DOMAIN,expectedDomainVersion);
-  await db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)')
-    .bind(crypto.randomUUID(),ownerId,actor.userId,actor.name,actor.role,'Updated '+changed.join(', '),JSON.stringify(changed),now).run();
-  return {data:inventorySupplierData(next),version:nextVersion,domainVersion};
+  await db.batch([
+    db.prepare('UPDATE crm_workspaces SET data=?,version=version+1,updated_at=? WHERE owner_id=? AND version=?').bind(JSON.stringify(next),now,ownerId,row.version),
+    db.prepare("SELECT 1 / CASE WHEN EXISTS (SELECT 1 FROM crm_workspaces WHERE owner_id=? AND version=? AND updated_at=?) THEN 1 ELSE 0 END").bind(ownerId,nextVersion,now),
+    ...inventorySupplierShadowStatements(ownerId,next,nextVersion,now),
+    ...domainVersionBumpStatements(ownerId,INVENTORY_SUPPLIER_DOMAIN,expectedDomainVersion,now),
+    db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)')
+      .bind(crypto.randomUUID(),ownerId,actor.userId,actor.name,actor.role,'Updated '+changed.join(', '),JSON.stringify(changed),now)
+  ]);
+  return {data:inventorySupplierData(next),version:nextVersion,domainVersion:expectedDomainVersion+1};
 }
 
 export async function markInventorySupplierShadowStale(ownerId:string,sourceVersion:number){
