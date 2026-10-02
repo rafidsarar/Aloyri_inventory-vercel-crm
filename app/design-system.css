@@ -125,6 +125,13 @@
 }
 
 
+/* Native fieldsets otherwise keep their min-content width and stretch dialogs. */
+.record-dialog .record-form,
+.record-dialog .record-form > fieldset {
+  min-width: 0;
+  max-width: 100%;
+}
+
 /* Reusable CRM layout primitives */
 .crm-page-header {
   display: flex;
