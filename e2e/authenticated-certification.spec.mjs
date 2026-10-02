@@ -206,3 +206,46 @@ test('real session revocation invalidates another authenticated browser',async({
   await first.context.close();
   await second.context.close();
 });
+
+
+test('management reporting is authenticated, role-bound and internally consistent',async({browser})=>{
+  const allowed=new Set(['owner','admin']);
+  for(const role of roles){
+    const s=await login(browser,role);
+    const operational=await s.request.get('/api/operational-intelligence');
+    const growth=await s.request.get('/api/growth-control');
+    expect(operational.status(),role+' operational intelligence access').toBe(allowed.has(role)?200:403);
+    expect(growth.status(),role+' growth control access').toBe(allowed.has(role)?200:403);
+    if(allowed.has(role)){
+      const op=await operational.json();
+      expect(op.source.architecture).toBe('relational-core');
+      expect(op.managementReports.windowDays).toBe(30);
+      expect(Number.isFinite(op.managementReports.current.revenue)).toBeTruthy();
+      expect(Number.isFinite(op.managementReports.current.profit)).toBeTruthy();
+      expect(op.managementReports.current.orders).toBeGreaterThanOrEqual(0);
+      expect(op.dashboard.openOrders).toBeGreaterThanOrEqual(0);
+      expect(Array.isArray(op.hardening.checks)).toBeTruthy();
+
+      const gc=await growth.json();
+      expect(gc.source.architecture).toBe('relational-core');
+      expect(Number.isFinite(gc.executive.revenue30)).toBeTruthy();
+      expect(Number.isFinite(gc.executive.profit30)).toBeTruthy();
+      expect(gc.finance.receivableBuckets.current+gc.finance.receivableBuckets.days8to30+gc.finance.receivableBuckets.days31plus)
+        .toBeCloseTo(gc.finance.receivables,2);
+      expect(gc.finance.payableBuckets.notOverdue+gc.finance.payableBuckets.days1to30+gc.finance.payableBuckets.days31plus)
+        .toBeCloseTo(gc.finance.payables,2);
+      expect(gc.performance.indexReady).toBe(true);
+
+      if(role==='owner'){
+        const page=await s.context.newPage();
+        await page.goto('/');
+        await expect(page.getByRole('heading',{name:'Run the business from what needs attention now.'})).toBeVisible({timeout:15000});
+        await page.getByRole('button',{name:'Reports',exact:true}).click();
+        await expect(page.getByRole('heading',{name:'Executive performance overview'})).toBeVisible({timeout:15000});
+        await expect(page.getByText('Business Control Center',{exact:true})).toBeVisible({timeout:15000});
+        await expect(page.getByText('Operational intelligence',{exact:true})).toBeVisible({timeout:15000});
+      }
+    }
+    await s.context.close();
+  }
+});
