@@ -40,7 +40,9 @@ jobs:
                   && checks.cutoverReady===true
                   && checks.relationalDomainsReady===true
                   && checks.domainVersionsReady===true
-                  && checks.restoreInfrastructureReady===true;
+                  && checks.restoreInfrastructureReady===true
+                  && checks.securityInfrastructureReady===true
+                  && checks.recoveryTrackingReady===true;
                 process.exit(healthOk&&acceptanceOk?0:1);
               } catch {
                 process.exit(1);
