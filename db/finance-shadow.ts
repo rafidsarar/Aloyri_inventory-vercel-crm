@@ -18,9 +18,8 @@ export async function getFinanceMigrationStatus(ownerId:string){
   return database().prepare('SELECT status,source_version,verified_at,updated_at FROM crm_relational_migrations WHERE owner_id=? AND domain=?')
     .bind(ownerId,FINANCE_DOMAIN).first<MigrationRow>();
 }
-export async function migrateFinanceShadow(ownerId:string,state:State,sourceVersion:number){
-  await ensureRelationalFoundation();
-  const db=database(),now=new Date().toISOString(),q:any[]=[];
+export function financeShadowStatements(ownerId:string,state:State,sourceVersion:number,now=new Date().toISOString()){
+  const db=database(),q:any[]=[];
   q.push(db.prepare('INSERT INTO crm_relational_migrations (owner_id,domain,status,source_version,migrated_at,verified_at,updated_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT (owner_id,domain) DO UPDATE SET status=EXCLUDED.status,source_version=EXCLUDED.source_version,migrated_at=EXCLUDED.migrated_at,verified_at=NULL,updated_at=EXCLUDED.updated_at').bind(ownerId,FINANCE_DOMAIN,'migrating',sourceVersion,now,null,now));
   for(const table of ['crm_rel_finance_account_matches','crm_rel_finance_account_openings','crm_rel_finance_cash_entries','crm_rel_finance_expenses','crm_rel_finance_closes'])
     q.push(db.prepare('DELETE FROM '+table+' WHERE owner_id=?').bind(ownerId));
@@ -35,7 +34,11 @@ export async function migrateFinanceShadow(ownerId:string,state:State,sourceVers
   state.financeCloses.forEach(x=>q.push(db.prepare('INSERT INTO crm_rel_finance_closes (owner_id,month,closed_at,closed_by,notes,record_version,updated_at) VALUES (?,?,?,?,?,?,?)')
     .bind(ownerId,x.month,x.closedAt,x.closedBy,x.notes,0,now)));
   q.push(db.prepare('UPDATE crm_relational_migrations SET status=?,source_version=?,verified_at=?,updated_at=? WHERE owner_id=? AND domain=?').bind('verified',sourceVersion,now,now,ownerId,FINANCE_DOMAIN));
-  await db.batch(q);
+  return q;
+}
+export async function migrateFinanceShadow(ownerId:string,state:State,sourceVersion:number){
+  await ensureRelationalFoundation();
+  await database().batch(financeShadowStatements(ownerId,state,sourceVersion));
 }
 export async function ensureFinanceApiReady(ownerId:string){
   await ensureRelationalFoundation();
