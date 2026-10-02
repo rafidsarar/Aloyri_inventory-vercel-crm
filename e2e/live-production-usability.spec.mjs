@@ -44,7 +44,7 @@ test('owner daily oversight: reports, alerts, automation control and audit histo
   await expect(page.getByRole('heading',{name:'Daily business brief'})).toBeVisible();
 
   await nav(page,'Automation');
-  await expect(page.getByRole('heading',{name:'Automation Center'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Automation Center'}).first()).toBeVisible();
   const toggle=page.getByRole('button',{name:'Toggle low-stock watch'});
   const before=await toggle.getAttribute('aria-pressed');
   await toggle.click();
