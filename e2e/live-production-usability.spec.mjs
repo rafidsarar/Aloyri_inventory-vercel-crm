@@ -125,7 +125,7 @@ test('sales daily workflow: create customer/order, progress order, create and co
   await page.getByLabel('title').fill('Live audit sales follow-up');
   await page.getByRole('button',{name:'Save changes'}).click();
   await expect(page.getByText('Live audit sales follow-up',{exact:true})).toBeVisible({timeout:30000});
-  await page.getByRole('checkbox',{name:'Complete Live audit sales follow-up'}).check();
+  await page.getByRole('checkbox',{name:'Complete Live audit sales follow-up'}).click();
   await expect(page.getByText('Completed',{exact:true}).first()).toBeVisible({timeout:30000});
 
   await nav(page,'Customers');
