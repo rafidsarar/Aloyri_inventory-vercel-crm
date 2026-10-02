@@ -15,7 +15,6 @@ async function cleanup(){
   const statements=[
     "DELETE FROM crm_sessions WHERE user_id IN (SELECT id FROM crm_users WHERE owner_id=?)",
     "DELETE FROM crm_invites WHERE user_id IN (SELECT id FROM crm_users WHERE owner_id=?)",
-    "DELETE FROM crm_login_attempts WHERE email LIKE 'live-usability-%@aloyri.test'",
     "DELETE FROM crm_rel_order_allocations WHERE owner_id=?",
     "DELETE FROM crm_rel_order_items WHERE owner_id=?",
     "DELETE FROM crm_rel_order_collections WHERE owner_id=?",
@@ -89,8 +88,9 @@ export async function GET(request:Request){
   await seed();
   const role=url.searchParams.get('role') as WorkspaceRole|null;
   if(!role||!roles.includes(role))return Response.json({ok:true,roles},{headers:{'Cache-Control':'no-store'}});
-  const response=Response.redirect(new URL('/',request.url),302);
-  response.headers.set('Set-Cookie',await createSession(request,userId(role)));
-  response.headers.set('Cache-Control','no-store');
-  return response;
+  return new Response(null,{status:302,headers:{
+    'Location':new URL('/',request.url).toString(),
+    'Set-Cookie':await createSession(request,userId(role)),
+    'Cache-Control':'no-store'
+  }});
 }
