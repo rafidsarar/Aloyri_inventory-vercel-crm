@@ -30,7 +30,7 @@ const noOverflow=async page=>{
   expect(overflow).toBeLessThanOrEqual(2);
 };
 
-test.describe.configure({mode:'serial'});
+// Keep one worker in playwright.live.config.mjs, but let later role audits run even if one role fails.
 
 test('owner daily oversight: reports, alerts, automation control and audit history',async({page})=>{
   const clean=consoleGuard(page);
