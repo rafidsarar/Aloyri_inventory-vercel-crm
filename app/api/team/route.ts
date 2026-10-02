@@ -10,7 +10,6 @@ export async function POST(request:Request){
   try{
     if(!checkOrigin(request))return response({error:'Invalid request origin.'},403);
     const access=await owner();if(access.error)return access.error;
-    await ensureWorkspaceRoleConstraint();
     const text=await request.text();if(text.length>2048)return response({error:'Invalid request.'},400);
     let body:any;try{body=JSON.parse(text)}catch{return response({error:'Invalid request.'},400)}
     const email=typeof body.email==='string'?normalizeEmail(body.email):'';
