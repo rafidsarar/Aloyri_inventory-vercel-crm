@@ -11,6 +11,16 @@ import { getDomainVersion,domainVersionBumpStatements } from './domain-version.t
 export type OrderRecord=Order&{recordVersion:number};
 export type OrderActor={userId:string;name:string;role:WorkspaceRole};
 
+export function orderRecordForRole(order:OrderRecord,role:WorkspaceRole):OrderRecord{
+  if(role!=='sales')return order;
+  return {
+    ...order,
+    items:order.items.map(item=>({...item,allocations:item.allocations.map(allocation=>({...allocation,unitCost:0}))})),
+    courierCost:0,packaging:0,paymentFee:0,returnFee:0,
+    collections:[],settled:false,settledAt:undefined
+  };
+}
+
 type OrderRow={
   id:string;number:string;customer_id:string;created:string;delivered:string|null;returned_at:string|null;settled_at:string|null;
   channel:Order['channel'];payment:Order['payment'];status:Order['status'];discount:string|number;delivery_charge:string|number;
