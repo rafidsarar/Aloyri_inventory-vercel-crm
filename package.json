@@ -11,7 +11,9 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test tests/*.test.ts"
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "db:migrate": "node --experimental-strip-types scripts/migrate-db.ts",
+    "test:postgres": "bash scripts/postgres-integration.sh"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
