@@ -81,6 +81,7 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql://crm:crm@localhost:5432/aloyri_e2e
+      E2E_LOCAL_POSTGRES: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
