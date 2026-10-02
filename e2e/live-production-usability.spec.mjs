@@ -114,7 +114,7 @@ test('sales daily workflow: create customer/order, progress order, create and co
   await page.getByRole('option',{name:/Live Audit Sales Customer/}).click();
   await page.getByRole('button',{name:'Create order'}).click();
   await expect(page.getByRole('heading',{name:/^Invoice for /})).toBeVisible({timeout:30000});
-  await page.getByRole('button',{name:'Close'}).click();
+  await page.locator('.invoice-actions').getByRole('button',{name:'Close'}).click();
   await expect(page.getByRole('button',{name:'Confirm'}).first()).toBeVisible();
   await page.getByRole('button',{name:'Confirm'}).first().click();
   await expect(page.getByText('Confirmed',{exact:true}).first()).toBeVisible({timeout:30000});
