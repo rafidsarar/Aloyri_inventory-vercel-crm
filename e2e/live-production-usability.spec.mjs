@@ -98,7 +98,12 @@ test('sales daily workflow: create customer/order, progress order, create and co
   await page.getByLabel('phone').fill('01722222222');
   await page.getByLabel('city').fill('Dhaka');
   await page.getByLabel('address').fill('Dhanmondi, Dhaka');
+  const customerPost=page.waitForResponse(response=>response.url().endsWith('/api/customers')&&response.request().method()==='POST');
   await page.getByRole('button',{name:'Save changes'}).click();
+  const customerResponse=await customerPost;
+  const customerBody=await customerResponse.text();
+  console.log('AUDIT_DIAGNOSTIC sales customer POST',customerResponse.status(),customerBody);
+  expect(customerResponse.status(),'Sales customer create: '+customerBody).toBe(201);
   await expect(page.getByText('Live Audit Sales Customer',{exact:true}).first()).toBeVisible({timeout:30000});
 
   await nav(page,'Orders');
