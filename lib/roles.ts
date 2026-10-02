@@ -1,4 +1,4 @@
-export type WorkspaceRole='owner'|'admin'|'sales'|'inventory'|'viewer';
+export type WorkspaceRole='owner'|'admin'|'sales'|'inventory'|'finance'|'viewer';
 
 export const roleCapabilities={
   owner:{
@@ -20,6 +20,11 @@ export const roleCapabilities={
     sections:['Overview','Alerts','Inventory','Suppliers'],
     edit:['products','productCategories','batches','suppliers','purchaseOrders','stockAdjustments','inventoryHolds'],
     settings:false,team:false,reset:false,backup:false,recordImport:false,starterCatalog:true,audit:false,invoice:false,finance:false,financeClose:false,dataExport:false,returnInspection:true
+  },
+  finance:{
+    sections:['Overview','Alerts','Orders','Inventory','Customers','Suppliers','Finances'],
+    edit:['expenses','cashEntries','accountOpenings','accountMatches','financeCloses'],
+    settings:false,team:false,reset:false,backup:false,recordImport:false,starterCatalog:false,audit:false,invoice:true,finance:true,financeClose:true,dataExport:true,returnInspection:false
   },
   viewer:{
     sections:['Overview','Alerts','Orders','Inventory','Customers','Suppliers','Finances','Follow-ups'],
@@ -48,6 +53,7 @@ export const roleLabels:Record<WorkspaceRole,string>={
   admin:'Admin',
   sales:'Sales employee',
   inventory:'Inventory manager',
+  finance:'Finance manager',
   viewer:'View only'
 };
 
@@ -56,6 +62,7 @@ export const roleDescriptions:Record<WorkspaceRole,string>={
   admin:'Manage business records, automation rules, orders, customers, inventory, suppliers, finance, month-end, settings, audit history and imports. Staff access, full backups and workspace reset remain owner-only.',
   sales:'Create and manage orders, customers and follow-ups; update fulfillment, tracking and notes; print customer invoices. Supplier costs, purchasing finance and accounting remain hidden.',
   inventory:'Manage catalog, stock receiving, batches, adjustments, suppliers, purchase orders and Holds & Returns, including return inspection. Customer identity and finance data remain protected.',
+  finance:'Manage collections, supplier payments, expenses, cashflow, accounts, reconciliation, month-end finance close and finance exports. Supporting order, customer, supplier and inventory records are read-only. Owner capital and drawings, staff access and business administration remain restricted.',
   viewer:'Read-only access to the operational workspace and invoices. Cannot change records, manage finance, export bulk data or access administrative controls.'
 };
 
@@ -80,5 +87,6 @@ export const roleLandingView:Record<WorkspaceRole,string>={
   admin:'Overview',
   sales:'Overview',
   inventory:'Overview',
+  finance:'Overview',
   viewer:'Overview'
 };
