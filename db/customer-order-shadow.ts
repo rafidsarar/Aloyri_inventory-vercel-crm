@@ -90,13 +90,11 @@ export function verificationMatches(
   return JSON.stringify(expected)===JSON.stringify(actual);
 }
 
-export async function migrateCustomersOrdersShadow(ownerId:string,state:State,sourceVersion:number){
+export function customerOrderShadowStatements(ownerId:string,state:State,sourceVersion:number,now=new Date().toISOString()){
   if(!ownerId)throw new Error('Owner is required for relational migration.');
   if(!Number.isInteger(sourceVersion)||sourceVersion<0)throw new Error('A valid workspace version is required for relational migration.');
-  await ensureRelationalFoundation();
   const db=database();
-  const now=new Date().toISOString();
-  const statements=[
+  const statements:any[]=[
     db.prepare('INSERT INTO crm_relational_migrations (owner_id,domain,status,source_version,migrated_at,verified_at,updated_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT (owner_id,domain) DO UPDATE SET status=EXCLUDED.status,source_version=EXCLUDED.source_version,migrated_at=EXCLUDED.migrated_at,verified_at=EXCLUDED.verified_at,updated_at=EXCLUDED.updated_at').bind(ownerId,CUSTOMER_ORDER_DOMAIN,'migrating',sourceVersion,now,null,now),
     db.prepare('DELETE FROM crm_rel_order_allocations WHERE owner_id=?').bind(ownerId),
     db.prepare('DELETE FROM crm_rel_order_collections WHERE owner_id=?').bind(ownerId),
@@ -124,15 +122,23 @@ export async function migrateCustomersOrdersShadow(ownerId:string,state:State,so
         .bind(ownerId,order.id,collection.id,collection.date,collection.amount,collection.reference));
     }
   }
-  await db.batch(statements);
+  statements.push(db.prepare('UPDATE crm_relational_migrations SET status=?,source_version=?,verified_at=?,updated_at=? WHERE owner_id=? AND domain=?')
+    .bind('verified',sourceVersion,now,now,ownerId,CUSTOMER_ORDER_DOMAIN));
+  return statements;
+}
 
+export async function migrateCustomersOrdersShadow(ownerId:string,state:State,sourceVersion:number){
+  await ensureRelationalFoundation();
+  await database().batch(customerOrderShadowStatements(ownerId,state,sourceVersion));
   const expected={metrics:customerOrderShadowMetrics(state),ids:customerOrderShadowIds(state)};
   const actual=await readShadowVerification(ownerId);
   const verified=verificationMatches(expected,actual);
   const verifiedAt=verified?new Date().toISOString():null;
-  await db.prepare('UPDATE crm_relational_migrations SET status=?,verified_at=?,updated_at=? WHERE owner_id=? AND domain=?')
-    .bind(verified?'verified':'mismatch',verifiedAt,new Date().toISOString(),ownerId,CUSTOMER_ORDER_DOMAIN).run();
-  if(!verified)throw new Error('Relational shadow verification did not match the workspace source.');
+  if(!verified){
+    await database().prepare('UPDATE crm_relational_migrations SET status=?,verified_at=?,updated_at=? WHERE owner_id=? AND domain=?')
+      .bind('mismatch',null,new Date().toISOString(),ownerId,CUSTOMER_ORDER_DOMAIN).run();
+    throw new Error('Relational shadow verification did not match the workspace source.');
+  }
   return {domain:CUSTOMER_ORDER_DOMAIN,sourceVersion,status:'verified' as const,verifiedAt,metrics:actual.metrics};
 }
 
