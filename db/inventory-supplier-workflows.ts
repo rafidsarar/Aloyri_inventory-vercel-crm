@@ -1,10 +1,10 @@
 import { database } from './raw.ts';
-import { getDomainVersion,bumpDomainVersion } from './domain-version.ts';
-import { migrateFinanceShadow,FINANCE_DOMAIN } from './finance-shadow.ts';
+import { getDomainVersion,domainVersionBumpStatements } from './domain-version.ts';
+import { financeShadowStatements,FINANCE_DOMAIN } from './finance-shadow.ts';
 import { applyPurchaseOrderReceipt, accountIds, fixedBusinessName, stateSchema, today, uid, validateRelations, type State } from '../lib/crm.ts';
 import { validateWorkspaceChange } from '../lib/role-data.ts';
 import type { WorkspaceRole } from '../lib/roles.ts';
-import { ensureInventorySupplierApiReady, migrateInventorySupplierShadow, INVENTORY_SUPPLIER_DOMAIN } from './inventory-supplier-shadow.ts';
+import { ensureInventorySupplierApiReady, inventorySupplierShadowStatements, INVENTORY_SUPPLIER_DOMAIN } from './inventory-supplier-shadow.ts';
 
 type Actor={userId:string;name:string;role:WorkspaceRole};
 
@@ -14,22 +14,24 @@ async function ensureAudit(){
   await db.prepare('CREATE INDEX IF NOT EXISTS crm_audit_owner_created_idx ON crm_audit_log(owner_id,created_at DESC)').run();
 }
 
-async function commit(ownerId:string,before:State,next:State,version:number,actor:Actor,summary:string,sections:string[]){
+async function commit(ownerId:string,before:State,next:State,version:number,expectedInventoryVersion:number,expectedFinanceVersion:number|undefined,actor:Actor,summary:string,sections:string[]){
   validateWorkspaceChange(before,next);validateRelations(next,{skipOrderNumberUniqueness:true});
   const db=database(),now=new Date().toISOString(),nextVersion=version+1;
   await ensureAudit();
-  const result=await db.prepare('UPDATE crm_workspaces SET data=?,version=version+1,updated_at=? WHERE owner_id=? AND version=?')
-    .bind(JSON.stringify(fixedBusinessName(next)),now,ownerId,version).run();
-  if(!result.meta.changes)throw new Error('WORKSPACE_VERSION_CONFLICT');
-  await migrateInventorySupplierShadow(ownerId,next,nextVersion);
-  await bumpDomainVersion(ownerId,INVENTORY_SUPPLIER_DOMAIN);
+  const statements:any[]=[
+    db.prepare('UPDATE crm_workspaces SET data=?,version=version+1,updated_at=? WHERE owner_id=? AND version=?').bind(JSON.stringify(fixedBusinessName(next)),now,ownerId,version),
+    db.prepare("SELECT 1 / CASE WHEN EXISTS (SELECT 1 FROM crm_workspaces WHERE owner_id=? AND version=? AND updated_at=?) THEN 1 ELSE 0 END").bind(ownerId,nextVersion,now),
+    ...inventorySupplierShadowStatements(ownerId,next,nextVersion,now),
+    ...domainVersionBumpStatements(ownerId,INVENTORY_SUPPLIER_DOMAIN,expectedInventoryVersion,now)
+  ];
   if(sections.includes('accountMatches')){
-    try{await migrateFinanceShadow(ownerId,next,nextVersion)}catch(error){console.error('Finance shadow sync failed after supplier workflow',error)}
-    await bumpDomainVersion(ownerId,FINANCE_DOMAIN);
+    if(expectedFinanceVersion===undefined)throw new Error('FINANCE_VERSION_REQUIRED');
+    statements.push(...financeShadowStatements(ownerId,next,nextVersion,now),...domainVersionBumpStatements(ownerId,FINANCE_DOMAIN,expectedFinanceVersion,now));
   }
-  await db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)')
-    .bind(crypto.randomUUID(),ownerId,actor.userId,actor.name,actor.role,summary,JSON.stringify(sections),now).run();
-  return {version:nextVersion};
+  statements.push(db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)')
+    .bind(crypto.randomUUID(),ownerId,actor.userId,actor.name,actor.role,summary,JSON.stringify(sections),now));
+  await db.batch(statements);
+  return {version:nextVersion,domainVersion:expectedInventoryVersion+1,financeDomainVersion:expectedFinanceVersion===undefined?undefined:expectedFinanceVersion+1};
 }
 
 export async function receivePurchaseOrderWorkflow(ownerId:string,input:{purchaseOrderId:string;received:string;invoice:string;dueDate?:string;lines:{productId:string;qty:number;expiry:string}[];domainVersion:number},actor:Actor){
@@ -38,7 +40,7 @@ export async function receivePurchaseOrderWorkflow(ownerId:string,input:{purchas
   if(await getDomainVersion(ownerId,INVENTORY_SUPPLIER_DOMAIN)!==input.domainVersion)throw new Error('DOMAIN_VERSION_CONFLICT');
   const next=applyPurchaseOrderReceipt(state,{purchaseOrderId:input.purchaseOrderId,received:input.received,invoice:input.invoice,dueDate:input.dueDate,lines:input.lines});
   const po=next.purchaseOrders.find(x=>x.id===input.purchaseOrderId);
-  const result=await commit(ownerId,state,next,row.version,actor,'Received stock for '+(po?.number||'purchase order'),['purchaseOrders','batches']);
+  const result=await commit(ownerId,state,next,row.version,input.domainVersion,undefined,actor,'Received stock for '+(po?.number||'purchase order'),['purchaseOrders','batches']);
   return {...result,data:{purchaseOrders:next.purchaseOrders,batches:next.batches}};
 }
 
@@ -59,6 +61,7 @@ export async function postSupplierPaymentWorkflow(ownerId:string,input:{batchId:
   const paidAfter=(target.paid&&target.payments.length===1?total:0)+target.payments.reduce((n,p)=>n+p.amount,0);
   target.paid=paidAfter>=total-.001;target.paidAt=target.paid?input.date:undefined;
   next.accountMatches.push({entryId:'batch-payment-'+target.id+'-'+paymentId,account:input.account as typeof accountIds[number],matched:true,reference:input.note.trim()||'Supplier payment'});
-  const result=await commit(ownerId,state,next,row.version,actor,'Recorded supplier payment for '+(target.invoice||target.id),['batches','accountMatches']);
+  const financeDomainVersion=await getDomainVersion(ownerId,FINANCE_DOMAIN);
+  const result=await commit(ownerId,state,next,row.version,input.domainVersion,financeDomainVersion,actor,'Recorded supplier payment for '+(target.invoice||target.id),['batches','accountMatches']);
   return {...result,batch:target,paymentId};
 }
