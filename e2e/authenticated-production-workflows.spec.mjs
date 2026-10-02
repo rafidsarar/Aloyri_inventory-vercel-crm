@@ -8,11 +8,11 @@ const email=role=>role+'@e2e.aloyri.local';
 async function login(browser,role){
   const context=await browser.newContext();
   const page=await context.newPage();
-  await page.goto('/login');
-  await page.getByLabel('Email address').fill(email(role));
-  await page.getByLabel('Password').fill(PASSWORD);
-  await page.getByRole('button',{name:'Sign in'}).click();
-  await page.waitForURL(url=>!url.pathname.startsWith('/login'));
+  const authenticated=await context.request.post('/api/auth/login',{
+    headers:origin,
+    data:{email:email(role),password:PASSWORD}
+  });
+  expect(authenticated.status(),role+' authentication').toBe(200);
   const workspace=await context.request.get('/api/workspace');
   expect(workspace.status(),role+' workspace login').toBe(200);
   const data=await workspace.json();
