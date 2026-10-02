@@ -36,7 +36,11 @@ export async function GET(){
     if(role==='owner')await db.prepare('INSERT OR IGNORE INTO crm_workspaces (owner_id,data,version,updated_at) VALUES (?,?,0,?)').bind(ownerId,JSON.stringify(initialState()),new Date().toISOString()).run();
     const row=await db.prepare('SELECT data,version,updated_at FROM crm_workspaces WHERE owner_id = ?').bind(ownerId).first<{data:string;version:number;updated_at:string}>();
     if(!row)return response({error:'The shared workspace is not ready. Ask the owner to sign in first.'},404);
-    const compatibility=fixedBusinessName(stateSchema.parse(JSON.parse(row.data)));validateRelations(compatibility,{skipOrderNumberUniqueness:true});
+    const compatibility=()=>{
+      const state=fixedBusinessName(stateSchema.parse(JSON.parse(row.data)));
+      validateRelations(state,{skipOrderNumberUniqueness:true});
+      return state;
+    };
     const cutover=await ensureRelationalCutover(ownerId);
     if(cutover.enabled){
       try{
@@ -44,15 +48,15 @@ export async function GET(){
         return response({data:visibleState(workspace,role),version:row.version,role,userName:user.displayName,relationalCutover:true,recoveryMode:false,readSource:'relational'});
       }catch(relationalError){
         const incidentId=crypto.randomUUID();
-        console.error('Relational workspace read failed; serving compatibility recovery snapshot',{incidentId},relationalError);
+        console.error('Relational workspace read failed; serving compatibility recovery snapshot',{incidentId,relationalError});
         return response({
-          data:visibleState(compatibility,role),version:row.version,role,userName:user.displayName,relationalCutover:true,
+          data:visibleState(compatibility(),role),version:row.version,role,userName:user.displayName,relationalCutover:true,
           recoveryMode:true,readSource:'compatibility-recovery',incidentId,
           warning:'Relational records are temporarily unavailable. Showing the latest synchronized records in read-only recovery mode.'
         });
       }
     }
-    return response({data:visibleState(compatibility,role),version:row.version,role,userName:user.displayName,relationalCutover:false,recoveryMode:false,readSource:'compatibility'});
+    return response({data:visibleState(compatibility(),role),version:row.version,role,userName:user.displayName,relationalCutover:false,recoveryMode:false,readSource:'compatibility'});
   }catch(e){
     if(e instanceof AccessDenied)return response({error:e.message},403);
     console.error('Workspace read failed',e);
@@ -96,30 +100,21 @@ export async function PUT(request:Request){
     const result=await db.prepare('UPDATE crm_workspaces SET data = ?, version = version + 1, updated_at = ? WHERE owner_id = ? AND version = ?').bind(JSON.stringify(merged),now,ownerId,body.version).run();
     if(!result.meta.changes)return response({error:'This workspace changed in another window. Refresh records, then try again.'},409);
     if(changedSections.length)await db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)').bind(crypto.randomUUID(),ownerId,user.userId,user.displayName||user.email,role,'Updated '+changedSections.join(', '),JSON.stringify(changedSections),now).run();
-    let shadowSync:'not-needed'|'verified'|'stale'='not-needed';
-    if(customerOrderSectionsChanged(previous,merged)){
-      const nextVersion=body.version+1;
-      try{
-        await migrateCustomersOrdersShadow(ownerId,merged,nextVersion);
-        shadowSync='verified';
-      }catch(error){
-        shadowSync='stale';
-        console.error('Customers/orders relational shadow sync failed after primary workspace save',error);
-        try{await markCustomersOrdersShadowStale(ownerId,nextVersion)}catch(markError){console.error('Could not mark customers/orders shadow stale',markError)}
-      }
-    }
-    let inventorySupplierSync:'not-needed'|'verified'|'stale'='not-needed';
-    if(inventorySupplierSectionsChanged(previous,merged)){
-      const nextVersion=body.version+1;
-      try{await migrateInventorySupplierShadow(ownerId,merged,nextVersion);inventorySupplierSync='verified'}
-      catch(error){inventorySupplierSync='stale';console.error('Inventory/suppliers relational shadow sync failed after workspace save',error);try{await markInventorySupplierShadowStale(ownerId,nextVersion)}catch(markError){console.error('Could not mark inventory/suppliers shadow stale',markError)}}
-    }
-    let financeSync:'not-needed'|'verified'|'stale'='not-needed';
-    if(financeSectionsChanged(previous,merged)){
-      const nextVersion=body.version+1;
-      try{await migrateFinanceShadow(ownerId,merged,nextVersion);financeSync='verified'}
-      catch(error){financeSync='stale';console.error('Finance relational shadow sync failed after workspace save',error);try{await markFinanceShadowStale(ownerId,nextVersion)}catch(markError){console.error('Could not mark Finance shadow stale',markError)}}
-    }
+    const nextVersion=body.version+1;
+    const [shadowSync,inventorySupplierSync,financeSync]=await Promise.all([
+      customerOrderSectionsChanged(previous,merged)?(async()=>{
+        try{await migrateCustomersOrdersShadow(ownerId,merged,nextVersion);return 'verified' as const}
+        catch(error){console.error('Customers/orders relational shadow sync failed after primary workspace save',error);try{await markCustomersOrdersShadowStale(ownerId,nextVersion)}catch(markError){console.error('Could not mark customers/orders shadow stale',markError)}return 'stale' as const}
+      })():Promise.resolve('not-needed' as const),
+      inventorySupplierSectionsChanged(previous,merged)?(async()=>{
+        try{await migrateInventorySupplierShadow(ownerId,merged,nextVersion);return 'verified' as const}
+        catch(error){console.error('Inventory/suppliers relational shadow sync failed after workspace save',error);try{await markInventorySupplierShadowStale(ownerId,nextVersion)}catch(markError){console.error('Could not mark inventory/suppliers shadow stale',markError)}return 'stale' as const}
+      })():Promise.resolve('not-needed' as const),
+      financeSectionsChanged(previous,merged)?(async()=>{
+        try{await migrateFinanceShadow(ownerId,merged,nextVersion);return 'verified' as const}
+        catch(error){console.error('Finance relational shadow sync failed after workspace save',error);try{await markFinanceShadowStale(ownerId,nextVersion)}catch(markError){console.error('Could not mark Finance shadow stale',markError)}return 'stale' as const}
+      })():Promise.resolve('not-needed' as const)
+    ]);
     return response({version:body.version+1,data:visibleState(merged,role),shadowSync,inventorySupplierSync,financeSync});
   }catch(e){
     if(e instanceof AccessDenied)return response({error:e.message},403);

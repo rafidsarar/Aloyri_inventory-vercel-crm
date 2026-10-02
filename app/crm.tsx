@@ -2,6 +2,7 @@
 /* Final operational polish complete */
 /* Production release: management intelligence */
 import React,{useDeferredValue,useEffect,useMemo,useRef,useState} from 'react';
+import dynamic from 'next/dynamic';
 import { LayoutDashboard,ShoppingBag,Package,Users,Truck,Wallet,CalendarCheck,Plus,ArrowUpRight,ArrowRight,ChevronRight,ChevronDown,Download,Search,Bell,Check,CheckCircle2,Clock,AlertTriangle,Leaf,RefreshCw,ShieldCheck,Receipt,ArrowDownLeft,Box,Loader2,X,Mail,Phone,MapPin,ExternalLink,TrendingUp,Zap } from 'lucide-react';
 import { SidebarProvider,SidebarTrigger } from '@/components/ui/sidebar';
 import { Table,TableHeader,TableHead,TableBody,TableRow,TableCell } from '@/components/ui/table';
@@ -15,28 +16,27 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
-import { AreaChart,Area,CartesianGrid,XAxis,YAxis,Tooltip,ResponsiveContainer } from 'recharts';
 import { State,Product,Order,Customer,Task,initialState,uid,today,shiftDate,taka,dateLabel,stock,batchRemaining,stockPosition,metrics,cashflow,subtotal,total,receivable,collectedAmount,orderBalance,orderPaymentStatus,contribution,purchaseOrderValue,purchaseOrderUnits,purchaseOrderReceivedUnits,purchaseOrderOutstandingUnits,purchaseOrderProgress,supplierInsight,automationSignals,statuses,nextStatuses,stateSchema,accountIds,accountNames,accountBalance,type AutomationSettings } from '@/lib/crm';
 import { validateRoleRelations, validateWorkspaceChange } from '@/lib/role-data';
 import Form,{Choice,Modal} from './forms';
-import Invoice from './invoice';
-import Team from './team';
-import ChangePassword from './change-password';
-import AccountSecurity from './account-security';
-import Reconciliation from './reconciliation';
 import { canManageBusinessSettings, roleCanBackup, roleCanEdit, roleCanPrintInvoice, roleCanManageFinance, roleCanCloseFinance, roleCanExportData, roleCanImport, roleCanInspectReturns, roleCanManageTeam, roleCanReset, type WorkspaceRole } from '@/lib/roles';
 import { Avatar, Empty, Nav, OrderProgress, ProductIcon, Stat, Status, navIcons, sections, visibleSections, type View } from './crm-ui';
 import AlertsSection,{type AutoAlert} from './crm-sections/alerts';
 import ActivitySection from './crm-sections/activity';
-import AutomationSection from './crm-sections/automation';
 import OverviewSection from './crm-sections/overview';
 import CustomersSection from './crm-sections/customers';
 import FollowUpsSection from './crm-sections/follow-ups';
 import OrdersSection from './crm-sections/orders';
 import InventorySection from './crm-sections/inventory';
 import SuppliersSection from './crm-sections/suppliers';
-import ReportsSection from './crm-sections/reports';
-import FinancesSection from './crm-sections/finances';
+const Invoice=dynamic(()=>import('./invoice'));
+const Team=dynamic(()=>import('./team'));
+const ChangePassword=dynamic(()=>import('./change-password'));
+const AccountSecurity=dynamic(()=>import('./account-security'));
+const Reconciliation=dynamic(()=>import('./reconciliation'));
+const AutomationSection=dynamic(()=>import('./crm-sections/automation'));
+const ReportsSection=dynamic(()=>import('./crm-sections/reports'));
+const FinancesSection=dynamic(()=>import('./crm-sections/finances'));
 type GlobalResult={id:string;view:View;title:string;meta:string;query:string;score:number;detail?:{type:'order'|'customer'|'supplier';id:string}};
 type CustomerApiRecord=Customer&{recordVersion:number};
 type OrderApiRecord=Order&{recordVersion:number};
@@ -292,10 +292,12 @@ async function loadLive(showErrors=true,manageBusy=true){
     if(manageBusy)setView('Overview');
     setMemberName(d.userName||'Team member');setLoaded(true);setError(recovery?(d.warning||'Saved records are visible in read-only recovery mode.'):'');setAuthRequired(false);
     if(!recovery){
-      try{await loadCustomerRecords(nextRole)}catch(customerError){if(showErrors)toast.error(customerError instanceof Error?customerError.message:'Could not load customer records.')}
-      try{await loadOrderRecords(nextRole)}catch(orderError){if(showErrors)toast.error(orderError instanceof Error?orderError.message:'Could not load order records.')}
-      try{await loadInventorySupplierRecords(nextRole)}catch(domainError){if(showErrors)toast.error(domainError instanceof Error?domainError.message:'Could not load Inventory and Supplier records.')}
-      try{await loadFinanceRecords(nextRole)}catch(financeError){if(showErrors)toast.error(financeError instanceof Error?financeError.message:'Could not load Finance records.')}
+      await Promise.all([
+        loadCustomerRecords(nextRole).catch(customerError=>{if(showErrors)toast.error(customerError instanceof Error?customerError.message:'Could not load customer records.')}),
+        loadOrderRecords(nextRole).catch(orderError=>{if(showErrors)toast.error(orderError instanceof Error?orderError.message:'Could not load order records.')}),
+        loadInventorySupplierRecords(nextRole).catch(domainError=>{if(showErrors)toast.error(domainError instanceof Error?domainError.message:'Could not load Inventory and Supplier records.')}),
+        loadFinanceRecords(nextRole).catch(financeError=>{if(showErrors)toast.error(financeError instanceof Error?financeError.message:'Could not load Finance records.')})
+      ]);
     }
     return true;
   }catch(e){if(showErrors)setError(e instanceof Error?e.message:'Could not load your workspace.');return false;}
@@ -309,29 +311,30 @@ useEffect(()=>{let active=true;(async()=>{try{
   setLive(d.data);setVersion(d.version);setRole(nextRole);setRecoveryMode(recovery);
   setView('Overview');
   setMemberName(d.userName||'Team member');setLoaded(true);setError(recovery?(d.warning||'Saved records are visible in read-only recovery mode.'):'');
-  if(!recovery&&visibleSections(nextRole).includes('Customers')){
-    const customerRes=await fetch('/api/customers',{cache:'no-store'}),customerData:any=await customerRes.json();
-    if(active&&customerRes.ok){
-      const records=(Array.isArray(customerData.customers)?customerData.customers:[]) as CustomerApiRecord[];
+  if(!recovery){
+    const wantsCustomers=visibleSections(nextRole).includes('Customers');
+    const wantsOrders=visibleSections(nextRole).includes('Orders');
+    const wantsInventory=visibleSections(nextRole).some(section=>section==='Inventory'||section==='Suppliers');
+    const wantsFinance=visibleSections(nextRole).includes('Finances');
+    const [customerResult,orderResult,inventoryResult,financeResult]=await Promise.all([
+      wantsCustomers?fetch('/api/customers',{cache:'no-store'}).then(async r=>({ok:r.ok,data:await r.json()})):Promise.resolve(null),
+      wantsOrders?fetch('/api/orders',{cache:'no-store'}).then(async r=>({ok:r.ok,data:await r.json()})):Promise.resolve(null),
+      wantsInventory?fetch('/api/inventory-suppliers',{cache:'no-store'}).then(async r=>({ok:r.ok,data:await r.json()})):Promise.resolve(null),
+      wantsFinance?fetch('/api/finances',{cache:'no-store'}).then(async r=>({ok:r.ok,data:await r.json()})):Promise.resolve(null)
+    ]);
+    if(!active)return;
+    if(customerResult?.ok){
+      const records=(Array.isArray(customerResult.data.customers)?customerResult.data.customers:[]) as CustomerApiRecord[];
       setCustomerRecordVersions(Object.fromEntries(records.map(customer=>[customer.id,customer.recordVersion])));
       setLive(current=>({...current,customers:records.map(({recordVersion:_,...customer})=>customer)}));
     }
-  }
-  if(!recovery&&visibleSections(nextRole).includes('Orders')){
-    const orderRes=await fetch('/api/orders',{cache:'no-store'}),orderData:any=await orderRes.json();
-    if(active&&orderRes.ok){
-      const records=(Array.isArray(orderData.orders)?orderData.orders:[]) as OrderApiRecord[];
+    if(orderResult?.ok){
+      const records=(Array.isArray(orderResult.data.orders)?orderResult.data.orders:[]) as OrderApiRecord[];
       setOrderRecordVersions(Object.fromEntries(records.map(order=>[order.id,order.recordVersion])));
       setLive(current=>({...current,orders:records.map(({recordVersion:_,...order})=>order)}));
     }
-  }
-  if(!recovery&&visibleSections(nextRole).some(section=>section==='Inventory'||section==='Suppliers')){
-    const domainRes=await fetch('/api/inventory-suppliers',{cache:'no-store'}),domainData:any=await domainRes.json();
-    if(active&&domainRes.ok){setInventorySupplierVersion(Number(domainData.domainVersion||0));setLive(current=>({...current,...domainData.data}));}
-  }
-  if(!recovery&&visibleSections(nextRole).includes('Finances')){
-    const financeRes=await fetch('/api/finances',{cache:'no-store'}),financeData:any=await financeRes.json();
-    if(active&&financeRes.ok){setFinanceDomainVersion(Number(financeData.domainVersion||0));setLive(current=>({...current,...financeData.data}));}
+    if(inventoryResult?.ok){setInventorySupplierVersion(Number(inventoryResult.data.domainVersion||0));setLive(current=>({...current,...inventoryResult.data.data}));}
+    if(financeResult?.ok){setFinanceDomainVersion(Number(financeResult.data.domainVersion||0));setLive(current=>({...current,...financeResult.data.data}));}
   }
 }catch(e){if(active)setError(e instanceof Error?e.message:'Could not load your saved records.')}})();return()=>{active=false}},[]);
 async function save(next:State):Promise<boolean>{if(recoveryMode){toast.error('Recovery mode is read-only. Refresh records after the relational connection recovers.');return false;}if(saving.current)return false;try{next=stateSchema.parse(next);if(role==='inventory')validateRoleRelations(next,role);else validateWorkspaceChange(s,next);}catch(e){toast.error(e instanceof Error?e.message:'Please check the values.');return false;}if(!loaded){toast.error('Load your workspace before saving.');return false;}if(Object.keys(s).some(key=>!roleCanEdit(role,key)&&!(role==='inventory'&&key==='orders')&&JSON.stringify(next[key as keyof State])!==JSON.stringify(s[key as keyof State]))){toast.error('Your role cannot change that section.');return false;}saving.current=true;setBusy(true);try{const res=await fetch('/api/workspace',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:next,version})});const d:any=await res.json();if(!res.ok)throw Error(d.error||'Could not save.');setLive(d.data?stateSchema.parse(d.data):next);setVersion(d.version);setError('');toast.success('Changes saved');return true;}catch(e){const message=e instanceof Error?e.message:'Could not save.';setError(message);toast.error(message);return false;}finally{saving.current=false;setBusy(false)}}
