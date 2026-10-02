@@ -91,14 +91,22 @@ test('sales daily workflow: create customer/order, progress order, create and co
   const clean=consoleGuard(page);
   await login(page,'sales');
 
+  await nav(page,'Customers');
+  await page.getByRole('button',{name:'Add customer'}).click();
+  await expect(page.getByRole('heading',{name:'Add customer'})).toBeVisible();
+  await page.getByLabel('name').fill('Live Audit Sales Customer');
+  await page.getByLabel('phone').fill('01722222222');
+  await page.getByLabel('city').fill('Dhaka');
+  await page.getByLabel('address').fill('Dhanmondi, Dhaka');
+  await page.getByRole('button',{name:'Save changes'}).click();
+  await expect(page.getByText('Live Audit Sales Customer',{exact:true}).first()).toBeVisible({timeout:30000});
+
   await nav(page,'Orders');
   await page.getByRole('button',{name:'Create order'}).click();
   await expect(page.getByRole('heading',{name:'New order'})).toBeVisible();
-  await page.getByRole('tab',{name:'New customer'}).click();
-  await page.getByLabel('New customer name').fill('Live Audit Sales Customer');
-  await page.getByLabel('New customer mobile').fill('01722222222');
-  await page.getByLabel('New customer city').fill('Dhaka');
-  await page.getByLabel('New customer delivery address').fill('Dhanmondi, Dhaka');
+  const orderDialog=page.locator('.record-dialog');
+  await orderDialog.getByRole('combobox').first().click();
+  await page.getByRole('option',{name:/Live Audit Sales Customer/}).click();
   await page.getByRole('button',{name:'Create order'}).click();
   await expect(page.getByRole('heading',{name:/^Invoice for /})).toBeVisible({timeout:30000});
   await page.getByRole('button',{name:'Close'}).click();
