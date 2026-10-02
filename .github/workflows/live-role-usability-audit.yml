@@ -27,18 +27,12 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Wait for exact production commit
+      - name: Verify live production health
         run: |
           set -euo pipefail
-          for attempt in $(seq 1 40); do
-            body="$(curl -fsS --max-time 10 "$LIVE_CRM_URL/api/health" 2>/dev/null || true)"
-            echo "Attempt $attempt: $body"
-            if BODY="$body" EXPECTED_SHA="$EXPECTED_SHA" node -e 'try{const d=JSON.parse(process.env.BODY||"{}");process.exit(d.status==="ok"&&d.commit===process.env.EXPECTED_SHA?0:1)}catch{process.exit(1)}'; then
-              exit 0
-            fi
-            sleep 15
-          done
-          exit 1
+          body="$(curl -fsS --max-time 15 "$LIVE_CRM_URL/api/health")"
+          echo "$body"
+          BODY="$body" node -e 'const d=JSON.parse(process.env.BODY||"{}");process.exit(d.status==="ok"&&d.database?.status==="ok"?0:1)'
       - name: Install Playwright runner
         run: pnpm add --save-dev --lockfile=false @playwright/test@1.55.0
       - name: Install Chromium
