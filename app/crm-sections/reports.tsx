@@ -43,7 +43,7 @@ export default function ReportsSection({ctx}:Props){
   const [stage4,setStage4]=useState<any>(null);
   const [stage4Error,setStage4Error]=useState('');
   const [stage4Loading,setStage4Loading]=useState(true);
-  useEffect(()=>{let active=true;setStage4Loading(true);fetch('/api/operational-intelligence',{cache:'no-store'}).then(async response=>{const data=await response.json();if(!response.ok)throw new Error(data.error||'Could not load operational intelligence.');if(active){setStage4(data);setStage4Error('')}}).catch(error=>{if(active)setStage4Error(error instanceof Error?error.message:'Could not load operational intelligence.')}).finally(()=>{if(active)setStage4Loading(false)});return()=>{active=false}},[reportMonth]);
+  useEffect(()=>{let active=true;fetch('/api/operational-intelligence',{cache:'no-store'}).then(async response=>{const data=await response.json();if(!response.ok)throw new Error(data.error||'Could not load operational intelligence.');if(active){setStage4(data);setStage4Error('')}}).catch(error=>{if(active)setStage4Error(error instanceof Error?error.message:'Could not load operational intelligence.')}).finally(()=>{if(active)setStage4Loading(false)});return()=>{active=false}},[]);
   return <WorkspaceSection className="management-report-page">
 <section className="management-report-hero">
   <div className="management-report-hero-copy">
