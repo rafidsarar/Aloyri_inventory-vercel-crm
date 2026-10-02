@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { database } from '../db/raw.ts';
 import { ensureRelationalFoundation } from '../db/relational-foundation.ts';
 import { runLegacyDataCertification } from './canonicalize-legacy-data.ts';
+import { cleanupDeterministicBusinessExceptions } from './cleanup-business-exceptions.ts';
 
 const db=database();
 const now=()=>new Date().toISOString();
@@ -36,6 +37,7 @@ for(const file of migrationFiles()){
 // request handlers do not need to be the first place schema is discovered.
 await ensureRelationalFoundation();
 await runLegacyDataCertification();
+await cleanupDeterministicBusinessExceptions();
 
 const latest=await db.prepare('SELECT version FROM crm_schema_migrations ORDER BY version DESC LIMIT 1').first<{version:string}>();
 console.log('Database migrations ready',latest?.version||'baseline');
