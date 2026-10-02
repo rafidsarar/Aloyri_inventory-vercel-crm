@@ -31,6 +31,21 @@ BEGIN
      OR to_regclass('public.crm_login_attempts') IS NULL THEN
     RAISE EXCEPTION 'baseline auth/workspace tables missing';
   END IF;
+  IF to_regclass('public.crm_rel_customers') IS NULL
+     OR to_regclass('public.crm_rel_orders') IS NULL
+     OR to_regclass('public.crm_rel_products') IS NULL
+     OR to_regclass('public.crm_rel_finance_cash_entries') IS NULL
+     OR to_regclass('public.crm_domain_versions') IS NULL
+     OR to_regclass('public.crm_relational_cutover') IS NULL THEN
+    RAISE EXCEPTION 'relational foundation tables missing';
+  END IF;
+  IF to_regclass('public.crm_restore_snapshots') IS NULL
+     OR to_regclass('public.crm_audit_log') IS NULL THEN
+    RAISE EXCEPTION 'restore infrastructure missing';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM crm_schema_migrations WHERE version='004_restore_infrastructure') THEN
+    RAISE EXCEPTION 'restore migration was not recorded';
+  END IF;
 END $$;
 
 DELETE FROM crm_users WHERE owner_id='owner-test';
