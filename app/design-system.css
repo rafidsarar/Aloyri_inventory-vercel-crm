@@ -125,11 +125,23 @@
 }
 
 
-/* Native fieldsets otherwise keep their min-content width and stretch dialogs. */
+/* Keep intrinsic form content inside the dialog grid. */
+.record-dialog,
+.record-dialog .business-settings {
+  grid-template-columns: minmax(0, 1fr);
+}
+.record-dialog > *,
+.record-dialog .business-settings > * {
+  min-width: 0;
+}
 .record-dialog .record-form,
 .record-dialog .record-form > fieldset {
   min-width: 0;
   max-width: 100%;
+}
+
+.record-dialog .form-actions {
+  margin-inline: 0;
 }
 
 /* Reusable CRM layout primitives */
@@ -544,7 +556,7 @@
   .section-tabs [role="tab"],
   .finance-tabs [role="tab"],
   .purchasing-tabs [role="tab"],
-.inventory-records [role="tab"] {
+  .inventory-records [role="tab"] {
     min-height: 44px;
   }
 

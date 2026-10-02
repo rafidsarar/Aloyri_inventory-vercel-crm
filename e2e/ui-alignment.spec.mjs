@@ -147,6 +147,7 @@ for (const width of [390, 650, 768, 1440]) {
     await page.getByRole('button', { name: 'Business settings', exact: true }).click();
     const settings = page.getByRole('dialog', { name: 'Business settings', exact: true });
     await expect(settings).toBeVisible();
+    if (width === 390 || width === 1440) await page.screenshot({ path: testInfo.outputPath('settings.png') });
     expect(await settings.evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1);
     const bounds = await settings.boundingBox();
     for (const field of await settings.locator('.record-form input:visible, .form-actions button:visible').all()) {
@@ -154,7 +155,6 @@ for (const width of [390, 650, 768, 1440]) {
       expect(box.x).toBeGreaterThanOrEqual(bounds.x);
       expect(box.x + box.width).toBeLessThanOrEqual(bounds.x + bounds.width - 10);
     }
-    if (width === 390 || width === 1440) await page.screenshot({ path: testInfo.outputPath('settings.png') });
     await settings.getByRole('button', { name: 'Cancel', exact: true }).click();
     await expect(settings).toHaveCount(0);
   });
