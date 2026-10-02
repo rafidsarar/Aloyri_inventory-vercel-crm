@@ -45,7 +45,7 @@ export async function receivePurchaseOrderWorkflow(ownerId:string,input:{purchas
 }
 
 export async function postSupplierPaymentWorkflow(ownerId:string,input:{batchId:string;date:string;amount:number;note:string;account:string;domainVersion:number},actor:Actor){
-  if(!['owner','admin'].includes(actor.role))throw new Error('FINANCE_FORBIDDEN');
+  if(!['owner','admin','finance'].includes(actor.role))throw new Error('FINANCE_FORBIDDEN');
   if(!accountIds.includes(input.account as any))throw new Error('Choose a valid account.');
   if(!/^\d{4}-\d{2}-\d{2}$/.test(input.date)||input.date>today())throw new Error('Choose a valid payment date that is not in the future.');
   if(!Number.isFinite(input.amount)||input.amount<=0)throw new Error('Payment amount must be above zero.');
