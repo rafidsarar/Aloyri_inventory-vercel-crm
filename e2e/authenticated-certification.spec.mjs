@@ -60,7 +60,12 @@ test('real authenticated RBAC matrix protects reads and writes for every role',a
     expect((await s.request.get('/api/workspace')).status(),role+' workspace').toBe(200);
     expect((await s.request.get('/api/orders')).status(),role+' orders').toBe(readable[role].orders);
     expect((await s.request.get('/api/customers')).status(),role+' customers').toBe(readable[role].customers);
-    expect((await s.request.get('/api/inventory-suppliers')).status(),role+' inventory').toBe(readable[role].inventory);
+    const inventoryRead=await s.request.get('/api/inventory-suppliers');
+    expect(inventoryRead.status(),role+' inventory').toBe(readable[role].inventory);
+    if(role==='inventory'){
+      const inventoryBody=await inventoryRead.json();
+      expect(inventoryBody.data.batches.every(batch=>batch.payments.length===0&&batch.paid===false&&batch.paidAt==null),'inventory payment fields hidden').toBeTruthy();
+    }
     expect((await s.request.get('/api/finances')).status(),role+' finance').toBe(readable[role].finance);
     expect((await s.request.get('/api/team')).status(),role+' team').toBe(readable[role].team);
     expect((await s.request.get('/api/workspace/backup')).status(),role+' backup').toBe(readable[role].backup);
