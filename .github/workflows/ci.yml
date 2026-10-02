@@ -50,6 +50,15 @@ jobs:
       DATABASE_URL: postgresql://crm:crm@localhost:5432/aloyri_test
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - name: Verify versioned migrations against PostgreSQL
         run: bash scripts/postgres-integration.sh
 
