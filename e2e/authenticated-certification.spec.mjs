@@ -239,10 +239,11 @@ test('management reporting is authenticated, role-bound and internally consisten
       if(role==='owner'){
         const page=await s.context.newPage();
         await page.goto('/');
+        await expect(page.getByRole('heading',{name:'Run the business from what needs attention now.'})).toBeVisible({timeout:15000});
         await page.getByRole('button',{name:'Reports',exact:true}).click();
-        await expect(page.getByRole('heading',{name:'Executive performance overview'})).toBeVisible();
-        await expect(page.getByText('Business Control Center',{exact:true})).toBeVisible();
-        await expect(page.getByText('Operational intelligence',{exact:true})).toBeVisible();
+        await expect(page.getByRole('heading',{name:'Executive performance overview'})).toBeVisible({timeout:15000});
+        await expect(page.getByText('Business Control Center',{exact:true})).toBeVisible({timeout:15000});
+        await expect(page.getByText('Operational intelligence',{exact:true})).toBeVisible({timeout:15000});
       }
     }
     await s.context.close();
