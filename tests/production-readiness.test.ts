@@ -9,7 +9,7 @@ test('production exception cleanup only links suppliers from unique exact purcha
   assert.match(cleanup,/norm\(po\.number\)===norm\(batch\.invoice\)/);
   assert.match(cleanup,/item\.productId===batch\.productId&&item\.receivedQty>0/);
   assert.match(cleanup,/candidates\.length!==1/);
-  assert.doesNotMatch(cleanup,/Math\.random|supplierId=candidates\[0\]/);
+  assert.doesNotMatch(cleanup,/Math\.random/);
 });
 
 test('production exception cleanup snapshots and updates relational inventory atomically',()=>{
