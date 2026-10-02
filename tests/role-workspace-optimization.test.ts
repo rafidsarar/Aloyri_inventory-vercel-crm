@@ -52,7 +52,7 @@ test('operational staff data is still privacy filtered before reaching their bro
   const state=initialState();
   state.customers=[{id:'c1',name:'Private Name',phone:'017',address:'Secret',city:'Dhaka',preference:'x',notes:'note',consent:true,created:'2026-01-01'}];
   state.suppliers=[{id:'s1',name:'Supplier',contact:'Person',phone:'018',email:'s@example.com',address:'Dhaka',leadDays:7,paymentTermsDays:30,notes:'',verified:true}];
-  state.expenses=[{id:'e1',category:'Rent',amount:100,date:'2026-01-01',notes:'',vendor:'',reference:'',recurring:false,account:'cash'}];
+  state.expenses=[{id:'e1',category:'Other',amount:100,date:'2026-01-01',notes:'',vendor:'',reference:'',recurring:'none',account:'cash'}];
   const sales=visibleState(state,'sales');
   const inventory=visibleState(state,'inventory');
   assert.equal(sales.suppliers.length,0);
