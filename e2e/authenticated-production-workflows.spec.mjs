@@ -8,8 +8,10 @@ const email=role=>role+'@e2e.aloyri.local';
 async function login(browser,role){
   const context=await browser.newContext();
   const page=await context.newPage();
+  await page.goto('/login');
+  const requestOrigin=new URL(page.url()).origin;
   const authenticated=await context.request.post('/api/auth/login',{
-    headers:origin,
+    headers:{Origin:requestOrigin},
     data:{email:email(role),password:PASSWORD}
   });
   expect(authenticated.status(),role+' authentication').toBe(200);
