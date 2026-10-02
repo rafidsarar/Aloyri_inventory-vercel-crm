@@ -1,7 +1,7 @@
 import { getAppUser, checkOrigin } from '@/app/local-auth';
 import { AccessDenied, resolveWorkspace } from '@/app/team-access';
 import { database } from '@/db/raw';
-import { fixedBusinessName, stateSchema, validateRelations, workspaceIntegrityWarnings, type State } from '@/lib/crm';
+import { validateRelations, workspaceIntegrityWarnings, type State } from '@/lib/crm';
 import { roleCanBackup } from '@/lib/roles';
 import { relationalCoreState,verifyRelationalParity } from '@/db/relational-cutover';
 import { customerOrderShadowStatements,CUSTOMER_ORDER_DOMAIN } from '@/db/customer-order-shadow';
