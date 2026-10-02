@@ -10,29 +10,46 @@ permissions:
 jobs:
   production-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 10
     steps:
-      - name: Wait for this commit to be live and healthy
+      - name: Wait for this commit and production acceptance
         env:
           EXPECTED_SHA: ${{ github.sha }}
           HEALTH_URL: https://aloyriinventory-vercel-crm.vercel.app/api/health
+          ACCEPTANCE_URL: https://aloyriinventory-vercel-crm.vercel.app/api/acceptance
         run: |
           set -euo pipefail
-          for attempt in $(seq 1 24); do
-            body="$(curl -fsS --max-time 10 "$HEALTH_URL" 2>/dev/null || true)"
-            echo "Attempt $attempt: $body"
-            if BODY="$body" EXPECTED_SHA="$EXPECTED_SHA" node -e '
+          for attempt in $(seq 1 32); do
+            health="$(curl -fsS --max-time 10 "$HEALTH_URL" 2>/dev/null || true)"
+            acceptance="$(curl -fsS --max-time 10 "$ACCEPTANCE_URL" 2>/dev/null || true)"
+            echo "Attempt $attempt health: $health"
+            echo "Attempt $attempt acceptance: $acceptance"
+            if HEALTH="$health" ACCEPTANCE="$acceptance" EXPECTED_SHA="$EXPECTED_SHA" node -e '
               try {
-                const body = JSON.parse(process.env.BODY || "{}");
-                process.exit(body.status === "ok" && body.commit === process.env.EXPECTED_SHA && body.database?.status === "ok" && body.database?.relationalSchema === "ok" && body.database?.migrationVersion ? 0 : 1);
+                const health=JSON.parse(process.env.HEALTH||"{}");
+                const acceptance=JSON.parse(process.env.ACCEPTANCE||"{}");
+                const healthOk=health.status==="ok"
+                  && health.commit===process.env.EXPECTED_SHA
+                  && health.database?.status==="ok"
+                  && health.database?.relationalSchema==="ok"
+                  && health.database?.migrationVersion;
+                const checks=acceptance.checks||{};
+                const acceptanceOk=acceptance.status==="ok"
+                  && acceptance.commit===process.env.EXPECTED_SHA
+                  && checks.workspaceReady===true
+                  && checks.cutoverReady===true
+                  && checks.relationalDomainsReady===true
+                  && checks.domainVersionsReady===true
+                  && checks.restoreInfrastructureReady===true;
+                process.exit(healthOk&&acceptanceOk?0:1);
               } catch {
                 process.exit(1);
               }
             '; then
-              echo "Production code, database migrations and relational schema are healthy on commit $EXPECTED_SHA"
+              echo "Production code, database and operational acceptance are healthy on commit $EXPECTED_SHA"
               exit 0
             fi
             sleep 15
           done
-          echo "Production did not become healthy on the expected commit in time."
+          echo "Production did not pass acceptance on the expected commit in time."
           exit 1
