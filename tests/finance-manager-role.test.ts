@@ -55,8 +55,8 @@ test('Finance Manager is recognized at CRM session load and receives finance ale
 
 test('Finance Manager can post collections supplier payments and ordinary finance changes',()=>{
   assert.match(financeRecords,/\['owner','admin','finance'\]\.includes\(actor\.role\)/);
-  assert.match(orderWorkflows,/\['owner','admin','finance'\]\.includes\(actor\.role\).*FINANCE_FORBIDDEN/s);
-  assert.match(inventoryWorkflows,/\['owner','admin','finance'\]\.includes\(actor\.role\).*FINANCE_FORBIDDEN/s);
+  assert.match(orderWorkflows,/\['owner','admin','finance'\]\.includes\(actor\.role\)[\s\S]*FINANCE_FORBIDDEN/);
+  assert.match(inventoryWorkflows,/\['owner','admin','finance'\]\.includes\(actor\.role\)[\s\S]*FINANCE_FORBIDDEN/);
   assert.match(financeWorkflows,/reverseManualCashEntry[\s\S]*\['owner','admin','finance'\]\.includes\(actor\.role\)/);
   assert.match(financeRoute,/\['owner','admin','finance','viewer'\]/);
 });
