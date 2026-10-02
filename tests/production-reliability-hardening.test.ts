@@ -10,7 +10,7 @@ const dates=readFileSync(new URL('../db/relational-date.ts',import.meta.url),'ut
 test('workspace read falls back to synchronized compatibility data when relational read fails',()=>{
   assert.match(workspace,/try\{\s*const workspace=\(await relationalCoreState\(ownerId\)\)\.state/);
   assert.match(workspace,/serving compatibility recovery snapshot/);
-  assert.match(workspace,/data:visibleState\(compatibility,role\)/);
+  assert.match(workspace,/data:visibleState\(compatibility\(\),role\)/);
   assert.match(workspace,/recoveryMode:true/);
   assert.match(workspace,/readSource:'compatibility-recovery'/);
 });
@@ -18,7 +18,7 @@ test('workspace read falls back to synchronized compatibility data when relation
 test('recovery mode is explicitly read-only in the CRM',()=>{
   assert.match(crm,/const canEdit=\(key:string\)=>!recoveryMode&&roleCanEdit\(role,key\)/);
   assert.match(crm,/Recovery mode is read-only/);
-  assert.match(crm,/if\(!recovery&&visibleSections\(nextRole\)\.includes\('Customers'\)\)/);
+  assert.match(crm,/if\(!recovery\)\{[\s\S]*const wantsCustomers=visibleSections\(nextRole\)\.includes\('Customers'\)/);
   assert.match(crm,/editing is paused until relational checks recover/);
 });
 
