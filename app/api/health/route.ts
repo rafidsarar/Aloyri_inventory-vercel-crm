@@ -6,7 +6,7 @@ const headers={
   'Cache-Control':'no-store, max-age=0',
   'Content-Type':'application/json; charset=utf-8'
 };
-const MIN_MIGRATION='006_session_security_recovery';
+const MIN_MIGRATION='007_legacy_date_canonicalization';
 
 type SchemaHealth={
   ok:number;
@@ -16,6 +16,7 @@ type SchemaHealth={
   rel_products:string|null;
   rel_finance:string|null;
   domain_versions:string|null;
+  integrity_certifications:string|null;
 };
 
 export async function GET(){
@@ -30,16 +31,17 @@ export async function GET(){
         to_regclass('public.crm_rel_orders')::text AS rel_orders,
         to_regclass('public.crm_rel_products')::text AS rel_products,
         to_regclass('public.crm_rel_finance_cash_entries')::text AS rel_finance,
-        to_regclass('public.crm_domain_versions')::text AS domain_versions
+        to_regclass('public.crm_domain_versions')::text AS domain_versions,
+        to_regclass('public.crm_data_integrity_certifications')::text AS integrity_certifications
     `).first<SchemaHealth>();
     if(result?.ok!==1)throw new Error('Database health check failed.');
     if(!result.role_check?.toLowerCase().includes('finance'))throw new Error('Workspace role schema is outdated.');
     if(!result.migration_version||result.migration_version.localeCompare(MIN_MIGRATION)<0)throw new Error('Database migrations are incomplete.');
-    if(!result.rel_orders||!result.rel_products||!result.rel_finance||!result.domain_versions)throw new Error('Relational schema is incomplete.');
+    if(!result.rel_orders||!result.rel_products||!result.rel_finance||!result.domain_versions||!result.integrity_certifications)throw new Error('Relational or data-integrity schema is incomplete.');
     return Response.json({
       status:'ok',
       commit,
-      database:{status:'ok',migrationVersion:result.migration_version,relationalSchema:'ok'}
+      database:{status:'ok',migrationVersion:result.migration_version,relationalSchema:'ok',dataIntegritySchema:'ok'}
     },{status:200,headers});
   }catch(error){
     console.error('Health check failed',error);
