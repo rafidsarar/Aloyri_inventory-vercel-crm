@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { customer360,financeControl,inventoryPlanning,orderOperations,supplierPerformance } from '../db/growth-control.ts';
-import { initialState,shiftDate,today,total,subtotal,type State } from '../lib/crm.ts';
+import { initialState,shiftDate,subtotal,type State } from '../lib/crm.ts';
 
 function fixture(){
   const s=initialState();
@@ -20,7 +20,7 @@ function fixture(){
     {id:'o3',number:'RPT-3',customerId:'c2',created:shiftDate(-5),collections:[],channel:'Instagram',payment:'COD',status:'Packed',items:[{productId:'simple-wash',qty:1,price:800,allocations:[{batchId:'b1',qty:1,unitCost:500}]}],discount:0,deliveryCharge:80,courierCost:0,packaging:0,paymentFee:0,returnFee:0,settled:false,restocked:false,tracking:'',notes:''}
   ] as State['orders'];
   s.purchaseOrders=[{id:'po1',number:'PO-1',supplierId:'s1',created:shiftDate(-50),expected:shiftDate(-42),status:'Received',notes:'',items:[{productId:'simple-wash',qty:20,unitCost:500,receivedQty:20}]}];
-  s.expenses=[{id:'e1',category:'Marketing',amount:250,date:shiftDate(-4),notes:'',vendor:'',reference:'',recurring:'none',account:'cash'}];
+  s.expenses=[{id:'e1',category:'Advertising',amount:250,date:shiftDate(-4),notes:'',vendor:'',reference:'',recurring:'none',account:'cash'}];
   return s;
 }
 
