@@ -8,6 +8,7 @@ import { customerOrderShadowStatements,CUSTOMER_ORDER_DOMAIN } from '@/db/custom
 import { inventorySupplierShadowStatements,INVENTORY_SUPPLIER_DOMAIN } from '@/db/inventory-supplier-shadow';
 import { financeShadowStatements,FINANCE_DOMAIN } from '@/db/finance-shadow';
 import { getDomainVersion,domainVersionBumpStatements } from '@/db/domain-version';
+import { canonicalizeLegacyState } from '@/lib/data-integrity';
 
 export const dynamic='force-dynamic';
 const response=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
@@ -44,8 +45,7 @@ async function parseBackup(backup:any){
       throw new Error('Backup integrity metadata is missing.');
     if(backup.integrity.checksum!==rawChecksum)throw new Error('Backup integrity check failed. The file may be incomplete or modified.');
   }
-  const restored=fixedBusinessName(stateSchema.parse(backup.data));
-  validateRelations(restored,{skipOrderNumberUniqueness:true});
+  const {state:restored}=canonicalizeLegacyState(backup.data);
   const counts=recordCounts(restored);
   if(backup.schemaVersion>=2&&backup.integrity.counts&&Object.entries(counts).some(([key,value])=>backup.integrity.counts[key]!==value))
     throw new Error('Backup record counts do not match the file contents.');
