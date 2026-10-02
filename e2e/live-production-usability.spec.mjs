@@ -193,8 +193,13 @@ test('finance daily workflow: collect receivable, pay supplier, record expense a
   await page.getByRole('tab',{name:'Payables'}).click();
   await page.getByRole('button',{name:'Record payment'}).first().click();
   await expect(page.getByRole('heading',{name:'Record supplier payment'})).toBeVisible();
+  const supplierPaymentResponsePromise=page.waitForResponse(response=>response.url().includes('/api/inventory-batches/')&&response.url().endsWith('/supplier-payment')&&response.request().method()==='POST');
   await page.getByRole('button',{name:'Post & reconcile'}).click();
-  await expect(page.getByText('No supplier payments due')).toBeVisible({timeout:30000});
+  const supplierPaymentResponse=await supplierPaymentResponsePromise;
+  const supplierPaymentBody=await supplierPaymentResponse.text();
+  console.log('AUDIT_DIAGNOSTIC finance supplier payment POST',supplierPaymentResponse.status(),supplierPaymentBody);
+  expect(supplierPaymentResponse.status(),'Finance supplier payment: '+supplierPaymentBody).toBe(200);
+  await expect(page.getByRole('heading',{name:'Record supplier payment'})).toHaveCount(0);
 
   await page.getByRole('tab',{name:'Expenses'}).click();
   await page.getByRole('button',{name:'Record expense'}).click();
