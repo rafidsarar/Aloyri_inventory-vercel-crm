@@ -22,6 +22,12 @@ test('sessions store device metadata and support bounded lifecycle cleanup',()=>
   assert.match(auth,/DELETE FROM crm_login_attempts WHERE expires_at<=\?/);
 });
 
+test('session API never exposes full token hashes and scopes revocation to the signed-in user',()=>{
+  assert.match(sessions,/id:row\.token_hash\.slice\(0,16\)/);
+  assert.match(sessions,/WHERE user_id=\? AND LEFT\(token_hash,16\)=\?/);
+  assert.doesNotMatch(sessions,/token_hash:row\.token_hash/);
+});
+
 test('users can review and revoke only their own active sessions',()=>{
   assert.match(sessions,/WHERE user_id=\? AND expires_at>\?/);
   assert.match(sessions,/action==='revokeOthers'/);
