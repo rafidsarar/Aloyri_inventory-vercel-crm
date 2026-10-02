@@ -1,16 +1,15 @@
 import { getAppUser, checkOrigin } from '@/app/local-auth';
 import { database } from '@/db/raw';
-import { fixedBusinessName,stateSchema,validateRelations } from '@/lib/crm';
+import { stateSchema } from '@/lib/crm';
+import { canonicalizeLegacyState } from '@/lib/data-integrity';
 import { roleCanImport } from '@/lib/roles';
 export async function POST(request:Request){
   if(!checkOrigin(request))return Response.json({error:'Invalid request origin.'},{status:403});
   const user=await getAppUser();if(!user||!roleCanImport(user.role))return Response.json({error:'Only the owner or an admin can import records.'},{status:403});
   const text=await request.text();if(text.length>1800000)return Response.json({error:'Backup is too large.'},{status:413});
   let raw:any;try{raw=JSON.parse(text)}catch{return Response.json({error:'Invalid JSON backup.'},{status:400})}
-  const parsed=stateSchema.safeParse(raw.data||raw);
-  if(!parsed.success)return Response.json({error:'This is not a valid Skinventory backup.'},{status:400});
-  const imported=fixedBusinessName(parsed.data);
-  try{validateRelations(imported)}catch{return Response.json({error:'Backup has inconsistent records.'},{status:400})}
+  let imported;
+  try{imported=canonicalizeLegacyState(raw.data||raw).state}catch{return Response.json({error:'This backup contains invalid or inconsistent records.'},{status:400})}
   const db=database();
   const row=await db.prepare('SELECT data,version FROM crm_workspaces WHERE owner_id=?').bind(user.ownerId).first<{data:string;version:number}>();
   if(row){const current=stateSchema.parse(JSON.parse(row.data));if(row.version!==0||current.customers.length||current.orders.length||current.batches.length||current.expenses.length)return Response.json({error:'This workspace already has records. Import into a new empty workspace only.'},{status:409})}
