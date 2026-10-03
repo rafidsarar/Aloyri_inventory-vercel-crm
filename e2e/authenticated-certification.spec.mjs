@@ -294,6 +294,7 @@ test('owner backup restore drill round-trips safely and stays owner-only',async(
 test('inventory manager links an existing batch through the UI without altering stock or payment history',async({browser})=>{
   const owner=await login(browser,'owner');
   const inventory=await login(browser,'inventory');
+  inventory.context.setDefaultTimeout(15000);
   try{
     const seed=await owner.request.get('/api/inventory-suppliers').then(r=>r.json());
     const batch=seed.data.batches.find(b=>b.id==='batch-1');
@@ -324,5 +325,5 @@ test('inventory manager links an existing batch through the UI without altering 
     const audit=await owner.request.get('/api/audit').then(r=>r.json());
     expect(JSON.stringify(audit)).toContain('Supplier links: batch-1');
     expect(JSON.stringify(audit)).toContain('INV-VERIFIED-LINK');
-  }finally{await inventory.context.close();await owner.context.close();}
+  }finally{await Promise.allSettled([inventory.context.close(),owner.context.close()]);}
 });
