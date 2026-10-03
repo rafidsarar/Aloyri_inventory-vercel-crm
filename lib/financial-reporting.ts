@@ -1,4 +1,4 @@
-import { costOfOrder,customerPaidAmount,refundedAmount,returnInventoryCost,subtotal,type State } from './crm.ts';
+import { costOfOrder,customerPaidAmount,refundedAmount,returnInventoryCost,subtotal,today,type State } from './crm.ts';
 const inMonth=(date:string|undefined,month:string)=>!!date&&date.slice(0,7)===month;
 export function retainedReturnIncome(s:State){return s.returnSettlements.reduce((n,r)=>{const o=s.orders.find(o=>o.id===r.orderId);if(!o)return n;return n+Math.max(0,customerPaidAmount(o)-(r.kind==='Refund'?r.amount:refundedAmount(s,o)+r.amount));},0);}
 /** Dated delivery, return and inspection events keep later returns out of earlier periods. */
@@ -25,3 +25,5 @@ export function periodSalesBreakdown(s:State,month:string){
  }
  return {channels:[...channels.values()],products:[...products.values()]};
 }
+
+export function financialMonths(s:State){return [...new Set([today().slice(0,7),...s.orders.flatMap(o=>[o.created,o.delivered,o.returnedAt].filter((d):d is string=>!!d).map(d=>d.slice(0,7))),...s.expenses.map(e=>e.date.slice(0,7)),...s.returnSettlements.map(e=>e.date.slice(0,7)),...s.returnInspections.map(e=>e.date.slice(0,7)),...s.customerRefunds.map(e=>e.date.slice(0,7)),...s.creditUses.map(e=>e.date.slice(0,7))])].sort().reverse();}

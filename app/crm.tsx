@@ -1,5 +1,5 @@
 'use client';
-import { financialPeriod,periodSalesBreakdown } from '@/lib/financial-reporting';
+import { financialPeriod,financialMonths,periodSalesBreakdown } from '@/lib/financial-reporting';
 /* Final operational polish complete */
 /* Production release: management intelligence */
 import React,{useDeferredValue,useEffect,useMemo,useRef,useState} from 'react';
@@ -155,7 +155,7 @@ const inventoryAgeingTotal=inventoryAgeing.reduce((n,row)=>n+row.value,0);
 const supplierPerformance=s.suppliers.map(supplier=>{const insight=supplierInsight(s,supplier.id),pos=insight.purchaseOrders.filter(po=>po.status!=='Cancelled'),received=pos.filter(po=>po.status==='Received'),open=pos.filter(po=>!['Received','Cancelled'].includes(po.status)),overdue=insight.overduePurchaseOrders,value=pos.reduce((n,po)=>n+purchaseOrderValue(po),0);return {supplier,orders:pos.length,received:received.length,open:open.length,overdue:overdue.length,value,avgLead:insight.avgLeadDays}}).filter(row=>row.orders>0).sort((a,b)=>b.value-a.value||b.orders-a.orders).slice(0,6);
 const reportCollected=reportOrders.reduce((n,o)=>n+Math.min(receivable(o),o.collections.reduce((x,p)=>x+p.amount,0)+(o.settled&&o.collections.length===0?receivable(o):0)),0);
 const reportCollectionRate=reportOrders.reduce((n,o)=>n+receivable(o),0)?reportCollected/reportOrders.reduce((n,o)=>n+receivable(o),0)*100:0;
-const reportMonths=Array.from(new Set([...s.orders.map(o=>(o.delivered||o.created).slice(0,7)),...s.expenses.map(e=>e.date.slice(0,7)),today().slice(0,7)])).sort().reverse();
+const reportMonths=financialMonths(s);
 const closeEnd=closeMonth+'-31',closeMovements=flow.entries.filter(e=>e.date.slice(0,7)===closeMonth),closeUnassigned=closeMovements.filter(e=>!s.accountMatches.some(m=>m.entryId===e.id)).length,closeMissingAccounts=4-s.accountOpenings.length,closeReceivables=s.orders.filter(o=>o.status==='Delivered'&&(o.delivered||o.created).slice(0,7)<=closeMonth).reduce((n,o)=>{const due=receivable(o),legacy=o.settled&&o.collections.length===0?due:0;return n+Math.max(0,due-o.collections.filter(p=>p.date<=closeEnd).reduce((x,p)=>x+p.amount,0)-legacy)},0),closePayables=s.batches.filter(b=>b.received.slice(0,7)<=closeMonth).reduce((n,b)=>{const amount=b.qty*b.unitCost,legacy=b.paid&&b.payments.length===0?amount:0;return n+Math.max(0,amount-b.payments.filter(p=>p.date<=closeEnd).reduce((x,p)=>x+p.amount,0)-legacy)},0),closeRecord=s.financeCloses.find(x=>x.month===closeMonth),closeBlockers=closeUnassigned+closeMissingAccounts+flow.undated;
 
 const ageDays=(date:string)=>Math.max(0,Math.floor((Date.parse(today()+'T12:00:00Z')-Date.parse(date+'T12:00:00Z'))/86400000));const ageBucket=(days:number)=>days<=7?'0–7 days':days<=30?'8–30 days':days<=60?'31–60 days':'60+ days';const agingLabels=['0–7 days','8–30 days','31–60 days','60+ days'] as const;
