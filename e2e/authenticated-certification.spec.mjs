@@ -315,8 +315,12 @@ test('inventory manager links an existing batch through the UI without altering 
     await dialog.getByRole('combobox',{name:'Batch supplier'}).click();
     await page.getByRole('option',{name:'E2E Supplier',exact:true}).click();
     await dialog.getByRole('textbox',{name:'invoice',exact:true}).fill('INV-VERIFIED-LINK');
+    const savedPromise=page.waitForResponse(response=>response.url().endsWith('/api/inventory-suppliers')&&response.request().method()==='PUT',{timeout:15000});
     await dialog.getByRole('button',{name:'Save changes',exact:true}).click();
-    await expect(dialog).toBeHidden();
+    const saved=await savedPromise;
+    const savedBody=await saved.json();
+    expect(saved.status(),JSON.stringify(savedBody)).toBe(200);
+    await expect(dialog).toBeHidden({timeout:15000});
     await expect(page.getByText('INV-VERIFIED-LINK · E2E Supplier',{exact:true})).toBeVisible();
     const after=await owner.request.get('/api/workspace').then(r=>r.json());
     const expected=structuredClone(before.data);
