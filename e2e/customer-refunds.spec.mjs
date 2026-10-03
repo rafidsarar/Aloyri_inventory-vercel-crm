@@ -17,7 +17,8 @@ test('paid delivered return supports partial and full refund through Finance wit
  const originalOrder=before.data.orders.find(o=>o.id===order.id);
  const finance=await session(browser,'finance'),page=await finance.context.newPage();await page.goto('/');
  await page.locator('.app-sidebar').getByRole('button',{name:'Finances',exact:true}).click();await page.getByRole('tab',{name:'Refunds',exact:true}).click();
- const row=page.getByRole('row').filter({hasText:'#REFUND-E2E-1'});
+ const refundPanel=page.locator('section').filter({has:page.getByRole('heading',{name:'Customer refunds',exact:true})});
+ const row=refundPanel.getByRole('row').filter({hasText:'#REFUND-E2E-1'});
  await expect(row).toContainText('Refund due');await expect(row).toContainText('৳749');
  await row.getByRole('button',{name:'Record refund',exact:true}).click();await page.getByLabel('Refund amount').fill('300');await page.getByLabel('Refund reference').fill('REFUND-300');await page.getByLabel('Refund reason').fill('Customer returned product');
  const reqPromise=page.waitForRequest(req=>req.url().endsWith('/api/finances/customer-refunds')&&req.method()==='POST');
