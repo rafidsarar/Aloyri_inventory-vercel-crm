@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { initialState,refundBalance,customerCreditPayable,cashflow,metrics,returnInventoryCost,validateRelations,type State } from '../lib/crm.ts';
-import { financialPeriod } from '../lib/financial-reporting.ts';
+import { financialPeriod,periodSalesBreakdown } from '../lib/financial-reporting.ts';
 import { prepareReturnSettlement } from '../lib/return-settlement.ts';
 import { prepareCustomerRefund } from '../lib/customer-refunds.ts';
 import { validateWorkspaceChange,visibleState } from '../lib/role-data.ts';
@@ -17,3 +17,5 @@ test('later quarantine damage is a later dated writeoff and does not rewrite ori
 test('settlements require valid amounts and dates and cannot be forged through generic saves',()=>{const s=fixture();for(const change of [{amount:1001,kind:'Refund'},{date:'2026-01-01'},{amount:1}])assert.throws(()=>prepareReturnSettlement(s,{...decision,...change}));const next=prepareReturnSettlement(s,decision);assert.throws(()=>validateWorkspaceChange(s,next),/dedicated/);const deleted=structuredClone(next);deleted.returnSettlements=[];assert.throws(()=>validateWorkspaceChange(next,deleted),/history/);assert.equal(visibleState(next,'sales').returnSettlements.length,0);});
 test('paid cancelled orders can be settled and refunded without a returned-stock inspection',()=>{const s=fixture();s.orders[0].status='Cancelled';s.orders[0].returnedAt=undefined;s.orders[0].delivered=undefined;const next=prepareReturnSettlement(s,decision);assert.equal(refundBalance(next,next.orders[0]),0);});
 test('pagination rejects oversized and invalid bounds and keeps unpaginated compatibility',()=>{assert.equal(parsePageRequest('https://example.test/api/orders'),undefined);assert.deepEqual(parsePageRequest('https://example.test/api/orders?page=2&pageSize=25&q=abc'),{page:2,pageSize:25,q:'abc',status:'All'});for(const query of ['page=0','pageSize=201','page=1.5','page=-1','page=10001'])assert.throws(()=>parsePageRequest('https://example.test/?'+query));});
+
+test('channel and product totals follow dated returns and allocate product discounts',()=>{const s=fixture();s.orders[0].discount=100;const january=periodSalesBreakdown(s,'2026-01'),february=periodSalesBreakdown(s,'2026-02');assert.equal(january.channels[0].revenue,900);assert.equal(january.products[0].revenue,900);assert.equal(february.channels[0].revenue,-900);assert.equal(february.products[0].units,-1);});

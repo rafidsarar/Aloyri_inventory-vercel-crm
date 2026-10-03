@@ -1,5 +1,5 @@
 'use client';
-import { financialPeriod } from '@/lib/financial-reporting';
+import { financialPeriod,periodSalesBreakdown } from '@/lib/financial-reporting';
 /* Final operational polish complete */
 /* Production release: management intelligence */
 import React,{useDeferredValue,useEffect,useMemo,useRef,useState} from 'react';
@@ -132,8 +132,9 @@ const reportRepeatCustomers=reportCustomerIds.filter(customerId=>s.orders.some(o
 const reportRepeatRate=reportCustomerIds.length?reportRepeatCustomers/reportCustomerIds.length*100:0;
 const reportReturnedOrders=s.orders.filter(o=>o.status==='Returned'&&(o.returnedAt||o.delivered||o.created).slice(0,7)===reportMonth);
 const reportReturnRate=(reportOrders.length+reportReturnedOrders.length)?reportReturnedOrders.length/(reportOrders.length+reportReturnedOrders.length)*100:0;
-const reportChannelRows=Array.from(new Set(reportOrders.map(o=>o.channel))).map(channel=>{const orders=reportOrders.filter(o=>o.channel===channel);return {channel,orders:orders.length,revenue:orders.reduce((n,o)=>n+subtotal(o),0)}}).sort((a,b)=>b.revenue-a.revenue);
-const reportProductRows=s.products.map(product=>{let units=0,revenue=0;for(const order of reportOrders)for(const item of order.items.filter(i=>i.productId===product.id)){units+=item.qty;revenue+=item.qty*item.price}return {product,units,revenue}}).filter(row=>row.units>0).sort((a,b)=>b.revenue-a.revenue||b.units-a.units).slice(0,6);
+const salesBreakdown=periodSalesBreakdown(s,reportMonth);
+const reportChannelRows=salesBreakdown.channels.sort((a,b)=>b.revenue-a.revenue);
+const reportProductRows=salesBreakdown.products.map(row=>({product:productById.get(row.productId)!,units:row.units,revenue:row.revenue})).filter(row=>row.product&&(row.units!==0||row.revenue!==0)).sort((a,b)=>b.revenue-a.revenue||b.units-a.units).slice(0,6);
 const reportProductMax=Math.max(1,...reportProductRows.map(row=>row.revenue));
 const reportRevenueDelta=previousRevenue?Math.round((reportRevenue-previousRevenue)/previousRevenue*100):null;
 const reportPulse=reportProfit<0?'Needs attention':reportReturnRate>12?'Watch returns':reportRepeatRate>=35?'Healthy retention':'Building momentum';
