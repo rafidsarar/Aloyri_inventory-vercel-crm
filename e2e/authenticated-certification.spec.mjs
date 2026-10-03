@@ -306,6 +306,7 @@ test('inventory manager links an existing batch through the UI without altering 
     const original=before.data.batches.find(b=>b.id==='batch-1');
     const page=await inventory.context.newPage();
     await page.goto('/');
+    await expect(page.getByRole('heading',{name:'Protect stock availability and keep purchasing moving.'})).toBeVisible({timeout:15000});
     await page.getByRole('button',{name:'Inventory',exact:true}).click();
     await page.getByRole('tab',{name:'Batches & expiry',exact:true}).click();
     await page.getByRole('button',{name:'Link supplier for '+original.invoice,exact:true}).click();
