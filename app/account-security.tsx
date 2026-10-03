@@ -1,4 +1,5 @@
 'use client';
+import RecoveryCodes from './recovery-codes';
 import React,{useEffect,useState} from 'react';
 import { Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription } from '@/components/ui/dialog';
 import { Laptop,RefreshCw,ShieldCheck,Smartphone,Trash2 } from 'lucide-react';
@@ -26,6 +27,7 @@ export default function AccountSecurity({open,onClose,onChangePassword}:{open:bo
         <button className="icon-button" aria-label="Refresh sessions" disabled={loading} onClick={()=>void load()}><RefreshCw size={16} className={loading?'spin':''}/></button>
       </div>
       {error&&<p role="alert" className="form-error">{error}</p>}
+      <RecoveryCodes/>
       <div className="session-list">
         {sessions.map(session=><div className="session-row" key={session.id}>
           <span className="session-device">{/Android|iPhone|iPad/i.test(session.userAgent)?<Smartphone size={18}/>:<Laptop size={18}/>}</span>
@@ -37,3 +39,4 @@ export default function AccountSecurity({open,onClose,onChangePassword}:{open:bo
     </DialogContent>
   </Dialog>;
 }
+

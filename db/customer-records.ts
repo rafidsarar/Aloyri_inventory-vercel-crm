@@ -1,3 +1,4 @@
+import { pageMetadata,type PageRequest } from '../lib/pagination.ts';
 import { database } from './raw.ts';
 import { relationalDate } from './relational-date.ts';
 import { ensureRelationalFoundation } from './relational-foundation.ts';
@@ -38,12 +39,12 @@ export async function ensureCustomerRecordApiReady(ownerId:string){
   return {row,state};
 }
 
-export async function listCustomerRecords(ownerId:string){
+export async function listCustomerRecords(ownerId:string,page?:PageRequest){
   const {row}=await ensureCustomerRecordApiReady(ownerId);
-  const result=await database().prepare(
-    'SELECT id,name,phone,address,city,preference,notes,consent,created,record_version FROM crm_rel_customers WHERE owner_id=? ORDER BY created DESC,id'
-  ).bind(ownerId).all<CustomerRow>();
-  return {customers:result.results.map(mapCustomer),workspaceVersion:row.version};
+  const db=database(),where='owner_id=?'+(page?.q?' AND (name ILIKE ? OR phone ILIKE ? OR city ILIKE ? OR preference ILIKE ? OR notes ILIKE ?)':''),binds:unknown[]=[ownerId,...(page?.q?Array(5).fill('%'+page.q+'%'):[])];
+  const total=page?Number((await db.prepare('SELECT COUNT(*) AS n FROM crm_rel_customers WHERE '+where).bind(...binds).first<{n:number}>())?.n||0):0;
+  const result=await db.prepare('SELECT id,name,phone,address,city,preference,notes,consent,created,record_version FROM crm_rel_customers WHERE '+where+' ORDER BY created DESC,id'+(page?' LIMIT ? OFFSET ?':'')).bind(...binds,...(page?[page.pageSize,(page.page-1)*page.pageSize]:[])).all<CustomerRow>();
+  return {customers:result.results.map(mapCustomer),workspaceVersion:row.version,pagination:page?pageMetadata(page,total):undefined};
 }
 
 export async function getCustomerRecord(ownerId:string,id:string){
@@ -157,3 +158,4 @@ export async function deleteCustomerRecord(ownerId:string,id:string,expectedVers
   ]);
   return {id,workspaceVersion:nextWorkspaceVersion};
 }
+

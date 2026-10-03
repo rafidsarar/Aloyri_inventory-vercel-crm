@@ -100,7 +100,7 @@ test('customer collections and return inspection synchronize cross-domain relati
   assert.match(orderWorkflows,/await db\.batch\(statements\)/);
   assert.doesNotMatch(orderWorkflows,/Finance shadow sync failed after order workflow/);
   assert.match(orderWorkflows,/\['orders','accountMatches'\]/);
-  assert.match(orderWorkflows,/\['orders','inventoryHolds'\]/);
+  assert.match(orderWorkflows,/\['orders','inventoryHolds','returnInspections'\]/);
 });
 
 test('order cancellation quarantine is committed atomically with the order update',()=>{

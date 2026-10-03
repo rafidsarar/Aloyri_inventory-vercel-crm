@@ -5,7 +5,7 @@ import { inventorySupplierShadowStatements,INVENTORY_SUPPLIER_DOMAIN } from './i
 import { ensureCustomerRecordApiReady } from './customer-records.ts';
 import { CUSTOMER_ORDER_DOMAIN } from './customer-order-shadow.ts';
 import { validateWorkspaceChange } from '../lib/role-data.ts';
-import { accountIds, applyDeliveryFollowUps, batchRemaining, collectedAmount, customerSchema, nextStatuses, orderBalance, orderSchema, receivable, today, uid, type Customer, type Order, type State } from '../lib/crm.ts';
+import { creditBalance,orderBalance,creditUseSchema,accountIds, applyDeliveryFollowUps, batchRemaining, collectedAmount, customerSchema, nextStatuses, orderSchema, receivable, today, uid, type Customer, type Order, type State } from '../lib/crm.ts';
 import type { WorkspaceRole } from '../lib/roles.ts';
 
 type Actor={userId:string;name:string;role:WorkspaceRole};
@@ -37,11 +37,11 @@ async function currentRecordVersion(ownerId:string,id:string){
   return database().prepare('SELECT record_version FROM crm_rel_orders WHERE owner_id=? AND id=?').bind(ownerId,id).first<OrderVersionRow>();
 }
 
-async function commitWorkflow(ownerId:string,before:State,next:State,rowVersion:number,changed:{order:Order;expectedVersion:number}[],actor:Actor,summary:string,sections:string[]){
-  validateWorkspaceChange(before,next);
+async function commitWorkflow(ownerId:string,before:State,next:State,rowVersion:number,changed:{order:Order;expectedVersion:number}[],actor:Actor,summary:string,sections:string[],options:{allowInspections?:boolean;allowCreditUses?:boolean}={}){
+  validateWorkspaceChange(before,next,options);
   const now=new Date().toISOString(),db=database(),nextWorkspaceVersion=rowVersion+1;
   await ensureAuditTable();
-  const financeChanged=sections.includes('accountMatches'),inventoryChanged=sections.includes('inventoryHolds');
+  const financeChanged=sections.includes('accountMatches')||sections.includes('creditUses'),inventoryChanged=sections.includes('inventoryHolds');
   const expectedFinanceVersion=financeChanged?await getDomainVersion(ownerId,FINANCE_DOMAIN):undefined;
   const expectedInventoryVersion=inventoryChanged?await getDomainVersion(ownerId,INVENTORY_SUPPLIER_DOMAIN):undefined;
   const statements:any[]=[];
@@ -94,7 +94,7 @@ export async function inspectReturnedOrderWorkflow(ownerId:string,input:{orderId
   const version=await currentRecordVersion(ownerId,order.id);
   if(!version||Number(version.record_version)!==input.recordVersion)throw new Error('ORDER_VERSION_CONFLICT');
   if(order.status!=='Returned'||order.restocked)throw new Error('This return has already been inspected or is not ready for inspection.');
-  const next=structuredClone(state),target=next.orders.find(o=>o.id===order.id)!;target.restocked=true;
+  const next=structuredClone(state),target=next.orders.find(o=>o.id===order.id)!;target.restocked=true;next.returnInspections.push({id:uid(),orderId:target.id,date:today(),outcome:input.outcome});
   if(input.outcome!=='Sellable'){
     const byBatch=new Map<string,number>();
     for(const allocation of target.items.flatMap(i=>i.allocations))byBatch.set(allocation.batchId,(byBatch.get(allocation.batchId)||0)+allocation.qty);
@@ -105,7 +105,7 @@ export async function inspectReturnedOrderWorkflow(ownerId:string,input:{orderId
       next.inventoryHolds.push({id:uid(),batchId,qty,date:today(),type:input.outcome,reason:input.outcome==='Damaged'?'Returned stock inspected as damaged':'Returned stock needs further inspection',source:'Return',sourceOrderId:target.id});
     }
   }
-  const result=await commitWorkflow(ownerId,state,next,row.version,[{order:target,expectedVersion:input.recordVersion}],actor,'Inspected returned order '+target.number,['orders','inventoryHolds']);
+  const result=await commitWorkflow(ownerId,state,next,row.version,[{order:target,expectedVersion:input.recordVersion}],actor,'Inspected returned order '+target.number,['orders','inventoryHolds','returnInspections'],{allowInspections:true});
   return {...result,order:target};
 }
 
@@ -159,4 +159,17 @@ export async function createOrderWithCustomerWorkflow(ownerId:string,input:{cust
   statements.push(db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)').bind(crypto.randomUUID(),ownerId,actor.userId,actor.name,actor.role,'Created order '+order.number+' with new customer '+customer.name,JSON.stringify(['customers','orders']),now));
   await db.batch(statements);
   return {workspaceVersion:nextWorkspaceVersion,customer:{...customer,recordVersion:0},order:{...order,recordVersion:0}};
+}
+
+
+export async function applyCustomerCreditWorkflow(ownerId:string,input:{credit:unknown;recordVersion:number},actor:Actor){
+ if(!['owner','admin','finance'].includes(actor.role))throw new Error('FINANCE_FORBIDDEN');
+ const credit=creditUseSchema.parse(input),{row,state}=await ensureCustomerRecordApiReady(ownerId);
+ const prior=state.creditUses.find(u=>u.id===credit.id);if(prior){if(JSON.stringify(prior)!==JSON.stringify(credit))throw new Error('Credit reference already used.');return {duplicate:true};}
+ const settlement=state.returnSettlements.find(r=>r.id===credit.settlementId),target=state.orders.find(o=>o.id===credit.orderId);
+ if(!settlement||!target||['Returned','Cancelled'].includes(target.status))throw new Error('Choose an active replacement order.');
+ if(credit.amount>creditBalance(state,settlement)+.001||credit.amount>orderBalance(target)+.001)throw new Error('Credit exceeds the remaining credit or order balance.');
+ const version=await currentRecordVersion(ownerId,target.id);if(!version||Number(version.record_version)!==input.recordVersion)throw new Error('ORDER_VERSION_CONFLICT');
+ const next=structuredClone(state),order=next.orders.find(o=>o.id===target.id)!;next.creditUses.push(credit);order.collections.push({id:'credit-'+credit.id,date:credit.date,amount:credit.amount,reference:settlement.kind+' from returned order'});
+ try{return await commitWorkflow(ownerId,state,next,row.version,[{order,expectedVersion:input.recordVersion}],actor,'Applied customer return credit',['orders','creditUses'],{allowCreditUses:true});}catch(e){if(e instanceof Error&&/division by zero/i.test(e.message))throw new Error('ORDER_VERSION_CONFLICT');throw e;}
 }

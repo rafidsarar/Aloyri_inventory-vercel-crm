@@ -9,7 +9,7 @@ import { accountBalance,accountIds,cashflow,customerRefundPayable,fixedBusinessN
 type WorkspaceRow={data:string;version:number};
 type CutoverRow={enabled:boolean;enabled_at:string|null;enabled_by:string|null;last_verified_at:string|null;last_verification:string;updated_at:string};
 
-export const relationalCoreKeys=['customers','orders','products','productCategories','suppliers','purchaseOrders','batches','stockAdjustments','inventoryHolds','expenses','cashEntries','accountOpenings','accountMatches','financeCloses','customerRefunds'] as const;
+export const relationalCoreKeys=['customers','orders','products','productCategories','suppliers','purchaseOrders','batches','stockAdjustments','inventoryHolds','returnInspections','expenses','cashEntries','accountOpenings','accountMatches','financeCloses','customerRefunds','returnSettlements','creditUses'] as const;
 
 async function workspace(ownerId:string){
   const row=await database().prepare('SELECT data,version FROM crm_workspaces WHERE owner_id=?').bind(ownerId).first<WorkspaceRow>();

@@ -8,7 +8,7 @@ export function prepareCustomerRefund(state:State,input:unknown,role:WorkspaceRo
  const prior=state.customerRefunds.find(r=>r.id===refund.id);
  if(prior){if(JSON.stringify(prior)!==JSON.stringify(refund))throw new Error('Refund reference was already used for another payment.');return state;}
  const order=state.orders.find(o=>o.id===refund.orderId);
- if(!order||order.status!=='Returned')throw new Error('Choose a returned order.');
+ if(!order||!['Returned','Cancelled'].includes(order.status))throw new Error('Choose a returned order.');
  if(refund.amount>refundBalance(state,order)+.001)throw new Error('Refund amount exceeds the remaining customer refund balance.');
  const next=structuredClone(state);
  next.customerRefunds.push(refund);

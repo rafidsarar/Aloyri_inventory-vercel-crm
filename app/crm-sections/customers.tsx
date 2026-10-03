@@ -1,5 +1,6 @@
 'use client';
 
+import { useRecordPagination } from '../record-pagination';
 import { CalendarCheck, ChevronRight, Search } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -29,6 +30,7 @@ export default function CustomersSection({
   query,setQuery,filteredCustomers,customerCount,selectedCustomerIds,setSelectedCustomerIds,
   canEdit,busy,bulkCreateCustomerFollowUps,orders,setDetail,requestDelete
 }:Props){
+  const pagination=useRecordPagination(filteredCustomers,query);const shownCustomers=pagination.items;
   return <WorkspaceSection><SectionPanel className="customer-workspace">
     <ActionBar className="table-toolbar">
       <div className="search-input"><Search size={17}/><Input aria-label="Search customers" placeholder="Search name, phone or city…" value={query} onChange={e=>setQuery(e.target.value)}/></div>
@@ -41,9 +43,9 @@ export default function CustomersSection({
     {customerCount
       ? <>
           <div className="customers-desktop"><Table><TableHeader><TableRow>
-            {canEdit('tasks')&&<TableHead className="bulk-check-cell"><Checkbox aria-label="Select all shown customers" checked={filteredCustomers.length>0&&filteredCustomers.every(customer=>selectedCustomerIds.includes(customer.id))} onCheckedChange={checked=>setSelectedCustomerIds(checked===true?Array.from(new Set([...selectedCustomerIds,...filteredCustomers.map(customer=>customer.id)])):selectedCustomerIds.filter(id=>!filteredCustomers.some(customer=>customer.id===id)))}/></TableHead>}
+            {canEdit('tasks')&&<TableHead className="bulk-check-cell"><Checkbox aria-label="Select all shown customers" checked={filteredCustomers.length>0&&shownCustomers.every(customer=>selectedCustomerIds.includes(customer.id))} onCheckedChange={checked=>setSelectedCustomerIds(checked===true?Array.from(new Set([...selectedCustomerIds,...shownCustomers.map(customer=>customer.id)])):selectedCustomerIds.filter(id=>!shownCustomers.some(customer=>customer.id===id)))}/></TableHead>}
             <TableHead>Customer</TableHead><TableHead>Phone</TableHead><TableHead>Orders</TableHead><TableHead>Delivered spend</TableHead><TableHead>Follow-up consent</TableHead><TableHead/>
-          </TableRow></TableHeader><TableBody>{filteredCustomers.map((customer,index)=>{
+          </TableRow></TableHeader><TableBody>{shownCustomers.map((customer,index)=>{
             const customerOrders=orders.filter(order=>order.customerId===customer.id);
             return <TableRow key={customer.id}>
               {canEdit('tasks')&&<TableCell className="bulk-check-cell"><Checkbox aria-label={'Select customer '+customer.name} checked={selectedCustomerIds.includes(customer.id)} onCheckedChange={checked=>setSelectedCustomerIds(checked===true?[...selectedCustomerIds.filter(id=>id!==customer.id),customer.id]:selectedCustomerIds.filter(id=>id!==customer.id))}/></TableCell>}
@@ -55,7 +57,7 @@ export default function CustomersSection({
               <TableCell><div className="product-actions"><button className="icon-button" aria-label={'Open '+customer.name} onClick={()=>setDetail({type:'customer',id:customer.id})}><ChevronRight size={18}/></button>{canEdit('customers')&&<button className="text-button delete-button" disabled={busy} aria-label={'Delete customer '+customer.name} onClick={()=>requestDelete('customers',customer.id,customer.name)}>Delete</button>}</div></TableCell>
             </TableRow>;
           })}</TableBody></Table></div>
-          <div className="customers-mobile-list">{filteredCustomers.map((customer,index)=>{
+          <div className="customers-mobile-list">{shownCustomers.map((customer,index)=>{
             const customerOrders=orders.filter(order=>order.customerId===customer.id);
             const deliveredSpend=customerOrders.filter(order=>order.status==='Delivered').reduce((sum,order)=>sum+subtotal(order),0);
             return <article className="customer-mobile-card" key={customer.id}>
@@ -68,5 +70,6 @@ export default function CustomersSection({
           })}</div>
         </>
       : <Empty title="No customers yet" text="Save their contact details and preferences, then create an order."/>}
-  </SectionPanel></WorkspaceSection>;
+  {pagination.controls}</SectionPanel></WorkspaceSection>;
 }
+

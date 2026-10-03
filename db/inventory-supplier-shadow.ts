@@ -1,3 +1,4 @@
+import { returnLedgerStatements } from './return-ledgers.ts';
 import { database } from './raw.ts';
 import { ensureRelationalFoundation } from './relational-foundation.ts';
 import { fixedBusinessName, stateSchema, validateRelations, type State } from '../lib/crm.ts';
@@ -40,6 +41,7 @@ export function inventorySupplierShadowStatements(ownerId:string,state:State,sou
   state.stockAdjustments.forEach(a=>q.push(db.prepare('INSERT INTO crm_rel_stock_adjustments (owner_id,id,batch_id,delta,date,reason,record_version,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)').bind(ownerId,a.id,a.batchId,a.delta,a.date,a.reason,0,now,now)));
   state.inventoryHolds.forEach(h=>q.push(db.prepare('INSERT INTO crm_rel_inventory_holds (owner_id,id,batch_id,qty,date,type,reason,source,source_order_id,released_at,record_version,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(ownerId,h.id,h.batchId,h.qty,h.date,h.type,h.reason,h.source,h.sourceOrderId||null,h.releasedAt||null,0,now,now)));
   q.push(db.prepare('UPDATE crm_relational_migrations SET status=?,source_version=?,verified_at=?,updated_at=? WHERE owner_id=? AND domain=?').bind('verified',sourceVersion,now,now,ownerId,INVENTORY_SUPPLIER_DOMAIN));
+  q.push(...returnLedgerStatements(ownerId,state,['returnInspections']));
   return q;
 }
 
@@ -56,3 +58,4 @@ export async function ensureInventorySupplierApiReady(ownerId:string){
   if(!migration||migration.status!=='verified')await migrateInventorySupplierShadow(ownerId,state,row.version);
   return {row,state};
 }
+
