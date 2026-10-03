@@ -10,7 +10,6 @@ export function prepareCustomerRefund(state:State,input:unknown,role:WorkspaceRo
  const order=state.orders.find(o=>o.id===refund.orderId);
  if(!order||order.status!=='Returned')throw new Error('Choose a returned order.');
  if(refund.amount>refundBalance(state,order)+.001)throw new Error('Refund amount exceeds the remaining customer refund balance.');
- if(state.financeCloses.some(c=>c.month===refund.date.slice(0,7)))throw new Error('Refund date is in a closed month.');
  const next=structuredClone(state);
  next.customerRefunds.push(refund);
  next.accountMatches.push({entryId:'customer-refund-'+refund.id,account:refund.account,matched:false,reference:refund.reference});

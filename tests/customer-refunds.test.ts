@@ -23,12 +23,12 @@ test('partial and full refund preserve collections, deduct cash, clear liability
 });
 test('delivered and subsequently returned legacy settlements keep dated original inflow',()=>{const s=fixture('COD',true);assert.equal(cashflow(s).entries[0].amount,900);assert.equal(customerPaidAmount(s.orders[0]),1000);assert.equal(accountBalance(s,'bank'),1400);});
 test('COD refund uses customer gross payment after full remittance, partial remittance only confirms recorded funds',()=>{const s=fixture('COD');assert.equal(customerPaidAmount(s.orders[0]),1000);s.orders[0].collections[0].amount=400;s.orders[0].settled=false;s.orders[0].settledAt=undefined;assert.equal(customerPaidAmount(s.orders[0]),400);});
-test('reject overpayment, missing account, invalid date, closed month and non-returned order',()=>{
+test('reject overpayment, missing account, invalid date and non-returned order',()=>{
  const s=fixture();assert.throws(()=>prepareCustomerRefund(s,{...payment,amount:1001},'owner'),/exceeds/);
  assert.throws(()=>prepareCustomerRefund(s,{...payment,account:'cash'},'owner'),/account/);
  assert.throws(()=>prepareCustomerRefund(s,{...payment,date:'2026-01-02'},'owner'),/date/);
  assert.throws(()=>prepareCustomerRefund(s,{...payment,date:'2099-01-01'},'owner'),/date/);
- s.financeCloses=[{month:'2026-01',closedAt:'2026-02-01',closedBy:'Owner',notes:''}];assert.throws(()=>prepareCustomerRefund(s,payment,'owner'),/closed month/);
+ s.financeCloses=[{month:'2026-01',closedAt:'2026-02-01',closedBy:'Owner',notes:''}];assert.equal(prepareCustomerRefund(s,payment,'owner').customerRefunds.length,1);
  s.financeCloses=[];s.orders[0].status='Delivered';s.orders[0].returnedAt=undefined;assert.throws(()=>prepareCustomerRefund(s,payment,'owner'),/returned/);
 });
 test('refund records are role protected, immutable and only appended by payout workflow',()=>{

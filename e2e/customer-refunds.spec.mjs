@@ -16,6 +16,7 @@ test('paid delivered return supports partial and full refund through Finance wit
  const before=await (await owner.request.get('/api/workspace')).json();
  const originalOrder=before.data.orders.find(o=>o.id===order.id);
  const finance=await session(browser,'finance'),page=await finance.context.newPage();await page.goto('/');
+ await expect(page.getByRole('heading',{name:'Work from collections, payables and account control.'})).toBeVisible({timeout:15000});
  await page.locator('.app-sidebar').getByRole('button',{name:'Finances',exact:true}).click();await page.getByRole('tab',{name:'Refunds',exact:true}).click();
  const refundPanel=page.locator('section').filter({has:page.getByRole('heading',{name:'Customer refunds',exact:true})});
  const row=refundPanel.getByRole('row').filter({hasText:'#REFUND-E2E-1'});
@@ -25,7 +26,7 @@ test('paid delivered return supports partial and full refund through Finance wit
  await page.getByRole('button',{name:'Record refund payment',exact:true}).click();const posted=(await reqPromise).postDataJSON();
  await expect(row).toContainText('Partially refunded');await expect(row).toContainText('৳449');
  const retry=await finance.request.post('/api/finances/customer-refunds',{headers:{Origin:finance.origin},data:posted});expect(retry.status()).toBe(200);expect((await retry.json()).duplicate).toBe(true);
- await page.reload();await page.locator('.app-sidebar').getByRole('button',{name:'Finances',exact:true}).click();await page.getByRole('tab',{name:'Refunds',exact:true}).click();await expect(row).toContainText('৳449');
+ await page.reload();await expect(page.getByRole('heading',{name:'Work from collections, payables and account control.'})).toBeVisible({timeout:15000});await page.locator('.app-sidebar').getByRole('button',{name:'Finances',exact:true}).click();await page.getByRole('tab',{name:'Refunds',exact:true}).click();await expect(row).toContainText('৳449');
  await row.getByRole('button',{name:'Record refund',exact:true}).click();await page.getByLabel('Refund reference').fill('REFUND-449');await page.getByLabel('Refund reason').fill('Remaining refund');await page.getByRole('button',{name:'Record refund payment',exact:true}).click();await expect(row).toContainText('Refunded');await expect(row.getByRole('button',{name:'Record refund',exact:true})).toHaveCount(0);
  const after=await (await owner.request.get('/api/workspace')).json();const refunds=after.data.customerRefunds.filter(r=>r.orderId===order.id);expect(refunds).toHaveLength(2);expect(refunds.reduce((n,r)=>n+r.amount,0)).toBe(749);expect(after.data.orders.find(o=>o.id===order.id)).toEqual(originalOrder);expect(after.data.expenses).toEqual(before.data.expenses);expect(refunds.every(r=>after.data.accountMatches.some(m=>m.entryId==='customer-refund-'+r.id&&m.account==='cash'&&!m.matched))).toBe(true);
  await page.getByRole('tab',{name:'Cashflow',exact:true}).click();const cashRows=page.getByRole('row').filter({hasText:'Customer refund'}).filter({hasText:'#REFUND-E2E-1'});await expect(cashRows).toHaveCount(2);
