@@ -13,6 +13,7 @@ export function visibleState(source:State,role:WorkspaceRole):State {
   state.accountOpenings=[];
   state.accountMatches=[];
   state.financeCloses=[];
+  state.customerRefunds=[];
 
   if(role==='sales'){
     // Sales needs stock availability for order allocation, but not supplier purchasing or cost/payment data.
@@ -54,8 +55,12 @@ export function validateRoleRelations(state:State,role:WorkspaceRole){
 }
 
 /** Allow untouched legacy duplicate order numbers, but reject any new/changed number collision. */
-export function validateWorkspaceChange(current:State,next:State){
+export function validateWorkspaceChange(current:State,next:State,options:{allowNewRefunds?:boolean}={}){
+  if(!options.allowNewRefunds&&next.customerRefunds.some(r=>!current.customerRefunds.some(p=>p.id===r.id)))throw new Error('Use Record refund to post customer refunds.');
   validateRelations(next,{skipOrderNumberUniqueness:true});
+  for(const refund of current.customerRefunds){const after=next.customerRefunds.find(r=>r.id===refund.id);if(JSON.stringify(after)!==JSON.stringify(refund))throw new Error('Posted customer refund history cannot be changed or deleted.');}
+  const refundedOrders=new Set(current.customerRefunds.map(r=>r.orderId));
+  for(const id of refundedOrders){const before=current.orders.find(o=>o.id===id),after=next.orders.find(o=>o.id===id);const financialIdentity=(o:State['orders'][number]|undefined)=>o?{number:o.number,customerId:o.customerId,payment:o.payment,items:o.items,discount:o.discount,deliveryCharge:o.deliveryCharge,collections:o.collections,settled:o.settled,settledAt:o.settledAt,delivered:o.delivered,returnedAt:o.returnedAt}:undefined;if(JSON.stringify(financialIdentity(before))!==JSON.stringify(financialIdentity(after)))throw new Error('Orders with posted refunds must retain their original customer, values and payment history.');}
   const beforeNumbers=new Map(current.orders.map(order=>[order.id,order.number.trim().toLowerCase()]));
   for(const order of next.orders){
     const number=order.number.trim().toLowerCase();
@@ -182,3 +187,4 @@ export function applyRoleChanges(current:State,proposed:State,role:WorkspaceRole
   }
   return merged;
 }
+

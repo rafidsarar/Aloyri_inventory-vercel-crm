@@ -5,14 +5,16 @@ import { validateWorkspaceChange } from '../lib/role-data.ts';
 import type { WorkspaceRole } from '../lib/roles.ts';
 import { ensureFinanceApiReady,financeShadowStatements,FINANCE_DOMAIN } from './finance-shadow.ts';
 
+import { prepareCustomerRefund } from '../lib/customer-refunds.ts';
+
 type Actor={userId:string;name:string;role:WorkspaceRole};
 async function ensureAudit(){
  const db=database();
  await db.prepare('CREATE TABLE IF NOT EXISTS crm_audit_log (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, actor_id TEXT NOT NULL, actor_name TEXT NOT NULL, role TEXT NOT NULL, summary TEXT NOT NULL, sections TEXT NOT NULL, created_at TEXT NOT NULL)').run();
  await db.prepare('CREATE INDEX IF NOT EXISTS crm_audit_owner_created_idx ON crm_audit_log(owner_id,created_at DESC)').run();
 }
-async function commit(ownerId:string,before:State,next:State,version:number,expectedDomainVersion:number,actor:Actor,summary:string,sections:string[]){
- validateWorkspaceChange(before,next);validateRelations(next,{skipOrderNumberUniqueness:true});
+async function commit(ownerId:string,before:State,next:State,version:number,expectedDomainVersion:number,actor:Actor,summary:string,sections:string[],allowNewRefunds=false){
+ validateWorkspaceChange(before,next,{allowNewRefunds});validateRelations(next,{skipOrderNumberUniqueness:true});
  const now=new Date().toISOString(),db=database(),nextVersion=version+1;await ensureAudit();
  await db.batch([
   db.prepare('UPDATE crm_workspaces SET data=?,version=version+1,updated_at=? WHERE owner_id=? AND version=?').bind(JSON.stringify(next),now,ownerId,version),
@@ -48,4 +50,16 @@ export async function reverseManualCashEntry(ownerId:string,input:{id:string;rea
  next.cashEntries.push({id:rid,date:today(),kind:entry.kind==='in'?'out':'in',category:'Reversal · '+entry.category,description:'Reversal of '+entry.category+' · '+reason,amount:entry.amount,reversalOf:entry.id,reversalReason:reason});
  const match=state.accountMatches.find(m=>m.entryId==='manual-'+entry.id);if(match)next.accountMatches.push({entryId:'manual-'+rid,account:match.account,matched:true,reference:'Reversal · '+reason});
  const result=await commit(ownerId,state,next,row.version,input.domainVersion,actor,'Reversed cash movement '+entry.category,['cashEntries','accountMatches']);return {...result,id:rid};
+}
+
+
+export async function postCustomerRefund(ownerId:string,input:{refund:unknown;domainVersion:number},actor:Actor){
+ if(!['owner','admin','finance'].includes(actor.role))throw new Error('FINANCE_FORBIDDEN');
+ if(!Number.isInteger(input.domainVersion)||input.domainVersion<0)throw new Error('DOMAIN_VERSION_REQUIRED');
+ const {row,state}=await ensureFinanceApiReady(ownerId);
+ const next=prepareCustomerRefund(state,input.refund,actor.role);
+ // Exact retries return success without a second cash movement, even after the version has changed.
+ if(next===state)return {version:row.version,domainVersion:await getDomainVersion(ownerId,FINANCE_DOMAIN),duplicate:true};
+ if(await getDomainVersion(ownerId,FINANCE_DOMAIN)!==input.domainVersion)throw new Error('DOMAIN_VERSION_CONFLICT');
+ try{return await commit(ownerId,state,next,row.version,input.domainVersion,actor,'Recorded customer refund',['customerRefunds','accountMatches'],true);}catch(error){if(error instanceof Error&&/division by zero/i.test(error.message))throw new Error('DOMAIN_VERSION_CONFLICT');throw error;}
 }

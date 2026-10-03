@@ -4,12 +4,12 @@ import { listCustomerRecords } from './customer-records.ts';
 import { listOrderRecords } from './order-records.ts';
 import { getInventorySupplierDomain } from './inventory-supplier-records.ts';
 import { getFinanceDomain } from './finance-records.ts';
-import { accountBalance,accountIds,cashflow,fixedBusinessName,orderBalance,stateSchema,validateRelations,type State } from '../lib/crm.ts';
+import { accountBalance,accountIds,cashflow,customerRefundPayable,fixedBusinessName,orderBalance,stateSchema,validateRelations,type State } from '../lib/crm.ts';
 
 type WorkspaceRow={data:string;version:number};
 type CutoverRow={enabled:boolean;enabled_at:string|null;enabled_by:string|null;last_verified_at:string|null;last_verification:string;updated_at:string};
 
-export const relationalCoreKeys=['customers','orders','products','productCategories','suppliers','purchaseOrders','batches','stockAdjustments','inventoryHolds','expenses','cashEntries','accountOpenings','accountMatches','financeCloses'] as const;
+export const relationalCoreKeys=['customers','orders','products','productCategories','suppliers','purchaseOrders','batches','stockAdjustments','inventoryHolds','expenses','cashEntries','accountOpenings','accountMatches','financeCloses','customerRefunds'] as const;
 
 async function workspace(ownerId:string){
   const row=await database().prepare('SELECT data,version FROM crm_workspaces WHERE owner_id=?').bind(ownerId).first<WorkspaceRow>();
@@ -57,6 +57,7 @@ export async function verifyRelationalParity(ownerId:string){
   const jsonAccountBalances=Object.fromEntries(accountIds.map(account=>[account,accountBalance(json,account)]));
   const relAccountBalances=Object.fromEntries(accountIds.map(account=>[account,accountBalance(rel,account)]));
   const keyTotals={
+    customerRefundPayable:{json:customerRefundPayable(json),relational:customerRefundPayable(rel),match:customerRefundPayable(json)===customerRefundPayable(rel)},
     orderTotal:{json:jsonOrderTotal,relational:relOrderTotal,match:jsonOrderTotal===relOrderTotal},
     receivables:{json:jsonReceivables,relational:relReceivables,match:jsonReceivables===relReceivables},
     payables:{json:jsonPayables,relational:relPayables,match:jsonPayables===relPayables},
@@ -104,3 +105,4 @@ export async function setRelationalCutover(ownerId:string,enabled:boolean,actor:
     .bind(ownerId,enabled,enabled?now:null,actor,now,JSON.stringify(verification),now).run();
   return {enabled,verification};
 }
+

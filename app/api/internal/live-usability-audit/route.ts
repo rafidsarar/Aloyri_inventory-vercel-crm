@@ -30,6 +30,7 @@ async function cleanup(){
     "DELETE FROM crm_rel_products WHERE owner_id=?",
     "DELETE FROM crm_rel_product_categories WHERE owner_id=?",
     "DELETE FROM crm_rel_finance_account_matches WHERE owner_id=?",
+    "DELETE FROM crm_rel_finance_customer_refunds WHERE owner_id=?",
     "DELETE FROM crm_rel_finance_closes WHERE owner_id=?",
     "DELETE FROM crm_rel_finance_cash_entries WHERE owner_id=?",
     "DELETE FROM crm_rel_finance_expenses WHERE owner_id=?",
@@ -94,3 +95,4 @@ export async function GET(request:Request){
     'Cache-Control':'no-store'
   }});
 }
+
