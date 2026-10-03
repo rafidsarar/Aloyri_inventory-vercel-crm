@@ -185,7 +185,7 @@ export const collectedAmount=(o:Order)=>o.collections.reduce((n,p)=>n+p.amount,0
 export const customerPaidAmount=(o:Order)=>{const received=collectedAmount(o),due=receivable(o);if(o.payment==='COD'&&o.delivered&&((due>0&&received>=due-.001)||(o.settled&&o.collections.length===0)))return total(o);return received||(o.settled&&o.collections.length===0?due:0)};
 export const refundedAmount=(s:State,o:Order)=>s.customerRefunds.filter(r=>r.orderId===o.id).reduce((n,r)=>n+r.amount,0);
 export const refundBalance=(s:State,o:Order)=>o.status==='Returned'?Math.max(0,customerPaidAmount(o)-refundedAmount(s,o)):0;
-export const customerRefundPayable=(s:State)=>s.orders.reduce((n,o)=>n+refundBalance(s,o),0);
+export const customerRefundPayable=(s:State)=>{const paid=new Map<string,number>();for(const r of s.customerRefunds)paid.set(r.orderId,(paid.get(r.orderId)||0)+r.amount);return s.orders.reduce((n,o)=>n+(o.status==='Returned'?Math.max(0,customerPaidAmount(o)-(paid.get(o.id)||0)):0),0)};
 export const orderBalance=(o:Order)=>{if(o.status==='Cancelled'||o.status==='Returned')return 0;const due=receivable(o);const legacy=o.settled&&o.collections.length===0?due:0;return Math.max(0,due-collectedAmount(o)-legacy)};
 export const orderPaymentStatus=(o:Order)=>{if(o.status==='Cancelled'||o.status==='Returned')return 'Closed';const collected=collectedAmount(o),balance=orderBalance(o);if(balance<=.001&&receivable(o)>0)return 'Paid';if(collected>0)return 'Part paid';if(o.payment==='COD'&&o.status!=='Delivered')return 'Due on delivery';return 'Pending'};
 export const costOfOrder=(o:Order)=>o.items.flatMap(i=>i.allocations).reduce((n,a)=>n+a.unitCost*a.qty,0);

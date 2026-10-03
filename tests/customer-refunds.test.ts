@@ -42,3 +42,5 @@ test('refund records are role protected, immutable and only appended by payout w
 test('unpaid returns create no customer refund payable and old state documents default to empty refund history',()=>{const s=fixture();s.orders[0].collections=[];s.orders[0].settled=false;s.orders[0].settledAt=undefined;assert.equal(customerRefundPayable(s),0);assert.throws(()=>prepareCustomerRefund(s,payment,'owner'),/exceeds/);const {customerRefunds:_,...old}=s;assert.deepEqual(stateSchema.parse(old).customerRefunds,[]);});
 
 test('legacy direct payments remain in history for returned advances even without delivery',()=>{const s=fixture('Bank',true);s.orders[0].delivered=undefined;assert.equal(cashflow(s).entries[0].amount,1000);assert.equal(customerRefundPayable(s),1000);});
+
+test('refunded orders retain customer and payment history while return inspection remains editable',()=>{const s=prepareCustomerRefund(fixture(),payment,'owner'),edited=structuredClone(s);edited.orders[0].number='CHANGED';assert.throws(()=>validateWorkspaceChange(s,edited),/original customer/);edited.orders[0].number=s.orders[0].number;edited.orders[0].restocked=true;validateWorkspaceChange(s,edited);});
