@@ -6,7 +6,7 @@ import { fixedBusinessName,stateSchema,validateRelations,type State } from '../l
 import type { WorkspaceRole } from '../lib/roles.ts';
 import { ensureFinanceApiReady,FINANCE_DOMAIN,financeShadowStatements } from './finance-shadow.ts';
 
-export const financeKeys=['expenses','cashEntries','accountOpenings','accountMatches','financeCloses'] as const;
+export const financeKeys=['expenses','cashEntries','accountOpenings','accountMatches','financeCloses','customerRefunds'] as const;
 export type FinanceKey=typeof financeKeys[number];
 export type FinanceData=Pick<State,FinanceKey>;
 type Actor={userId:string;name:string;role:WorkspaceRole};
@@ -20,12 +20,13 @@ async function ensureAudit(){
 }
 export async function getFinanceDomain(ownerId:string){
  const {row}=await ensureFinanceApiReady(ownerId),db=database();
- const [expenses,cashEntries,openings,matches,closes,domainVersion]=await Promise.all([
+ const [expenses,cashEntries,openings,matches,closes,refunds,domainVersion]=await Promise.all([
   db.prepare('SELECT id,category,amount,date,notes,vendor,reference,recurring,account FROM crm_rel_finance_expenses WHERE owner_id=? ORDER BY date DESC,id').bind(ownerId).all<any>(),
   db.prepare('SELECT id,date,kind,category,description,amount,transfer_id,reversal_of,reversal_reason FROM crm_rel_finance_cash_entries WHERE owner_id=? ORDER BY date DESC,id').bind(ownerId).all<any>(),
   db.prepare('SELECT account,date,balance,statement_date,statement_balance FROM crm_rel_finance_account_openings WHERE owner_id=? ORDER BY account').bind(ownerId).all<any>(),
   db.prepare('SELECT entry_id,account,matched,reference FROM crm_rel_finance_account_matches WHERE owner_id=? ORDER BY entry_id').bind(ownerId).all<any>(),
   db.prepare('SELECT month,closed_at,closed_by,notes FROM crm_rel_finance_closes WHERE owner_id=? ORDER BY month DESC').bind(ownerId).all<any>(),
+  db.prepare('SELECT id,order_id,date,amount,account,reference,reason FROM crm_rel_finance_customer_refunds WHERE owner_id=? ORDER BY date DESC,id').bind(ownerId).all<any>(),
   getDomainVersion(ownerId,FINANCE_DOMAIN)
  ]);
  const data={
@@ -33,17 +34,19 @@ export async function getFinanceDomain(ownerId:string){
   cashEntries:cashEntries.results.map((x:any)=>({id:x.id,date:relationalDate(x.date),kind:x.kind,category:x.category,description:x.description,amount:Number(x.amount),transferId:x.transfer_id||undefined,reversalOf:x.reversal_of||undefined,reversalReason:x.reversal_reason||undefined})),
   accountOpenings:openings.results.map((x:any)=>({account:x.account,date:relationalDate(x.date),balance:Number(x.balance),statementDate:optionalRelationalDate(x.statement_date),statementBalance:x.statement_balance==null?undefined:Number(x.statement_balance)})),
   accountMatches:matches.results.map((x:any)=>({entryId:x.entry_id,account:x.account,matched:Boolean(x.matched),reference:x.reference})),
+  customerRefunds:refunds.results.map((x:any)=>({id:x.id,orderId:x.order_id,date:relationalDate(x.date),amount:Number(x.amount),account:x.account,reference:x.reference,reason:x.reason})),
   financeCloses:closes.results.map((x:any)=>({month:x.month,closedAt:relationalDate(x.closed_at),closedBy:x.closed_by,notes:x.notes}))
  };
- const parsed=stateSchema.pick({expenses:true,cashEntries:true,accountOpenings:true,accountMatches:true,financeCloses:true}).parse(data);
+ const parsed=stateSchema.pick({expenses:true,cashEntries:true,accountOpenings:true,accountMatches:true,financeCloses:true,customerRefunds:true}).parse(data);
  return {data:parsed,version:row.version,domainVersion};
 }
 export async function saveFinanceDomain(ownerId:string,input:unknown,expectedDomainVersion:number,actor:Actor){
  if(!['owner','admin','finance'].includes(actor.role))throw new Error('FINANCE_FORBIDDEN');
  if(!Number.isInteger(expectedDomainVersion)||expectedDomainVersion<0)throw new Error('DOMAIN_VERSION_REQUIRED');
- const parsed=stateSchema.pick({expenses:true,cashEntries:true,accountOpenings:true,accountMatches:true,financeCloses:true}).safeParse(input);
+ const parsed=stateSchema.pick({expenses:true,cashEntries:true,accountOpenings:true,accountMatches:true,financeCloses:true,customerRefunds:true}).safeParse(input);
  if(!parsed.success)throw new Error('INVALID_FINANCE_DATA');
  const {row,state}=await ensureFinanceApiReady(ownerId);
+ if(parsed.data.customerRefunds.length!==state.customerRefunds.length||parsed.data.customerRefunds.some(r=>JSON.stringify(r)!==JSON.stringify(state.customerRefunds.find(p=>p.id===r.id))))throw new Error('Use Record refund to post customer refunds.');
  const currentDomainVersion=await getDomainVersion(ownerId,FINANCE_DOMAIN);if(currentDomainVersion!==expectedDomainVersion)throw new Error('DOMAIN_VERSION_CONFLICT');
  const candidate=structuredClone(state);for(const key of financeKeys)(candidate[key] as any)=parsed.data[key] as any;
  const next=fixedBusinessName(applyRoleChanges(state,candidate,actor.role));
@@ -74,3 +77,4 @@ export async function markFinanceShadowStale(ownerId:string,sourceVersion:number
  await database().prepare('INSERT INTO crm_relational_migrations (owner_id,domain,status,source_version,migrated_at,verified_at,updated_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT (owner_id,domain) DO UPDATE SET status=EXCLUDED.status,source_version=EXCLUDED.source_version,verified_at=NULL,updated_at=EXCLUDED.updated_at')
  .bind(ownerId,FINANCE_DOMAIN,'stale',sourceVersion,null,null,now).run();
 }
+

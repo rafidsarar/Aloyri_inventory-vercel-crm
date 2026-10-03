@@ -27,6 +27,7 @@ const recordCounts=(data:State)=>({
   stockAdjustments:data.stockAdjustments.length,
   accountOpenings:data.accountOpenings.length,
   accountMatches:data.accountMatches.length,
+  customerRefunds:data.customerRefunds.length,
   financeCloses:data.financeCloses.length
 });
 
@@ -47,7 +48,7 @@ async function parseBackup(backup:any){
   }
   const {state:restored}=canonicalizeLegacyState(backup.data);
   const counts=recordCounts(restored);
-  if(backup.schemaVersion>=2&&backup.integrity.counts&&Object.entries(counts).some(([key,value])=>backup.integrity.counts[key]!==value))
+  if(backup.schemaVersion>=2&&backup.integrity.counts&&Object.entries(counts).some(([key,value])=>(key==='customerRefunds'&&backup.integrity.counts[key]===undefined&&value===0?false:backup.integrity.counts[key]!==value)))
     throw new Error('Backup record counts do not match the file contents.');
   if(backup.schemaVersion>=3&&!backup.integrity.counts)throw new Error('Backup record-count metadata is missing.');
   return {restored,counts,checksum:rawChecksum,warnings:workspaceIntegrityWarnings(restored)};
@@ -167,3 +168,4 @@ export async function POST(request:Request){
     return response({error:e instanceof Error?e.message:'Could not validate or restore backup.'},400);
   }
 }
+

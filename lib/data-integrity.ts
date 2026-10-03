@@ -72,6 +72,7 @@ export function canonicalizeLegacyState(input:unknown){
     setDate(x,'date',`accountOpenings[${i}].date`,false,report);
     setDate(x,'statementDate',`accountOpenings[${i}].statementDate`,true,report);
   });
+  each('customerRefunds',(x,i)=>setDate(x,'date',`customerRefunds[${i}].date`,false,report));
   each('financeCloses',(x,i)=>setDate(x,'closedAt',`financeCloses[${i}].closedAt`,false,report));
   each('tasks',(x,i)=>{
     setDate(x,'due',`tasks[${i}].due`,false,report);
@@ -89,3 +90,4 @@ export function assertCanonicalState(input:unknown):State{
   if(report.changedPaths.length)throw new Error('Workspace still contains non-canonical date values: '+report.changedPaths.join(', '));
   return state;
 }
+

@@ -26,7 +26,7 @@ test('finance shadow migration is tracked and verified',()=>{
  assert.match(shadow,/status=\?/);
 });
 test('Finance API is role protected and versioned',()=>{
- assert.match(records,/financeKeys=\['expenses','cashEntries','accountOpenings','accountMatches','financeCloses'\]/);
+ assert.match(records,/financeKeys=\['expenses','cashEntries','accountOpenings','accountMatches','financeCloses','customerRefunds'\]/);
  assert.match(records,/SELECT 1 \/ CASE WHEN EXISTS/);
  assert.match(records,/financeShadowStatements/);
  assert.match(records,/domainVersionBumpStatements/);
@@ -69,3 +69,4 @@ test('Step 7F removes constant 1\/0 transactional assertions',()=>{
   assert.doesNotMatch(source,/ELSE 1\/0/);
  assert.match(orderWorkflows,/SELECT 1 \/ CASE WHEN/);
 });
+

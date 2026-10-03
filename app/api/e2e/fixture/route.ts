@@ -23,7 +23,8 @@ export async function GET(request:Request){
     },domainVersion:1},
     finance:{data:{
       expenses:data.expenses,cashEntries:data.cashEntries,accountOpenings:data.accountOpenings,
-      accountMatches:data.accountMatches,financeCloses:data.financeCloses
+      accountMatches:data.accountMatches,financeCloses:data.financeCloses,customerRefunds:data.customerRefunds
     },domainVersion:1}
   },{headers:{'Cache-Control':'no-store'}});
 }
+
