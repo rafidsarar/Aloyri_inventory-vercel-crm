@@ -289,3 +289,40 @@ test('owner backup restore drill round-trips safely and stays owner-only',async(
     await s.context.close();
   }
 });
+
+
+test('inventory manager links an existing batch through the UI without altering stock or payment history',async({browser})=>{
+  const owner=await login(browser,'owner');
+  const inventory=await login(browser,'inventory');
+  try{
+    const seed=await owner.request.get('/api/inventory-suppliers').then(r=>r.json());
+    const batch=seed.data.batches.find(b=>b.id==='batch-1');
+    expect(batch).toBeTruthy();
+    batch.supplierId='';
+    const prepared=await api(owner.request,'PUT','/api/inventory-suppliers',{data:seed.data,domainVersion:seed.domainVersion});
+    expect(prepared.status()).toBe(200);
+    const before=await owner.request.get('/api/workspace').then(r=>r.json());
+    const original=before.data.batches.find(b=>b.id==='batch-1');
+    const page=await inventory.context.newPage();
+    await page.goto('/');
+    await page.getByRole('button',{name:'Inventory',exact:true}).click();
+    await page.getByRole('tab',{name:'Batches & expiry',exact:true}).click();
+    await page.getByRole('button',{name:'Link supplier for '+original.invoice,exact:true}).click();
+    const dialog=page.getByRole('dialog');
+    await expect(dialog.getByRole('heading',{name:'Link batch supplier'})).toBeVisible();
+    await dialog.getByRole('combobox',{name:'Batch supplier'}).click();
+    await page.getByRole('option',{name:'E2E Supplier',exact:true}).click();
+    await dialog.getByRole('textbox',{name:'invoice',exact:true}).fill('INV-VERIFIED-LINK');
+    await dialog.getByRole('button',{name:'Save changes',exact:true}).click();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByText('INV-VERIFIED-LINK · E2E Supplier',{exact:true})).toBeVisible();
+    const after=await owner.request.get('/api/workspace').then(r=>r.json());
+    const expected=structuredClone(before.data);
+    const linked=expected.batches.find(b=>b.id==='batch-1');
+    linked.supplierId='supplier-1';linked.invoice='INV-VERIFIED-LINK';
+    expect(after.data).toEqual(expected);
+    const audit=await owner.request.get('/api/audit').then(r=>r.json());
+    expect(JSON.stringify(audit)).toContain('Supplier links: batch-1');
+    expect(JSON.stringify(audit)).toContain('INV-VERIFIED-LINK');
+  }finally{await inventory.context.close();await owner.context.close();}
+});
