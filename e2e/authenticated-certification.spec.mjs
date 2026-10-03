@@ -1,6 +1,6 @@
 import { test,expect } from '@playwright/test';
 
-const BASE='http://127.0.0.1:3100';
+const BASE='http://localhost:3100';
 const PASSWORD=process.env.E2E_PASSWORD||'Aloyri-E2E-Password-2026!';
 const roles=['owner','admin','sales','inventory','finance','viewer'];
 const email=role=>`e2e-${role}@aloyri.test`;
@@ -288,4 +288,47 @@ test('owner backup restore drill round-trips safely and stays owner-only',async(
     expect((await s.request.get('/api/workspace/backup')).status(),role+' backup remains owner-only').toBe(403);
     await s.context.close();
   }
+});
+
+
+test('inventory manager links an existing batch through the UI without altering stock or payment history',async({browser})=>{
+  const owner=await login(browser,'owner');
+  const inventory=await login(browser,'inventory');
+  inventory.context.setDefaultTimeout(15000);
+  try{
+    const seed=await owner.request.get('/api/inventory-suppliers').then(r=>r.json());
+    const batch=seed.data.batches.find(b=>b.id==='batch-1');
+    expect(batch).toBeTruthy();
+    batch.supplierId='';
+    const prepared=await api(owner.request,'PUT','/api/inventory-suppliers',{data:seed.data,domainVersion:seed.domainVersion});
+    expect(prepared.status()).toBe(200);
+    const before=await owner.request.get('/api/workspace').then(r=>r.json());
+    const original=before.data.batches.find(b=>b.id==='batch-1');
+    const page=await inventory.context.newPage();
+    await page.goto('/');
+    await expect(page.getByRole('heading',{name:'Protect stock availability and keep purchasing moving.'})).toBeVisible({timeout:15000});
+    await page.getByRole('button',{name:'Inventory',exact:true}).click();
+    await page.getByRole('tab',{name:'Batches & expiry',exact:true}).click();
+    await page.getByRole('button',{name:'Link supplier for '+original.invoice,exact:true}).click();
+    const dialog=page.getByRole('dialog');
+    await expect(dialog.getByRole('heading',{name:'Link batch supplier'})).toBeVisible();
+    await dialog.getByRole('combobox',{name:'Batch supplier'}).click();
+    await page.getByRole('option',{name:'E2E Supplier',exact:true}).click();
+    await dialog.getByRole('textbox',{name:'invoice',exact:true}).fill('INV-VERIFIED-LINK');
+    const savedPromise=page.waitForResponse(response=>response.url().endsWith('/api/inventory-suppliers')&&response.request().method()==='PUT',{timeout:15000});
+    await dialog.getByRole('button',{name:'Save changes',exact:true}).click();
+    const saved=await savedPromise;
+    const savedBody=await saved.json();
+    expect(saved.status(),JSON.stringify(savedBody)).toBe(200);
+    await expect(dialog).toBeHidden({timeout:15000});
+    await expect(page.getByText('INV-VERIFIED-LINK · E2E Supplier',{exact:true})).toBeVisible();
+    const after=await owner.request.get('/api/workspace').then(r=>r.json());
+    const expected=structuredClone(before.data);
+    const linked=expected.batches.find(b=>b.id==='batch-1');
+    linked.supplierId='supplier-1';linked.invoice='INV-VERIFIED-LINK';
+    expect(after.data).toEqual(expected);
+    const audit=await owner.request.get('/api/audit').then(r=>r.json());
+    expect(JSON.stringify(audit)).toContain('Supplier links: batch-1');
+    expect(JSON.stringify(audit)).toContain('INV-VERIFIED-LINK');
+  }finally{await Promise.allSettled([inventory.context.close(),owner.context.close()]);}
 });

@@ -71,6 +71,15 @@ export async function saveInventorySupplierDomain(ownerId:string,input:unknown,e
   validateWorkspaceChange(state,next);validateRelations(next,{skipOrderNumberUniqueness:true});
   const changed=inventorySupplierKeys.filter(key=>JSON.stringify(state[key])!==JSON.stringify(next[key]));
   if(!changed.length)return {data:inventorySupplierData(state),version:row.version,domainVersion:currentDomainVersion};
+  const previousBatches=new Map(state.batches.map(b=>[b.id,b]));
+  const supplierNames=new Map([...state.suppliers,...next.suppliers].map(s=>[s.id,s.name]));
+  const supplierLinks=next.batches.flatMap(batch=>{
+    const before=previousBatches.get(batch.id);
+    if(!before||(before.supplierId===batch.supplierId&&before.invoice===batch.invoice))return [];
+    const name=(id:string)=>supplierNames.get(id)||id||'No supplier';
+    return [batch.id+': '+name(before.supplierId)+' / '+before.invoice+' → '+name(batch.supplierId)+' / '+batch.invoice];
+  });
+  const auditSummary='Updated '+changed.join(', ')+(supplierLinks.length?' · Supplier links: '+supplierLinks.join('; '):'');
   const now=new Date().toISOString(),db=database(),nextVersion=row.version+1;
   await ensureAudit();
   await db.batch([
@@ -79,7 +88,7 @@ export async function saveInventorySupplierDomain(ownerId:string,input:unknown,e
     ...inventorySupplierShadowStatements(ownerId,next,nextVersion,now),
     ...domainVersionBumpStatements(ownerId,INVENTORY_SUPPLIER_DOMAIN,expectedDomainVersion,now),
     db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)')
-      .bind(crypto.randomUUID(),ownerId,actor.userId,actor.name,actor.role,'Updated '+changed.join(', '),JSON.stringify(changed),now)
+      .bind(crypto.randomUUID(),ownerId,actor.userId,actor.name,actor.role,auditSummary,JSON.stringify(changed),now)
   ]);
   return {data:inventorySupplierData(next),version:nextVersion,domainVersion:expectedDomainVersion+1};
 }
