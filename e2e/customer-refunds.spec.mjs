@@ -11,7 +11,7 @@ test('paid delivered return supports partial and full refund through Finance wit
  const owner=await session(browser,'owner');const post=(path,data)=>owner.request.post(path,{headers:{Origin:owner.origin},data});
  const order={id:'refund-e2e-order',number:'REFUND-E2E-1',customerId:'customer-1',created:date(),collections:[],channel:'Website',payment:'Bank',status:'New',items:[{productId:'simple-wash',qty:1,price:749,allocations:[{batchId:'batch-1',qty:1,unitCost:500}]}],discount:0,deliveryCharge:0,courierCost:0,packaging:0,paymentFee:0,returnFee:0,settled:false,restocked:false,tracking:'',notes:'refund certification'};
  let res=await post('/api/orders',order);expect(res.status()).toBe(201);let saved=(await res.json()).order;
- res=await post('/api/orders/'+order.id+'/collection',{recordVersion:saved.recordVersion,date:date(),amount:749,reference:'Original customer payment',account:'cash'});expect(res.status()).toBe(200);saved=(await res.json()).order;
+ res=await post('/api/orders/'+order.id+'/collection',{recordVersion:saved.recordVersion,date:date(),amount:749,reference:'Original customer payment',account:'cash'});expect(res.status()).toBe(200);const collected=await res.json();saved={...collected.order,recordVersion:collected.recordVersions[order.id]};
  for(const status of ['Delivered','Returned']){res=await owner.request.put('/api/orders/'+order.id,{headers:{Origin:owner.origin},data:{order:{...saved,status,delivered:date(),returnedAt:status==='Returned'?date():undefined},recordVersion:saved.recordVersion}});expect(res.status(),await res.text()).toBe(200);saved=(await res.json()).order;}
  const before=await (await owner.request.get('/api/workspace')).json();
  const originalOrder=before.data.orders.find(o=>o.id===order.id);
