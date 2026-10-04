@@ -3,6 +3,10 @@ import { ensureCustomerRecordApiReady } from './customer-records.ts';
 import { CUSTOMER_ORDER_DOMAIN } from './customer-order-shadow.ts';
 import { validateWorkspaceChange } from '../lib/role-data.ts';
 import {
+  attemptImmediateCustomerNotifications,
+  initialWebsiteNotificationStatements
+} from './customer-notifications.ts';
+import {
   batchRemaining,
   customerSchema,
   orderSchema,
@@ -201,6 +205,13 @@ export async function createEcommerceOrder(input:{
   }
 
   statements.push(
+    ...initialWebsiteNotificationStatements({
+      ownerId:input.ownerId,
+      order,
+      email:input.order.customer.email,
+      phone,
+      now
+    }),
     db.prepare('INSERT INTO crm_rel_orders (owner_id,id,number,customer_id,created,delivered,returned_at,settled_at,channel,payment,status,discount,delivery_charge,courier_cost,packaging,payment_fee,return_fee,settled,restocked,tracking,notes,record_version,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
       .bind(input.ownerId,order.id,order.number,order.customerId,order.created,null,null,null,order.channel,order.payment,order.status,order.discount,order.deliveryCharge,order.courierCost,order.packaging,order.paymentFee,order.returnFee,order.settled,order.restocked,order.tracking,order.notes,0,now,now)
   );
@@ -225,5 +236,6 @@ export async function createEcommerceOrder(input:{
       .bind(input.ownerId,input.integrationId,input.idempotencyKey,input.order.externalOrderId,input.payloadHash,order.id,JSON.stringify(response),now)
   );
   await db.batch(statements);
+  await attemptImmediateCustomerNotifications(input.ownerId);
   return response;
 }
