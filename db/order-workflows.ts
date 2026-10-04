@@ -4,6 +4,10 @@ import { financeShadowStatements,FINANCE_DOMAIN } from './finance-shadow.ts';
 import { inventorySupplierShadowStatements,INVENTORY_SUPPLIER_DOMAIN } from './inventory-supplier-shadow.ts';
 import { ensureCustomerRecordApiReady } from './customer-records.ts';
 import { CUSTOMER_ORDER_DOMAIN } from './customer-order-shadow.ts';
+import {
+  attemptImmediateCustomerNotifications,
+  notificationStatusChangeStatements
+} from './customer-notifications.ts';
 import { validateWorkspaceChange } from '../lib/role-data.ts';
 import { creditBalance,orderBalance,creditUseSchema,accountIds, applyDeliveryFollowUps, batchRemaining, collectedAmount, customerSchema, nextStatuses, orderSchema, receivable, today, uid, type Customer, type Order, type State } from '../lib/crm.ts';
 import type { WorkspaceRole } from '../lib/roles.ts';
@@ -45,7 +49,11 @@ async function commitWorkflow(ownerId:string,before:State,next:State,rowVersion:
   const expectedFinanceVersion=financeChanged?await getDomainVersion(ownerId,FINANCE_DOMAIN):undefined;
   const expectedInventoryVersion=inventoryChanged?await getDomainVersion(ownerId,INVENTORY_SUPPLIER_DOMAIN):undefined;
   const statements:any[]=[];
-  for(const change of changed)statements.push(...orderReplaceStatements(ownerId,change.order,change.expectedVersion,change.expectedVersion+1,now));
+  for(const change of changed){
+    statements.push(...orderReplaceStatements(ownerId,change.order,change.expectedVersion,change.expectedVersion+1,now));
+    const beforeOrder=before.orders.find(order=>order.id===change.order.id);
+    if(beforeOrder)statements.push(...notificationStatusChangeStatements(ownerId,beforeOrder,change.order,now));
+  }
   statements.push(db.prepare('UPDATE crm_workspaces SET data=?,version=version+1,updated_at=? WHERE owner_id=? AND version=?').bind(JSON.stringify(next),now,ownerId,rowVersion));
   statements.push(db.prepare("SELECT 1 / CASE WHEN EXISTS (SELECT 1 FROM crm_workspaces WHERE owner_id=? AND version=? AND updated_at=?) THEN 1 ELSE 0 END").bind(ownerId,nextWorkspaceVersion,now));
   statements.push(db.prepare('UPDATE crm_relational_migrations SET status=?,source_version=?,verified_at=?,updated_at=? WHERE owner_id=? AND domain=?').bind('verified',nextWorkspaceVersion,now,now,ownerId,CUSTOMER_ORDER_DOMAIN));
@@ -57,6 +65,7 @@ async function commitWorkflow(ownerId:string,before:State,next:State,rowVersion:
   }
   statements.push(db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)').bind(crypto.randomUUID(),ownerId,actor.userId,actor.name,actor.role,summary,JSON.stringify(sections),now));
   await db.batch(statements);
+  await attemptImmediateCustomerNotifications(ownerId);
   return {workspaceVersion:nextWorkspaceVersion,recordVersions:Object.fromEntries(changed.map(c=>[c.order.id,c.expectedVersion+1])),financeDomainVersion:expectedFinanceVersion===undefined?undefined:expectedFinanceVersion+1,inventoryDomainVersion:expectedInventoryVersion===undefined?undefined:expectedInventoryVersion+1};
 }
 
