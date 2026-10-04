@@ -275,7 +275,7 @@ async function loadAudit(reset=false){
   }catch(e){toast.error(e instanceof Error?e.message:'Could not load activity history.')}
   finally{setAuditLoading(false)}
 }
-const changeView=(v:View)=>{if(!visibleSections(role).includes(v))return;setView(v);setQuery('');setFilter('All');setDetail(null);setSelectedOrderIds([]);setSelectedCustomerIds([]);setSelectedPurchaseOrderIds([]);setSelectedTaskIds([]);if(v==='Activity')void loadAudit(true)};
+const changeView=(v:View)=>{if(!visibleSections(role).includes(v))return;setView(v);setQuery('');setFilter('All');setDetail(null);setSelectedOrderIds([]);setSelectedCustomerIds([]);setSelectedPurchaseOrderIds([]);setSelectedTaskIds([]);if(v==='Activity'&&window.location.pathname==='/e2e')void loadAudit(true)};
 async function loadCustomerRecords(nextRole:WorkspaceRole){
   if(!visibleSections(nextRole).includes('Customers')){setCustomerRecordVersions({});return}
   const res=await fetch('/api/customers',{cache:'no-store'}),data:any=await res.json();
@@ -331,6 +331,7 @@ async function loadLive(showErrors=true,manageBusy=true,full=false){
 useEffect(()=>{void loadLive();return()=>{loadSequence.current++}},[]);
 useEffect(()=>{if(!loaded||window.location.pathname==='/e2e')return;void loadLive(false,false)},[view,reportMonth,range]);
 const pagedLists=loaded&&window.location.pathname!=='/e2e'&&!recoveryMode;
+const auditPage=useServerPagination<{events:typeof auditEvents;actorCount:number;roles:string[];sections:string[];latest?:typeof auditEvents[number]}>({path:'/api/audit',enabled:pagedLists&&view==='Activity',query:auditQuery,status:auditRole,extra:{section:auditSection},refresh:listRefresh});
 const orderPage=useServerPagination<{orders:OrderApiRecord[];customers:CustomerApiRecord[]}>({path:'/api/orders',enabled:pagedLists&&view==='Orders',query,status:filter,refresh:listRefresh,onLoaded:d=>{
  if(completeData.current)return;
  setOrderRecordVersions(current=>({...Object.fromEntries(Object.entries(current).filter(([id])=>selectedOrderIds.includes(id))),...Object.fromEntries(d.orders.map(o=>[o.id,o.recordVersion]))}));
@@ -829,6 +830,7 @@ return <SectionPaginationProvider value={{enabled:loaded&&!compactMode&&!recover
 {error&&<div className="error-banner" role="alert"><AlertTriangle size={18}/><span>{error}</span>{authRequired?<a href="/login" target="_top" className="text-button">Sign in</a>:<button className="text-button" onClick={()=>loadLive()}>Refresh records</button>}</div>}
 {!loaded?<section className="panel loading-panel">{busy?<><Skeleton className="h-8 w-60"/><Skeleton className="h-28 w-full"/></>:authRequired?<Empty title="Sign in to open your workspace" text="Your saved business records are available after you sign in." action={<a className="btn primary" href="/login" target="_top">Sign in</a>}/>:error?<Empty title="Saved records temporarily unavailable" text="Your records remain stored. Retry the secure workspace read before creating or editing anything." action={<button className="btn primary" onClick={()=>loadLive()}>Retry loading records</button>}/>:<Empty title="Start your workspace" text="Add stock, customers and orders to populate your dashboard." action={<button className="btn primary" onClick={()=>loadLive()}>Load saved records</button>}/>}</section>:<>
 {view==='Activity'&&<ActivitySection
+  serverPage={pagedLists?{events:auditPage.data?.events||[],total:auditPage.info.total,actorCount:auditPage.data?.actorCount||0,roles:auditPage.data?.roles||[],sections:auditPage.data?.sections||[],latest:auditPage.data?.latest,loading:auditPage.loading,controls:auditPage.controls,feedback:auditPage.feedback}:undefined}
   auditEvents={auditEvents}
   filteredAuditEvents={filteredAuditEvents}
   auditActorCount={auditActorCount}

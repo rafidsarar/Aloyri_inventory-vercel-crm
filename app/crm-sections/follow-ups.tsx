@@ -63,7 +63,7 @@ export default function FollowUpsSection({
     <div className="followup-grid">
       <section className="panel followup-queue-panel">
         <ActionBar className="followup-toolbar">
-          <div className="followup-toolbar-title"><h2>Follow-up queue</h2><p>{followUpRows.length} {followUpRows.length===1?'reminder':'reminders'} shown</p></div>
+          <div className="followup-toolbar-title"><h2>Follow-up queue</h2><p>{taskPage.rows.length} of {taskPage.total} reminders on this page</p></div>
           <div className="followup-search"><Search size={16}/><Input aria-label="Search follow-ups" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search customer, phone, order or reminder"/></div>
         </ActionBar>
         <div className="followup-filter-strip">

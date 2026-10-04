@@ -15,6 +15,7 @@ export type AuditEvent={
 };
 
 type Props={
+  serverPage?:{events:AuditEvent[];total:number;actorCount:number;roles:string[];sections:string[];latest?:AuditEvent;loading:boolean;controls:React.ReactNode;feedback:React.ReactNode};
   auditEvents:AuditEvent[];
   filteredAuditEvents:AuditEvent[];
   auditActorCount:number;
@@ -36,10 +37,13 @@ type Props={
 };
 
 export default function ActivitySection({
-  auditEvents,filteredAuditEvents,auditActorCount,auditLatest,auditQuery,auditRole,auditSection,
+  serverPage,auditEvents,filteredAuditEvents,auditActorCount,auditLatest,auditQuery,auditRole,auditSection,
   auditRoles,auditSections,auditHasMore,auditLoading,setAuditQuery,setAuditRole,setAuditSection,
   loadAudit,auditDate,auditTime,auditRelative
 }:Props){
+  const shown=serverPage?.events??filteredAuditEvents,latest=serverPage?.latest??auditLatest;
+  const hasHistory=serverPage?serverPage.actorCount>0:auditEvents.length>0;
+  const roles=serverPage?.roles??auditRoles,areas=serverPage?.sections??auditSections;
   return <WorkspaceSection>
     <section className="activity-hero">
       <div>
@@ -48,15 +52,15 @@ export default function ActivitySection({
         <p>Server-recorded workspace changes are read-only and preserved for accountability.</p>
       </div>
       <div className="activity-hero-meta">
-        <span><strong>{auditEvents.length}</strong><small>loaded events</small></span>
-        <span><strong>{auditActorCount}</strong><small>team members</small></span>
-        <span><strong>{auditLatest?auditRelative(auditLatest.created_at):'—'}</strong><small>latest change</small></span>
+        <span><strong>{serverPage?.total??auditEvents.length}</strong><small>{serverPage?'matching events':'loaded events'}</small></span>
+        <span><strong>{serverPage?.actorCount??auditActorCount}</strong><small>team members</small></span>
+        <span><strong>{latest?auditRelative(latest.created_at):'—'}</strong><small>latest change</small></span>
       </div>
     </section>
     <SectionPanel className="activity-panel activity-panel-pro">
       <div className="panel-heading">
         <div><h2>Change history</h2><p>Filter by team member role, changed section, or search the recorded summary.</p></div>
-        <span className="status">{filteredAuditEvents.length} shown</span>
+        <span className="status">{shown.length} shown</span>
       </div>
       <ActionBar className="activity-toolbar activity-toolbar-pro">
         <div className="search-input">
@@ -67,19 +71,19 @@ export default function ActivitySection({
         <div className="activity-filter-groups">
           <div><small>Role</small><div className="activity-section-filters">
             <button className={auditRole==='All'?'active':''} onClick={()=>setAuditRole('All')}>All</button>
-            {auditRoles.map(role=><button key={role} className={auditRole===role?'active':''} onClick={()=>setAuditRole(role)}>{role}</button>)}
+            {roles.map(role=><button key={role} className={auditRole===role?'active':''} onClick={()=>setAuditRole(role)}>{role}</button>)}
           </div></div>
           <div><small>Section</small><div className="activity-section-filters">
             <button className={auditSection==='All'?'active':''} onClick={()=>setAuditSection('All')}>All</button>
-            {auditSections.map(section=><button key={section} className={auditSection===section?'active':''} onClick={()=>setAuditSection(section)}>{section}</button>)}
+            {areas.map(section=><button key={section} className={auditSection===section?'active':''} onClick={()=>setAuditSection(section)}>{section}</button>)}
           </div></div>
         </div>
       </ActionBar>
-      {filteredAuditEvents.length
+      {shown.length
         ? <>
             <div className="activity-desktop">
               <Table><TableHeader><TableRow><TableHead>When</TableHead><TableHead>Team member</TableHead><TableHead>Role</TableHead><TableHead>Change</TableHead><TableHead>Areas</TableHead></TableRow></TableHeader>
-                <TableBody>{filteredAuditEvents.map(event=><TableRow key={event.id}>
+                <TableBody>{shown.map(event=><TableRow key={event.id}>
                   <TableCell><strong>{auditDate(event.created_at)}</strong><small className="cell-sub">{auditTime(event.created_at)} · {auditRelative(event.created_at)}</small></TableCell>
                   <TableCell><div className="activity-actor-cell"><Avatar name={event.actor_name}/><span><strong>{event.actor_name}</strong><small>Workspace change</small></span></div></TableCell>
                   <TableCell><Status value={event.role}/></TableCell>
@@ -88,14 +92,15 @@ export default function ActivitySection({
                 </TableRow>)}</TableBody>
               </Table>
             </div>
-            <div className="activity-mobile-list activity-mobile-list-pro">{filteredAuditEvents.map(event=><article key={event.id}>
+            <div className="activity-mobile-list activity-mobile-list-pro">{shown.map(event=><article key={event.id}>
               <div className="activity-mobile-head"><div className="activity-actor-cell"><Avatar name={event.actor_name}/><span><strong>{event.actor_name}</strong><small>{auditDate(event.created_at)} · {auditTime(event.created_at)}</small></span></div><Status value={event.role}/></div>
               <p>{event.summary}</p>
               <div className="activity-mobile-foot"><div className="activity-section-tags">{event.sections.map(section=><span key={section}>{section}</span>)}</div><small>{auditRelative(event.created_at)}</small></div>
             </article>)}</div>
-            {auditHasMore&&<div className="activity-load-more"><button className="btn secondary" disabled={auditLoading} onClick={()=>void loadAudit(false)}>{auditLoading?<Loader2 className="spin" size={15}/>:<Clock size={15}/>}Load older activity</button></div>}
+            {!serverPage&&auditHasMore&&<div className="activity-load-more"><button className="btn secondary" disabled={auditLoading} onClick={()=>void loadAudit(false)}>{auditLoading?<Loader2 className="spin" size={15}/>:<Clock size={15}/>}Load older activity</button></div>}
           </>
-        : <Empty title={auditEvents.length?'No matching activity':'No activity recorded yet'} text={auditEvents.length?'Clear search, role, or section filters to see more history.':'New workspace changes will appear here automatically.'} action={auditEvents.length?<button className="btn secondary" onClick={()=>{setAuditQuery('');setAuditSection('All');setAuditRole('All')}}>Clear filters</button>:undefined}/>}
-    </SectionPanel>
+        : serverPage?.loading?null:<Empty title={hasHistory?'No matching activity':'No activity recorded yet'} text={hasHistory?'Clear search, role, or section filters to see more history.':'New workspace changes will appear here automatically.'} action={hasHistory?<button className="btn secondary" onClick={()=>{setAuditQuery('');setAuditSection('All');setAuditRole('All')}}>Clear filters</button>:undefined}/>}
+    {serverPage?.feedback}{serverPage?.controls}</SectionPanel>
   </WorkspaceSection>;
 }
+
