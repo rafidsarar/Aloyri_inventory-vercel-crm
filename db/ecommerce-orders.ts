@@ -7,14 +7,12 @@ import {
   customerSchema,
   orderSchema,
   today,
-  type Customer,
   type Order,
   type State
 } from '../lib/crm.ts';
 import {
   ecommerceDeliveryCharge,
   normalizeBangladeshPhone,
-  sha256Hex,
   validBangladeshPhone,
   type EcommerceOrderInput
 } from '../lib/ecommerce-integration.ts';
