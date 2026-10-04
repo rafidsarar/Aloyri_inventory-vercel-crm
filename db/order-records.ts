@@ -151,7 +151,6 @@ export async function createOrderRecord(ownerId:string,input:unknown,actor:Order
     db.prepare('UPDATE crm_relational_migrations SET status=?,source_version=?,verified_at=?,updated_at=? WHERE owner_id=? AND domain=?').bind('verified',nextWorkspaceVersion,now,now,ownerId,CUSTOMER_ORDER_DOMAIN)
   ];
   if(inventoryChanged&&expectedInventoryVersion!==undefined)statements.push(...inventorySupplierShadowStatements(ownerId,merged,nextWorkspaceVersion,now),...domainVersionBumpStatements(ownerId,INVENTORY_SUPPLIER_DOMAIN,expectedInventoryVersion,now));
-  statements.push(...notificationStatusChangeStatements(ownerId,before,order,now));
   statements.push(db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)').bind(auditId,ownerId,actor.userId,actor.name,actor.role,'Created order '+order.number,JSON.stringify(['orders',...(inventoryChanged?['inventoryHolds']:[])]),now));
   await db.batch(statements);
   return {order:{...order,recordVersion:0} satisfies OrderRecord,workspaceVersion:nextWorkspaceVersion};
@@ -183,6 +182,7 @@ export async function updateOrderRecord(ownerId:string,id:string,input:unknown,e
     db.prepare('UPDATE crm_relational_migrations SET status=?,source_version=?,verified_at=?,updated_at=? WHERE owner_id=? AND domain=?').bind('verified',nextWorkspaceVersion,now,now,ownerId,CUSTOMER_ORDER_DOMAIN)
   ];
   if(inventoryChanged&&expectedInventoryVersion!==undefined)statements.push(...inventorySupplierShadowStatements(ownerId,merged,nextWorkspaceVersion,now),...domainVersionBumpStatements(ownerId,INVENTORY_SUPPLIER_DOMAIN,expectedInventoryVersion,now));
+  statements.push(...notificationStatusChangeStatements(ownerId,before,order,now));
   statements.push(db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)').bind(auditId,ownerId,actor.userId,actor.name,actor.role,'Updated order '+order.number,JSON.stringify(['orders',...(inventoryChanged?['inventoryHolds']:[])]),now));
   await db.batch(statements);
   await attemptImmediateCustomerNotifications(ownerId);
