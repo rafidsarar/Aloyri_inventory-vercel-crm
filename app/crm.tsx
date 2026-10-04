@@ -863,7 +863,7 @@ return <SectionPaginationProvider value={{enabled:loaded&&!compactMode&&!recover
   openAlert={openAlert}
   alertActionLabel={alertActionLabel}
 />{compactMode&&<>{alertPage.feedback}{alertPage.controls}</>}</>}
-{view==='Automation'&&!viewLoading&&<AutomationSection
+{view==='Automation'&&<div hidden={viewLoading}><AutomationSection
   settings={s.automationSettings}
   busy={busy}
   automationActiveRules={automationActiveRules}
@@ -875,8 +875,7 @@ return <SectionPaginationProvider value={{enabled:loaded&&!compactMode&&!recover
   updateAutomationRule={updateAutomationRule}
   changeView={changeView}
   setFinanceTab={setFinanceTab}
-/>}
-{view==='Overview'&&<OverviewSection
+/></div>}{view==='Overview'&&<OverviewSection
   role={role}
   alertCritical={serverSummary?.overview.alertCritical??(alertCritical)}
   alertAction={serverSummary?.overview.alertAction??(alertAction)}
@@ -938,7 +937,7 @@ return <SectionPaginationProvider value={{enabled:loaded&&!compactMode&&!recover
   serverPage={pagedLists?{rows:orderPage.data?.orders||[],total:orderPage.info.total,controls:orderPage.controls,feedback:orderPage.feedback,loading:orderPage.loading,stats:serverSummary?.orderStats??{total:s.orders.length,todayOrderCount:todayOrders.length,statusCounts:Object.fromEntries(statuses.map(status=>[status,s.orders.filter(o=>o.status===status).length]))}}:undefined}
 />}
 {viewLoading&&<p role="status">Loading workspace records…</p>}
-{view==='Inventory'&&!viewLoading&&<InventorySection ctx={{
+{view==='Inventory'&&<div hidden={viewLoading}><InventorySection ctx={{
   stockedProducts,inventoryUnits,s,canEdit,openModal,setInventoryTab,setFilter,setQuery,m,
   inventoryLow,inventoryOut,inventoryExpiring,openPurchaseOrders,inventoryPhysicalUnits,
   inventoryReservedUnits,inventoryReturnPendingUnits,inventoryBlockedUnits,receivedUnitsThisMonth,
@@ -948,8 +947,7 @@ return <SectionPaginationProvider value={{enabled:loaded&&!compactMode&&!recover
   releaseCancelledInspection,markCancelledInspectionDamaged,markInventoryHoldDamaged,
   releaseInventoryHold,requestDeleteCategory,currentInventoryMonth,match,productById,supplierById,
   role,canFinance,setView,setFinanceTab
-}}/>}
-{view==='Customers'&&<CustomersSection
+}}/></div>}{view==='Customers'&&<CustomersSection
   query={query}
   setQuery={setQuery}
   filteredCustomers={filteredCustomers}
@@ -964,14 +962,13 @@ return <SectionPaginationProvider value={{enabled:loaded&&!compactMode&&!recover
   requestDelete={requestDelete}
   serverPage={pagedLists?{rows:customerPage.data?.customers||[],total:customerPage.info.total,controls:customerPage.controls,feedback:customerPage.feedback,loading:customerPage.loading,orderStats:customerPage.data?.orderStats||{}}:undefined}
 />}
-{view==='Suppliers'&&!viewLoading&&<SuppliersSection ctx={{
+{view==='Suppliers'&&<div hidden={viewLoading}><SuppliersSection ctx={{
   purchasingTab,s,canEdit,openPurchaseOrder,openModal,purchasingOpen,purchasingOpenValue,
   purchasingOverdue,purchasingIncomingUnits,canFinance,purchasingPayable,setView,setFinanceTab,
   verifiedSupplierCount,setPurchasingTab,setFilter,setQuery,query,filter,purchaseOrderRows,
   selectedPurchaseOrderIds,setSelectedPurchaseOrderIds:ids=>setSelectedPurchaseOrderIds(ids.slice(0,200)),busy,bulkSendPurchaseOrders,
   setPurchaseOrderStatus,openPurchaseOrderReceipt,supplierRows,setDetail
-}}/>}
-{view==='Reports'&&<ReportsSection ctx={{
+}}/></div>}{view==='Reports'&&<ReportsSection ctx={{
   reportMonth,reportPulseTone,reportPulse,reportOrders,setReportMonth,reportMonths,changeView,
   canExport,exportManagementReport,reportRevenue,reportRevenueDelta,reportProfit,reportMargin,
   reportAov,reportRepeatRate,reportRepeatCustomers,reportCustomerIds,reportReturnRate,
@@ -983,7 +980,7 @@ return <SectionPaginationProvider value={{enabled:loaded&&!compactMode&&!recover
   unassignedMovements,automationActiveRules,inventoryExpired,projected30,reportCollectionRate,
   role,openModal,...(serverSummary?.report||{})
 }}/>}
-{view==='Finances'&&!viewLoading&&<FinancesSection ctx={{
+{view==='Finances'&&<div hidden={viewLoading}><FinancesSection ctx={{
   returnAction,postRefund,s,busy,canCloseFinance,canEdit,canExport,canFinance,canOwnerMoney,cashRange,closeBlockers,closeMissingAccounts,
   closeMonth,closePayables,closeReceivables,closeRecord,closeUnassigned,allCashIn,allCashOut,
   availableCash,configuredBalances,exportFinance,financeTab,forecastPayables30,forecastReceivables,
@@ -994,8 +991,7 @@ return <SectionPaginationProvider value={{enabled:loaded&&!compactMode&&!recover
   reportRevenue,reverseCashEntry,save:saveFinanceDomain,setCashRange,setCloseMonth,setDetail,setFinanceTab,
   setReportMonth,signedTaka,supplierById,trendMax,unassignedMovements,visibleCash,cashIn,cashOut,
   flow,integrityIssues,isCollectible
-}}/>}
-{view==='Follow-ups'&&!viewLoading&&<FollowUpsSection
+}}/></div>}{view==='Follow-ups'&&<div hidden={viewLoading}><FollowUpsSection
   focusText={followUpFocusText}
   canEdit={canEdit}
   openModal={openModal}
@@ -1021,8 +1017,7 @@ return <SectionPaginationProvider value={{enabled:loaded&&!compactMode&&!recover
   setDetail={setDetail}
   deleteFollowUp={deleteFollowUp}
   changeView={changeView}
-/>}
-</>}
+/></div>}</>}
 <footer className="page-footer"><span>ALOYRI <span className="footer-dot">·</span> Let Your Skin Glow.</span><span>All amounts in BDT · Dhaka time</span></footer></div></main>
 <Dialog open={!!modal} onOpenChange={open=>{if(!open&&!busy){setModal(null);if(completeData.current&&window.location.pathname!=='/e2e')void loadLive(false,false)}}}><DialogContent className="record-dialog"><DialogHeader><DialogTitle>{modal?({order:'New order',product:modal.record?'Edit product':'Add product',category:'Add category',customer:modal.record?'Edit customer':'Add customer',supplier:modal.record?'Edit supplier':'Add supplier',batch:'Receive stock',batchSupplier:'Link batch supplier',stockAdjust:'Edit available stock',stockHold:'Hold stock',expense:'Record an expense',cashEntry:'Record cash movement',task:modal.record?'Edit follow-up':'Add a follow-up',settings:'Business settings',orderEdit:'Delivery details'} as Record<string,string>)[modal.type]:''}</DialogTitle><DialogDescription>Changes are saved to your private workspace.</DialogDescription></DialogHeader>{modal&&<Form key={modal.type+(modal.record?.id||'')} modal={modal} s={s} busy={busy} onSave={saveRecordAware} onClose={()=>setModal(null)} onCreatedOrder={setInvoiceId} role={role} onReset={resetWorkspace} onBackup={downloadWorkspaceBackup} onRestore={restoreWorkspaceBackup} onOpenTeam={()=>{setModal(null);setTeamOpen(true)}}/>}</DialogContent></Dialog>
 <Dialog open={poOpen} onOpenChange={setPoOpen}><DialogContent className="payment-dialog purchase-order-dialog"><DialogHeader><DialogTitle>New purchase order</DialogTitle><DialogDescription>Create a supplier order before stock arrives. Payment is handled separately in Finance after receiving.</DialogDescription></DialogHeader><div className="payment-form"><label><span>Supplier</span><select value={poSupplier} onChange={e=>{const id=e.target.value;setPoSupplier(id);const supplier=s.suppliers.find(x=>x.id===id);setPoExpected(shiftDate(supplier?.leadDays??14))}}>{s.suppliers.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label><label><span>Expected delivery</span><Input type="date" min={today()} value={poExpected} onChange={e=>setPoExpected(e.target.value)}/></label>{poLines.map((line,index)=><div className="po-line" key={index}><label className="po-product-field"><span>Product</span><select aria-label={"PO product "+(index+1)} value={line.productId} onChange={e=>setPurchaseOrderProduct(index,e.target.value)}>{s.products.map(p=><option key={p.id} value={p.id} disabled={poLines.some((other,i)=>i!==index&&other.productId===p.id)}>{p.brand} {p.name}</option>)}</select></label><label><span>Quantity</span><Input aria-label="PO quantity" type="number" min="1" value={line.qty} onChange={e=>setPoLines(a=>a.map((x,i)=>i===index?{...x,qty:Number(e.target.value)}:x))}/></label><label><span>Unit cost (BDT)</span><Input aria-label="PO unit cost" type="number" min="0" step="0.01" value={line.unitCost} onChange={e=>setPoLines(a=>a.map((x,i)=>i===index?{...x,unitCost:Number(e.target.value)}:x))}/></label><button type="button" className="icon-button" aria-label={"Remove purchase item "+(index+1)} onClick={()=>setPoLines(a=>a.filter((_,i)=>i!==index))}><X size={16}/></button></div>)}<button className="btn secondary po-add-item" disabled={!s.products.some(p=>!poLines.some(line=>line.productId===p.id))} onClick={addPurchaseOrderItem}><Plus size={16}/>Add item</button><label className="po-notes"><span>Notes</span><Input value={poNotes} onChange={e=>setPoNotes(e.target.value)} placeholder="Terms, contact or delivery notes"/></label></div><DialogFooter><button className="btn secondary" onClick={()=>setPoOpen(false)}>Cancel</button><button className="btn primary" disabled={busy} onClick={()=>void createPurchaseOrder()}>Create draft PO</button></DialogFooter></DialogContent></Dialog>
