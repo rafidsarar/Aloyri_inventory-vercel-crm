@@ -145,6 +145,17 @@ export default function OrdersSection({
               </div>
               <button className="btn secondary small" onClick={()=>findReturnOrder(request)}><Search size={14}/>Find order</button>
             </div>
+            <label className="mt-3 block text-sm">
+              <span className="text-xs font-medium muted">Internal review note</span>
+              <textarea
+                value={request.staffNote}
+                maxLength={2000}
+                rows={2}
+                onChange={event=>setReturnRequests(current=>current.map(item=>item.id===request.id?{...item,staffNote:event.target.value}:item))}
+                placeholder="Add staff-only context for the return review…"
+                className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              />
+            </label>
             <div className="mt-3 flex flex-wrap gap-2">
               {request.requestStatus==='Requested'&&<button className="btn secondary small" disabled={returnRequestBusy===request.id} onClick={()=>void updateReturnRequest(request,'Reviewing')}>Start review</button>}
               {!['Approved','Rejected','Resolved'].includes(request.requestStatus)&&<>
