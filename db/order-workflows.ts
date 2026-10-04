@@ -164,7 +164,7 @@ export async function createOrderWithCustomerWorkflow(ownerId:string,input:{cust
 
 export async function applyCustomerCreditWorkflow(ownerId:string,input:{credit:unknown;recordVersion:number},actor:Actor){
  if(!['owner','admin','finance'].includes(actor.role))throw new Error('FINANCE_FORBIDDEN');
- const credit=creditUseSchema.parse(input),{row,state}=await ensureCustomerRecordApiReady(ownerId);
+ const credit=creditUseSchema.parse(input.credit),{row,state}=await ensureCustomerRecordApiReady(ownerId);
  const prior=state.creditUses.find(u=>u.id===credit.id);if(prior){if(JSON.stringify(prior)!==JSON.stringify(credit))throw new Error('Credit reference already used.');return {duplicate:true};}
  const settlement=state.returnSettlements.find(r=>r.id===credit.settlementId),target=state.orders.find(o=>o.id===credit.orderId);
  if(!settlement||!target||['Returned','Cancelled'].includes(target.status))throw new Error('Choose an active replacement order.');
