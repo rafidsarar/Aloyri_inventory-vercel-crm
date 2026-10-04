@@ -1,8 +1,5 @@
 import { neon } from '@neondatabase/serverless';
 import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-
-const execFileAsync=promisify(execFile);
 
 // Compatibility layer for the existing parameterized CRM queries. All SQL is
 // application-owned; user input is always sent as a separate parameter.
@@ -37,14 +34,26 @@ function sqlLiteral(value:unknown){
 function bindLocal(sql:string,values:unknown[]){
   return sql.replace(/\$(\d+)/g,(_match,n)=>sqlLiteral(values[Number(n)-1]));
 }
+// Send SQL through stdin so large synthetic workspaces do not exceed the
+// operating system's per-argument limit during PostgreSQL certification.
+function localPsql(sql:string,quiet:boolean,maxBuffer:number):Promise<{stdout:string}>{
+  return new Promise((resolve,reject)=>{
+    const args=[databaseUrl(),'-X',...(quiet?['-q']:[]),'-t','-A','-v','ON_ERROR_STOP=1'];
+    const child=execFile('psql',args,{maxBuffer,encoding:'utf8'},(error,stdout)=>{
+      if(error)reject(error);else resolve({stdout});
+    });
+    child.stdin?.on('error',reject);
+    child.stdin?.end(sql+'\n;\n');
+  });
+}
 async function localSelect(sql:string,values:unknown[]):Promise<QueryResult<Row>>{
   const wrapped=`SELECT COALESCE(json_agg(q),'[]'::json)::text FROM (${bindLocal(sql,values)}) q;`;
-  const result=await execFileAsync('psql',[databaseUrl(),'-X','-q','-t','-A','-v','ON_ERROR_STOP=1','-c',wrapped],{maxBuffer:16*1024*1024});
+  const result=await localPsql(wrapped,true,16*1024*1024);
   const rows=JSON.parse(result.stdout.trim()||'[]') as Row[];
   return {rows,rowCount:rows.length};
 }
 async function localRun(sql:string,values:unknown[]):Promise<QueryResult<Row>>{
-  const result=await execFileAsync('psql',[databaseUrl(),'-X','-t','-A','-v','ON_ERROR_STOP=1','-c',bindLocal(sql,values)],{maxBuffer:16*1024*1024});
+  const result=await localPsql(bindLocal(sql,values),false,16*1024*1024);
   const tag=result.stdout.trim().split(/\r?\n/).at(-1)||'';
   const match=tag.match(/^(?:INSERT\s+\d+\s+|UPDATE\s+|DELETE\s+)(\d+)$/i);
   return {rows:[],rowCount:match?Number(match[1]):0};
@@ -71,7 +80,7 @@ function client() {
 
 async function localBatch(statements:Statement[]){
   const body=statements.map(statement=>bindLocal(statement.sql,statement.values).replace(/;\s*$/,'')+';').join('\n');
-  await execFileAsync('psql',[databaseUrl(),'-X','-q','-v','ON_ERROR_STOP=1','-c','BEGIN;\n'+body+'\nCOMMIT;'],{maxBuffer:32*1024*1024});
+  await localPsql('BEGIN;\n'+body+'\nCOMMIT;',true,32*1024*1024);
   return statements.map(()=>({meta:{changes:1}}));
 }
 
@@ -86,3 +95,4 @@ export function database() {
     },
   };
 }
+

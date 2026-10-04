@@ -1,4 +1,5 @@
 'use client';
+import { useSectionPage } from '../section-pagination';
 
 import { AlertTriangle, ArrowRight, CalendarCheck, Check, ChevronRight, Clock, Leaf, Plus, Search, ShieldCheck, ShoppingBag, Users } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -43,6 +44,7 @@ export default function FollowUpsSection({
   tasks,busy,bulkCompleteFollowUps,customers,orders,updateFollowUp,followUpDueLabel,setDetail,
   deleteFollowUp,changeView
 }:Props){
+  const taskPage=useSectionPage('tasks',followUpRows,r=>r.id,{query,status:filter});
   return <WorkspaceSection>
     <section className="followup-header-card">
       <div className="followup-header-copy">
@@ -61,15 +63,15 @@ export default function FollowUpsSection({
     <div className="followup-grid">
       <section className="panel followup-queue-panel">
         <ActionBar className="followup-toolbar">
-          <div className="followup-toolbar-title"><h2>Follow-up queue</h2><p>{followUpRows.length} {followUpRows.length===1?'reminder':'reminders'} shown</p></div>
+          <div className="followup-toolbar-title"><h2>Follow-up queue</h2><p>{taskPage.rows.length} of {taskPage.total} reminders on this page</p></div>
           <div className="followup-search"><Search size={16}/><Input aria-label="Search follow-ups" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search customer, phone, order or reminder"/></div>
         </ActionBar>
         <div className="followup-filter-strip">
           {['All','Open','Overdue','Today','Next 7 days','High priority','Replenishment','Completed'].map(option=><button key={option} className={'followup-filter-chip '+(filter===option?'active':'')} onClick={()=>setFilter(option)}>{option}{option==='Overdue'&&followUpOverdue.length>0?<span>{followUpOverdue.length}</span>:option==='Today'&&followUpToday.length>0?<span>{followUpToday.length}</span>:option==='High priority'&&followUpHigh.length>0?<span>{followUpHigh.length}</span>:null}</button>)}
         </div>
-        {canEdit('tasks')&&followUpRows.length>0&&<div className="bulk-select-strip"><label><Checkbox aria-label="Select all shown follow-ups" checked={followUpRows.every(task=>selectedTaskIds.includes(task.id))} onCheckedChange={checked=>setSelectedTaskIds(checked===true?Array.from(new Set([...selectedTaskIds,...followUpRows.map(task=>task.id)])):selectedTaskIds.filter(id=>!followUpRows.some(task=>task.id===id)))}/><span>Select all shown</span></label>{selectedTaskIds.length>0&&<span>{selectedTaskIds.length} selected</span>}</div>}
+        {canEdit('tasks')&&followUpRows.length>0&&<div className="bulk-select-strip"><label><Checkbox aria-label="Select all shown follow-ups" checked={taskPage.rows.length>0&&taskPage.rows.every(task=>selectedTaskIds.includes(task.id))} onCheckedChange={checked=>setSelectedTaskIds(checked===true?Array.from(new Set([...selectedTaskIds,...taskPage.rows.map(task=>task.id)])):selectedTaskIds.filter(id=>!taskPage.rows.some(task=>task.id===id)))}/><span>Select all shown</span></label>{selectedTaskIds.length>0&&<span>{selectedTaskIds.length} selected</span>}</div>}
         {selectedTaskIds.length>0&&<div className="bulk-action-bar bulk-action-bar-pro followup-bulk-bar"><span><strong>{selectedTaskIds.length}</strong> follow-ups selected<small>{tasks.filter(task=>selectedTaskIds.includes(task.id)&&!task.done).length} open reminders eligible</small></span><div><button className="btn secondary" onClick={()=>setSelectedTaskIds([])}>Clear</button><button className="btn primary" disabled={busy||!tasks.some(task=>selectedTaskIds.includes(task.id)&&!task.done)} onClick={()=>void bulkCompleteFollowUps()}><Check size={15}/>Mark complete</button></div></div>}
-        {followUpRows.map(task=>{
+        {taskPage.rows.map(task=>{
           const customer=customers.find(item=>item.id===task.customerId);
           const linkedOrder=orders.find(order=>order.id===task.orderId);
           const dateState=task.done?'done':task.due<today()?'overdue':task.due===today()?'today':'upcoming';
@@ -87,7 +89,7 @@ export default function FollowUpsSection({
           </div>;
         })}
         {!followUpRows.length&&<Empty title={tasks.length?'Nothing in this view':'No follow-ups yet'} text={tasks.length?'Try another filter or clear your search.':'Add a reminder manually, or deliver an order and Aloyri will create a customer-care follow-up for 7 days later.'} action={tasks.length?<button className="btn secondary" onClick={()=>{setFilter('All');setQuery('')}}>Clear filters</button>:undefined}/>}
-      </section>
+      {taskPage.controls}</section>
       <aside className="panel followup-guide">
         <span className="care-icon"><Leaf size={24}/></span><h2>Simple workflow</h2><p>Keep each customer conversation focused and easy for the next staff member to continue.</p>
         <ol className="followup-steps"><li><span>1</span><div><strong>Start with urgency</strong><small>Handle overdue and high-priority reminders first.</small></div></li><li><span>2</span><div><strong>Check context</strong><small>Open the customer or order before contacting them.</small></div></li><li><span>3</span><div><strong>Finish the loop</strong><small>Mark it complete, or snooze it if another contact is needed.</small></div></li></ol>

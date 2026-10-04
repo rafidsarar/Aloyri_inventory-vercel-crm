@@ -1,4 +1,5 @@
 'use client';
+import { useSectionPage } from '../section-pagination';
 
 import { AlertTriangle, ArrowRight, Bell, CalendarCheck, CheckCircle2, ChevronRight, Clock, Mail, Package, Receipt, ShieldCheck, ShoppingBag, Truck, Users, Wallet, Zap } from 'lucide-react';
 import type { AutomationSettings, AutomationSignal } from '@/lib/crm';
@@ -23,6 +24,7 @@ export default function AutomationSection({
   settings,busy,automationActiveRules,automationCritical,automationAction,automationUpcoming,
   automationLive,automationRuleNames,updateAutomationRule,changeView,setFinanceTab
 }:Props){
+  const signalPage=useSectionPage('automation',automationLive,r=>r.key);
   return <WorkspaceSection>
     <section className="automation-hero">
       <div><span className="orders-eyebrow"><Zap size={15}/>Safe operations automation</span><h2>Automation Center</h2><p>Let Aloyri surface work automatically while keeping payments, stock receiving, order status changes and customer messaging under staff control.</p></div>
@@ -83,8 +85,9 @@ export default function AutomationSection({
     <section className="panel automation-signals">
       <div className="panel-heading"><div><h2>Live automation signals</h2><p>{automationLive.length} current {automationLive.length===1?'signal':'signals'} across operations, customers and finance.</p></div><button className="text-button" onClick={()=>changeView('Alerts')}>Open alert center<ArrowRight size={15}/></button></div>
       {automationLive.length
-        ? <div className="automation-list">{automationLive.map(signal=><button key={signal.key} className="automation-alert" onClick={()=>{changeView(signal.view);if(signal.view==='Finances'&&signal.rule==='customerCollections')setFinanceTab('Collections');if(signal.view==='Finances'&&signal.rule==='supplierPayments')setFinanceTab('Payables')}}><span className={'alert-level '+signal.level.toLowerCase().replace(' ','-')}>{signal.level}</span><span><strong>{signal.title}</strong><small>{automationRuleNames[signal.rule]} · {signal.detail}</small></span><ChevronRight size={17}/></button>)}</div>
+        ? <div className="automation-list">{signalPage.rows.map(signal=><button key={signal.key} className="automation-alert" onClick={()=>{changeView(signal.view);if(signal.view==='Finances'&&signal.rule==='customerCollections')setFinanceTab('Collections');if(signal.view==='Finances'&&signal.rule==='supplierPayments')setFinanceTab('Payables')}}><span className={'alert-level '+signal.level.toLowerCase().replace(' ','-')}>{signal.level}</span><span><strong>{signal.title}</strong><small>{automationRuleNames[signal.rule]} · {signal.detail}</small></span><ChevronRight size={17}/></button>)}</div>
         : <Empty title="No automation signals" text="All enabled rules are clear right now."/>}
-    </section>
+    {signalPage.controls}</section>
   </WorkspaceSection>;
 }
+

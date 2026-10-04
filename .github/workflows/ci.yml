@@ -84,6 +84,8 @@ jobs:
     env:
       DATABASE_URL: postgresql://crm:crm@localhost:5432/aloyri_e2e
       E2E_LOCAL_POSTGRES: '1'
+      E2E_TEST_MODE: '1'
+      E2E_PRODUCTION_BUILD: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -101,7 +103,18 @@ jobs:
           node --experimental-strip-types scripts/e2e-seed.ts
       - name: Install Playwright test runner
         run: pnpm add --save-dev --lockfile=false @playwright/test@1.55.0
+      - name: Build production runtime for certification
+        run: pnpm build
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: Run fixture UI and authenticated certification workflows
         run: pnpm exec playwright test
+
+      - name: Save browser failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-failure-diagnostics
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: ignore
