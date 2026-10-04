@@ -1,4 +1,5 @@
 'use client';
+import { financialPeriod,financialMonths,periodSalesBreakdown } from '@/lib/financial-reporting';
 /* Final operational polish complete */
 /* Production release: management intelligence */
 import React,{useDeferredValue,useEffect,useMemo,useRef,useState} from 'react';
@@ -40,8 +41,8 @@ const FinancesSection=dynamic(()=>import('./crm-sections/finances'));
 type GlobalResult={id:string;view:View;title:string;meta:string;query:string;score:number;detail?:{type:'order'|'customer'|'supplier';id:string}};
 type CustomerApiRecord=Customer&{recordVersion:number};
 type OrderApiRecord=Order&{recordVersion:number};
-const inventorySupplierKeys=['products','productCategories','suppliers','purchaseOrders','batches','stockAdjustments','inventoryHolds'] as const;
-const financeKeys=['expenses','cashEntries','accountOpenings','accountMatches','financeCloses','customerRefunds'] as const;
+const inventorySupplierKeys=['products','productCategories','suppliers','purchaseOrders','batches','stockAdjustments','inventoryHolds','returnInspections'] as const;
+const financeKeys=['expenses','cashEntries','accountOpenings','accountMatches','financeCloses','customerRefunds','returnSettlements','creditUses'] as const;
 const compatibilityKeys=['tasks','businessName','businessProfile','automationSettings'] as const;
 const modalCollection:Record<Modal['type'],string>={order:'orders',orderEdit:'orders',customer:'customers',task:'tasks',product:'products',category:'productCategories',batch:'batches',batchSupplier:'batches',stockAdjust:'stockAdjustments',stockHold:'inventoryHolds',supplier:'suppliers',expense:'expenses',cashEntry:'cashEntries',settings:'businessName'};
 const titles:Record<View,string>={Overview:'Business overview',Reports:'Management reports',Alerts:'Alert center',Automation:'Automation center',Orders:'Orders',Inventory:'Inventory',Customers:'Customers',Suppliers:'Suppliers',Finances:'Finances', 'Follow-ups':'Follow-ups',Activity:'Activity log'};
@@ -122,16 +123,18 @@ if(unassignedMovements)integrityIssues.push({level:'Warning',title:unassignedMov
 const flowIds=new Set(flow.entries.map(e=>e.id));s.accountMatches.filter(m=>!flowIds.has(m.entryId)).forEach(m=>integrityIssues.push({level:'Warning',title:'Orphan account assignment',detail:m.entryId+' no longer matches a cashflow movement.',tab:'Reconciliation'}));
 const transferIds=Array.from(new Set(s.cashEntries.map(e=>e.transferId).filter((id):id is string=>Boolean(id))));transferIds.forEach(id=>{const list=s.cashEntries.filter(e=>e.transferId===id);if(list.length!==2||list[0]?.amount!==list[1]?.amount||list[0]?.kind===list[1]?.kind)integrityIssues.push({level:'Critical',title:'Broken account transfer',detail:'Transfer '+id+' does not have one equal cash-in and cash-out pair.',tab:'Cashflow'})});
 s.cashEntries.filter(e=>e.reversalOf&&!s.cashEntries.some(x=>x.id===e.reversalOf)).forEach(e=>integrityIssues.push({level:'Warning',title:'Reversal source is missing',detail:e.description,tab:'Cashflow'}));
-const reportOrders=s.orders.filter(o=>o.status==='Delivered'&&(o.delivered||o.created).slice(0,7)===reportMonth),reportExpenses=s.expenses.filter(e=>e.date.slice(0,7)===reportMonth),reportRevenue=reportOrders.reduce((n,o)=>n+subtotal(o),0),reportDeliveryIncome=reportOrders.reduce((n,o)=>n+o.deliveryCharge,0),reportCogs=reportOrders.reduce((n,o)=>n+o.items.flatMap(i=>i.allocations).reduce((x,a)=>x+a.unitCost*a.qty,0),0),reportGross=reportRevenue-reportCogs,reportFulfillment=reportOrders.reduce((n,o)=>n+o.courierCost+o.packaging+o.paymentFee,0),reportReturns=s.orders.filter(o=>o.status==='Returned'&&(o.returnedAt||o.delivered||o.created).slice(0,7)===reportMonth).reduce((n,o)=>n+(o.restocked?0:o.items.flatMap(i=>i.allocations).reduce((x,a)=>x+a.unitCost*a.qty,0))+o.courierCost+o.returnFee+o.packaging+o.paymentFee,0),reportOpex=reportExpenses.reduce((n,e)=>n+e.amount,0),reportProfit=reportGross+reportDeliveryIncome-reportFulfillment-reportReturns-reportOpex,reportMargin=reportRevenue?reportProfit/reportRevenue*100:0;
-const previousMonth=(()=>{const [y,m]=reportMonth.split('-').map(Number);return new Date(Date.UTC(y,m-2,1)).toISOString().slice(0,7)})(),previousOrders=s.orders.filter(o=>o.status==='Delivered'&&(o.delivered||o.created).slice(0,7)===previousMonth),previousRevenue=previousOrders.reduce((n,o)=>n+subtotal(o),0);
+const periodReport=financialPeriod(s,reportMonth);
+const reportOrders=s.orders.filter(o=>(o.status==='Delivered'||!!o.delivered)&&(o.delivered||o.created).slice(0,7)===reportMonth),reportExpenses=s.expenses.filter(e=>e.date.slice(0,7)===reportMonth),reportRevenue=periodReport.revenue,reportDeliveryIncome=periodReport.delivery,reportCogs=periodReport.cogs,reportGross=reportRevenue-reportCogs,reportFulfillment=periodReport.fulfillment,reportReturns=periodReport.returnCosts,reportOpex=periodReport.expenses,reportProfit=periodReport.profit,reportMargin=reportRevenue>0?reportProfit/reportRevenue*100:0;
+const previousMonth=(()=>{const [y,m]=reportMonth.split('-').map(Number);return new Date(Date.UTC(y,m-2,1)).toISOString().slice(0,7)})(),previousOrders=s.orders.filter(o=>o.status==='Delivered'&&(o.delivered||o.created).slice(0,7)===previousMonth),previousRevenue=financialPeriod(s,previousMonth).revenue;
 const reportCustomerIds=Array.from(new Set(reportOrders.map(o=>o.customerId))),reportAov=reportOrders.length?reportRevenue/reportOrders.length:0;
 const reportNewCustomers=s.customers.filter(customer=>customer.created.slice(0,7)===reportMonth).length;
 const reportRepeatCustomers=reportCustomerIds.filter(customerId=>s.orders.some(o=>o.customerId===customerId&&o.status==='Delivered'&&(o.delivered||o.created)<reportMonth+'-01')).length;
 const reportRepeatRate=reportCustomerIds.length?reportRepeatCustomers/reportCustomerIds.length*100:0;
 const reportReturnedOrders=s.orders.filter(o=>o.status==='Returned'&&(o.returnedAt||o.delivered||o.created).slice(0,7)===reportMonth);
 const reportReturnRate=(reportOrders.length+reportReturnedOrders.length)?reportReturnedOrders.length/(reportOrders.length+reportReturnedOrders.length)*100:0;
-const reportChannelRows=Array.from(new Set(reportOrders.map(o=>o.channel))).map(channel=>{const orders=reportOrders.filter(o=>o.channel===channel);return {channel,orders:orders.length,revenue:orders.reduce((n,o)=>n+subtotal(o),0)}}).sort((a,b)=>b.revenue-a.revenue);
-const reportProductRows=s.products.map(product=>{let units=0,revenue=0;for(const order of reportOrders)for(const item of order.items.filter(i=>i.productId===product.id)){units+=item.qty;revenue+=item.qty*item.price}return {product,units,revenue}}).filter(row=>row.units>0).sort((a,b)=>b.revenue-a.revenue||b.units-a.units).slice(0,6);
+const salesBreakdown=periodSalesBreakdown(s,reportMonth);
+const reportChannelRows=salesBreakdown.channels.sort((a,b)=>b.revenue-a.revenue);
+const reportProductRows=salesBreakdown.products.map(row=>({product:productById.get(row.productId)!,units:row.units,revenue:row.revenue})).filter(row=>row.product&&(row.units!==0||row.revenue!==0)).sort((a,b)=>b.revenue-a.revenue||b.units-a.units).slice(0,6);
 const reportProductMax=Math.max(1,...reportProductRows.map(row=>row.revenue));
 const reportRevenueDelta=previousRevenue?Math.round((reportRevenue-previousRevenue)/previousRevenue*100):null;
 const reportPulse=reportProfit<0?'Needs attention':reportReturnRate>12?'Watch returns':reportRepeatRate>=35?'Healthy retention':'Building momentum';
@@ -152,7 +155,7 @@ const inventoryAgeingTotal=inventoryAgeing.reduce((n,row)=>n+row.value,0);
 const supplierPerformance=s.suppliers.map(supplier=>{const insight=supplierInsight(s,supplier.id),pos=insight.purchaseOrders.filter(po=>po.status!=='Cancelled'),received=pos.filter(po=>po.status==='Received'),open=pos.filter(po=>!['Received','Cancelled'].includes(po.status)),overdue=insight.overduePurchaseOrders,value=pos.reduce((n,po)=>n+purchaseOrderValue(po),0);return {supplier,orders:pos.length,received:received.length,open:open.length,overdue:overdue.length,value,avgLead:insight.avgLeadDays}}).filter(row=>row.orders>0).sort((a,b)=>b.value-a.value||b.orders-a.orders).slice(0,6);
 const reportCollected=reportOrders.reduce((n,o)=>n+Math.min(receivable(o),o.collections.reduce((x,p)=>x+p.amount,0)+(o.settled&&o.collections.length===0?receivable(o):0)),0);
 const reportCollectionRate=reportOrders.reduce((n,o)=>n+receivable(o),0)?reportCollected/reportOrders.reduce((n,o)=>n+receivable(o),0)*100:0;
-const reportMonths=Array.from(new Set([...s.orders.map(o=>(o.delivered||o.created).slice(0,7)),...s.expenses.map(e=>e.date.slice(0,7)),today().slice(0,7)])).sort().reverse();
+const reportMonths=financialMonths(s);
 const closeEnd=closeMonth+'-31',closeMovements=flow.entries.filter(e=>e.date.slice(0,7)===closeMonth),closeUnassigned=closeMovements.filter(e=>!s.accountMatches.some(m=>m.entryId===e.id)).length,closeMissingAccounts=4-s.accountOpenings.length,closeReceivables=s.orders.filter(o=>o.status==='Delivered'&&(o.delivered||o.created).slice(0,7)<=closeMonth).reduce((n,o)=>{const due=receivable(o),legacy=o.settled&&o.collections.length===0?due:0;return n+Math.max(0,due-o.collections.filter(p=>p.date<=closeEnd).reduce((x,p)=>x+p.amount,0)-legacy)},0),closePayables=s.batches.filter(b=>b.received.slice(0,7)<=closeMonth).reduce((n,b)=>{const amount=b.qty*b.unitCost,legacy=b.paid&&b.payments.length===0?amount:0;return n+Math.max(0,amount-b.payments.filter(p=>p.date<=closeEnd).reduce((x,p)=>x+p.amount,0)-legacy)},0),closeRecord=s.financeCloses.find(x=>x.month===closeMonth),closeBlockers=closeUnassigned+closeMissingAccounts+flow.undated;
 
 const ageDays=(date:string)=>Math.max(0,Math.floor((Date.parse(today()+'T12:00:00Z')-Date.parse(date+'T12:00:00Z'))/86400000));const ageBucket=(days:number)=>days<=7?'0–7 days':days<=30?'8–30 days':days<=60?'31–60 days':'60+ days';const agingLabels=['0–7 days','8–30 days','31–60 days','60+ days'] as const;
@@ -163,7 +166,7 @@ const forecastReceivables=s.orders.filter(isCollectible).reduce((n,o)=>{const du
 const forecastPayables30=s.batches.reduce((n,b)=>{const amount=b.qty*b.unitCost,legacy=b.paid&&b.payments.length===0?amount:0,balance=Math.max(0,amount-b.payments.reduce((x,p)=>x+p.amount,0)-legacy);return n+(balance>.001&&b.dueDate&&b.dueDate<=shiftDate(30)?balance:0)},0);
 const recent30=externalFlow.filter(e=>e.date>=shiftDate(-29)),recentCashIn=recent30.filter(e=>e.kind==='in').reduce((n,e)=>n+e.amount,0),recentCashOut=recent30.filter(e=>e.kind==='out').reduce((n,e)=>n+e.amount,0),recentNet=recentCashIn-recentCashOut;
 const projected30=availableCash+forecastReceivables-forecastPayables30-customerRefundPayable(s)+recentNet;
-const monthlyTrend=Array.from({length:6},(_,idx)=>{const d=new Date();d.setUTCDate(1);d.setUTCMonth(d.getUTCMonth()-(5-idx));const month=d.toISOString().slice(0,7),orders=s.orders.filter(o=>o.status==='Delivered'&&(o.delivered||o.created).slice(0,7)===month),revenue=orders.reduce((n,o)=>n+subtotal(o),0),profit=orders.reduce((n,o)=>n+contribution(o),0)-s.expenses.filter(e=>e.date.slice(0,7)===month).reduce((n,e)=>n+e.amount,0),cash=externalFlow.filter(e=>e.date.slice(0,7)===month).reduce((n,e)=>n+(e.kind==='in'?e.amount:-e.amount),0);return {month,label:new Date(month+'-01T12:00:00Z').toLocaleDateString('en-GB',{month:'short'}),revenue,profit,cash}}),trendMax=Math.max(1,...monthlyTrend.flatMap(x=>[Math.abs(x.revenue),Math.abs(x.profit),Math.abs(x.cash)]));
+const monthlyTrend=Array.from({length:6},(_,idx)=>{const d=new Date();d.setUTCDate(1);d.setUTCMonth(d.getUTCMonth()-(5-idx));const month=d.toISOString().slice(0,7),p=financialPeriod(s,month),revenue=p.revenue,profit=p.profit,cash=externalFlow.filter(e=>e.date.slice(0,7)===month).reduce((n,e)=>n+(e.kind==='in'?e.amount:-e.amount),0);return {month,label:new Date(month+'-01T12:00:00Z').toLocaleDateString('en-GB',{month:'short'}),revenue,profit,cash}}),trendMax=Math.max(1,...monthlyTrend.flatMap(x=>[Math.abs(x.revenue),Math.abs(x.profit),Math.abs(x.cash)]));
 
 
 const automationLive=useMemo(()=>automationSignals(s),[s]);
@@ -293,14 +296,14 @@ async function loadLive(showErrors=true,manageBusy=true){
     setMemberName(d.userName||'Team member');setLoaded(true);setError(recovery?(d.warning||'Saved records are visible in read-only recovery mode.'):'');setAuthRequired(false);
     if(!recovery){
       await Promise.all([
-        loadCustomerRecords(nextRole).catch(customerError=>{if(showErrors)toast.error(customerError instanceof Error?customerError.message:'Could not load customer records.')}),
-        loadOrderRecords(nextRole).catch(orderError=>{if(showErrors)toast.error(orderError instanceof Error?orderError.message:'Could not load order records.')}),
-        loadInventorySupplierRecords(nextRole).catch(domainError=>{if(showErrors)toast.error(domainError instanceof Error?domainError.message:'Could not load Inventory and Supplier records.')}),
-        loadFinanceRecords(nextRole).catch(financeError=>{if(showErrors)toast.error(financeError instanceof Error?financeError.message:'Could not load Finance records.')})
+        loadCustomerRecords(nextRole),
+        loadOrderRecords(nextRole),
+        loadInventorySupplierRecords(nextRole),
+        loadFinanceRecords(nextRole)
       ]);
     }
     return true;
-  }catch(e){if(showErrors)setError(e instanceof Error?e.message:'Could not load your workspace.');return false;}
+  }catch(e){setError((e instanceof Error?e.message:'Could not load your workspace.')+' Some records may be stale. Refresh and retry.');return false;}
   finally{if(manageBusy)setBusy(false)}
 }
 useEffect(()=>{let active=true;(async()=>{try{
@@ -584,7 +587,7 @@ function exportManagementReport(){if(!canExport){toast.error('Only the owner or 
   ['Control health score',managementControlScore]
 ];downloadCsv('aloyri-management-report-'+reportMonth+'.csv',['Metric','Value'],rows);toast.success('Management report downloaded')}
 function exportFinance(kind:'pnl'|'cashflow'|'expenses'|'receivables'|'payables'|'ledger'){if(!canExport){toast.error('Only the owner or an admin can export finance reports.');return}
- if(kind==='pnl')return downloadCsv('aloyri-pnl-'+reportMonth+'.csv',['Line item','Amount BDT'],[['Product revenue',reportRevenue],['COGS',-reportCogs],['Gross profit',reportGross],['Delivery income',reportDeliveryIncome],['Fulfillment costs',-reportFulfillment],['Return costs',-reportReturns],['Operating expenses',-reportOpex],['Operating profit',reportProfit]]);
+ if(kind==='pnl')return downloadCsv('aloyri-pnl-'+reportMonth+'.csv',['Line item','Amount BDT'],[['Product sales before returns',periodReport.productSales],['Return sales adjustments',-periodReport.returnSales],['Net product revenue',reportRevenue],['COGS net of inventory recovered',-reportCogs],['Gross profit',reportGross],['Delivery income net of returns',reportDeliveryIncome],['Fulfillment costs',-reportFulfillment],['Return costs',-reportReturns],['Retained return income',periodReport.retainedIncome],['Operating expenses',-reportOpex],['Operating profit',reportProfit]]);
  if(kind==='cashflow')return downloadCsv('aloyri-cashflow-'+reportMonth+'.csv',['Date','Source','Description','Direction','Amount BDT'],externalFlow.filter(e=>e.date.slice(0,7)===reportMonth).map(e=>[e.date,e.source,e.description,e.kind==='in'?'Cash in':'Cash out',e.amount]));
  if(kind==='expenses')return downloadCsv('aloyri-expenses-'+reportMonth+'.csv',['Date','Category','Vendor','Description','Reference','Recurring','Amount BDT'],reportExpenses.map(e=>[e.date,e.category,e.vendor,e.notes,e.reference,e.recurring,e.amount]));
  if(kind==='receivables')return downloadCsv('aloyri-receivables-'+reportMonth+'.csv',['Order','Customer','Delivered','Net receivable','Collected','Balance'],s.orders.filter(o=>o.status==='Delivered').map(o=>{const due=receivable(o),legacy=o.settled&&o.collections.length===0?due:0,collected=o.collections.reduce((n,p)=>n+p.amount,0)+legacy;return [o.number,s.customers.find(x=>x.id===o.customerId)?.name||'',o.delivered||o.created,due,collected,Math.max(0,due-collected)]}).filter(r=>Number(r[5])>.001));
@@ -598,6 +601,10 @@ async function createPurchaseOrder(){if(!canEdit('purchaseOrders')){toast.error(
 async function setPurchaseOrderStatus(id:string,status:State['purchaseOrders'][number]['status']){if(!canEdit('purchaseOrders')){toast.error('Your role cannot update purchase orders.');return}const next=structuredClone(s),po=next.purchaseOrders.find(p=>p.id===id);if(!po)return;po.status=status;await saveInventorySupplierDomain(next)}
 function openPurchaseOrderReceipt(id:string){if(!canEdit('purchaseOrders')||!canEdit('batches')){toast.error('Your role cannot receive purchase orders into stock.');return}const po=s.purchaseOrders.find(p=>p.id===id);if(!po)return;if(!['Sent','Part received'].includes(po.status)){toast.error('Mark the purchase order sent before receiving stock.');return}const lines=po.items.filter(item=>item.qty>item.receivedQty).map(item=>({productId:item.productId,qty:item.qty-item.receivedQty,expiry:shiftDate(365)}));if(!lines.length){toast.error('Nothing remains to receive on this PO.');return}const supplier=s.suppliers.find(x=>x.id===po.supplierId);setPoReceiveId(id);setPoReceiveDate(today());setPoReceiveInvoice(po.number);setPoReceiveDue(shiftDate(supplier?.paymentTermsDays??30));setPoReceiveLines(lines)}
 async function submitPurchaseOrderReceipt(){if(!poReceiveId)return;if(!canEdit('purchaseOrders')||!canEdit('batches')){toast.error('Your role cannot receive purchase orders into stock.');return}setBusy(true);try{const received=poReceiveLines.reduce((n,line)=>n+line.qty,0);const res=await fetch('/api/purchase-orders/'+encodeURIComponent(poReceiveId)+'/receive',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({received:poReceiveDate,invoice:poReceiveInvoice,dueDate:poReceiveDue||undefined,lines:poReceiveLines,domainVersion:inventorySupplierVersion})}),data:any=await res.json();if(!res.ok){if(res.status===409)await loadLive(false,false);throw Error(data.error||'Could not receive this purchase order.')}await loadLive(false,false);setPoReceiveId(null);toast.success(received+' units received into inventory.')}catch(e){toast.error(e instanceof Error?e.message:'Could not receive this purchase order.')}finally{setBusy(false)}}
+async function returnAction(action:'settlement'|'credit',payload:unknown,orderId?:string){
+ if(!canFinance)throw Error('Your role cannot settle returns.');setBusy(true);
+ try{const url=action==='settlement'?'/api/finances/return-settlements':'/api/finances/customer-credit';const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(action==='settlement'?{settlement:payload,domainVersion:financeDomainVersion}:{credit:payload,recordVersion:orderRecordVersions[orderId||'']})}),data=await res.json();if(!res.ok){if(res.status===409)await loadLive(false,false);throw Error(data.error||'Could not settle return.');}if(!await loadLive(false,false))throw Error('Saved, but records did not fully refresh. Reload before continuing.');}finally{setBusy(false)}
+}
 async function postRefund(refund:State['customerRefunds'][number]){if(!canFinance)throw Error('Your role cannot record customer refunds.');setBusy(true);try{const res=await fetch('/api/finances/customer-refunds',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refund,domainVersion:financeDomainVersion})}),data=await res.json();if(!res.ok){if(res.status===409)await loadLive(false,false);throw Error(data.error||'Could not record refund.')}const synced=await loadLive(false,false);if(!synced)throw Error('Refund recorded, but Finance could not refresh. Reload the CRM before recording another payment.');}finally{setBusy(false)}}
 function openOwnerMoney(kind:'capital'|'drawing'){if(!canOwnerMoney){toast.error('Only the owner or an admin can post owner capital or drawings.');return}setOwnerMoneyKind(kind);setOwnerMoneyAmount('');setOwnerMoneyDate(today());setOwnerMoneyAccount('bank');setOwnerMoneyReference('');setOwnerMoneyOpen(true)}
 async function submitOwnerMoney(){if(!canOwnerMoney){toast.error('Only the owner or an admin can post owner capital or drawings.');return}const amount=Number(ownerMoneyAmount);if(!Number.isFinite(amount)||amount<=0){toast.error('Enter an amount above zero.');return}setBusy(true);try{const res=await fetch('/api/finances/owner-money',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:ownerMoneyKind,amount,date:ownerMoneyDate,account:ownerMoneyAccount,reference:ownerMoneyReference.trim(),domainVersion:financeDomainVersion})}),data:any=await res.json();if(!res.ok){if(res.status===409)await loadLive(false,false);throw Error(data.error||'Could not post owner money.')}await loadLive(false,false);setOwnerMoneyOpen(false);toast.success((ownerMoneyKind==='capital'?'Owner capital':'Owner drawing')+' posted and reconciled.')}catch(e){toast.error(e instanceof Error?e.message:'Could not post owner money.')}finally{setBusy(false)}}
@@ -959,10 +966,10 @@ return <SidebarProvider style={{'--sidebar-width':'clamp(196px, 20vw, 240px)'} a
   role,openModal
 }}/>}
 {view==='Finances'&&<FinancesSection ctx={{
-  postRefund,s,busy,canCloseFinance,canEdit,canExport,canFinance,canOwnerMoney,cashRange,closeBlockers,closeMissingAccounts,
+  returnAction,postRefund,s,busy,canCloseFinance,canEdit,canExport,canFinance,canOwnerMoney,cashRange,closeBlockers,closeMissingAccounts,
   closeMonth,closePayables,closeReceivables,closeRecord,closeUnassigned,allCashIn,allCashOut,
   availableCash,configuredBalances,exportFinance,financeTab,forecastPayables30,forecastReceivables,
-  m,memberName,monthlyTrend,netCashMovement,openModal,openOwnerMoney,openPaymentDialog,
+  periodReport,m,memberName,monthlyTrend,netCashMovement,openModal,openOwnerMoney,openPaymentDialog,
   overduePayables,payableAging,previousRevenue,productById,projected30,receivableAging,recentNet,
   reconciledAccounts,reportCogs,reportDeliveryIncome,reportExpenses,reportFulfillment,reportGross,
   reportMargin,reportMonth,reportMonths,reportOpex,reportOrders,reportProfit,reportReturns,

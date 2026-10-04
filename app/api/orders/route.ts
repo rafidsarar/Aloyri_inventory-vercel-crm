@@ -1,3 +1,4 @@
+import { parsePageRequest } from '@/lib/pagination';
 import { getAppUser, checkOrigin } from '@/app/local-auth';
 import { AccessDenied, resolveWorkspace } from '@/app/team-access';
 import { roleCanEdit, roleCanViewSection } from '@/lib/roles';
@@ -6,15 +7,16 @@ import { createOrderRecord, listOrderRecords, orderRecordForRole } from '@/db/or
 export const dynamic='force-dynamic';
 const response=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
 
-export async function GET(){
+export async function GET(request:Request){
   try{
     const user=await getAppUser();
     if(!user)return response({error:'Sign in to view orders.'},401);
     const {ownerId,role}=await resolveWorkspace(user);
     if(!roleCanViewSection(role,'Orders'))return response({error:'You do not have access to orders.'},403);
-    const result=await listOrderRecords(ownerId);
-    return response({orders:result.orders.map(order=>orderRecordForRole(order,role)),version:result.workspaceVersion});
+    const result=await listOrderRecords(ownerId,parsePageRequest(request.url));
+    return response({orders:result.orders.map(order=>orderRecordForRole(order,role)),version:result.workspaceVersion,pagination:result.pagination});
   }catch(error){
+    if(error instanceof Error&&error.message==='Invalid pagination.')return response({error:error.message},400);
     if(error instanceof AccessDenied)return response({error:error.message},403);
     console.error('Order list failed',error);
     return response({error:'Could not load orders.'},503);
@@ -42,3 +44,4 @@ export async function POST(request:Request){
     return response({error:message},500);
   }
 }
+

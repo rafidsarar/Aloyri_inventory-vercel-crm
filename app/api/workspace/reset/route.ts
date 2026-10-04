@@ -20,7 +20,7 @@ export async function POST(request:Request){
     const row=await db.prepare('SELECT data,version FROM crm_workspaces WHERE owner_id = ?').bind(ownerId).first<{data:string;version:number}>();
     if(!row)return response({error:'Workspace not found.'},404);
     const current=fixedBusinessName(stateSchema.parse(JSON.parse(row.data)));
-    const cleaned={...current,products:[],customers:[],suppliers:[],purchaseOrders:[],batches:[],stockAdjustments:[],inventoryHolds:[],orders:[],expenses:[],cashEntries:[],accountOpenings:[],accountMatches:[],financeCloses:[],customerRefunds:[],tasks:[]};
+    const cleaned={...current,products:[],customers:[],suppliers:[],purchaseOrders:[],batches:[],stockAdjustments:[],inventoryHolds:[],orders:[],expenses:[],cashEntries:[],accountOpenings:[],accountMatches:[],financeCloses:[],customerRefunds:[],returnSettlements:[],creditUses:[],returnInspections:[],tasks:[]};
     validateRelations(cleaned);
     const result=await db.prepare('UPDATE crm_workspaces SET data = ?, version = version + 1, updated_at = ? WHERE owner_id = ? AND version = ?').bind(JSON.stringify(cleaned),new Date().toISOString(),ownerId,row.version).run();
     if(!result.meta.changes)return response({error:'Workspace changed while resetting. Please try again.'},409);

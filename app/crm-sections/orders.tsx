@@ -1,5 +1,6 @@
 'use client';
 
+import { useRecordPagination } from '../record-pagination';
 import type { ReactNode } from 'react';
 import { ArrowRight, Bell, CheckCircle2, ChevronRight, Package, Plus, Search, ShoppingBag, Truck, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -39,6 +40,7 @@ export default function OrdersSection({
   filteredOrders,selectedOrderIds,setSelectedOrderIds,busy,bulkAdvanceSelectedOrders,query,
   setQuery,orderTable
 }:Props){
+  const pagination=useRecordPagination(filteredOrders,query+"|"+filter);
   return <WorkspaceSection>
     <section className="orders-hero orders-hero-pro">
       <div className="orders-hero-copy">
@@ -74,8 +76,9 @@ export default function OrdersSection({
         <div className="search-input order-search"><Search size={17}/><Input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Search order, customer, phone, tracking or payment…" aria-label="Search orders"/>{query&&<button className="search-clear" aria-label="Clear search" onClick={()=>setQuery('')}><X size={15}/></button>}</div>
         <div className="order-toolbar-right"><Choice value={filter} onChange={setFilter} options={['All',...statuses]} label="Order status filter"/><span className="order-result-note">{filteredOrders.length} of {orders.length} orders</span></div>
       </ActionBar>
-      {orderTable(filteredOrders)}
+      {orderTable(pagination.items)}{pagination.controls}
       <div className="table-footer order-footer-pro"><span>Oldest active orders appear first inside each stage.</span><span>Use Next Step to advance fulfillment.</span></div>
     </SectionPanel>
   </WorkspaceSection>;
 }
+

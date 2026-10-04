@@ -1,3 +1,4 @@
+import { returnLedgerStatements } from './return-ledgers.ts';
 import { database } from './raw.ts';
 import { ensureRelationalFoundation } from './relational-foundation.ts';
 import { fixedBusinessName,stateSchema,validateRelations,type State } from '../lib/crm.ts';
@@ -35,6 +36,7 @@ export function financeShadowStatements(ownerId:string,state:State,sourceVersion
   state.financeCloses.forEach(x=>q.push(db.prepare('INSERT INTO crm_rel_finance_closes (owner_id,month,closed_at,closed_by,notes,record_version,updated_at) VALUES (?,?,?,?,?,?,?)')
     .bind(ownerId,x.month,x.closedAt,x.closedBy,x.notes,0,now)));
   q.push(db.prepare('UPDATE crm_relational_migrations SET status=?,source_version=?,verified_at=?,updated_at=? WHERE owner_id=? AND domain=?').bind('verified',sourceVersion,now,now,ownerId,FINANCE_DOMAIN));
+  q.push(...returnLedgerStatements(ownerId,state,['returnSettlements','creditUses']));
   return q;
 }
 export async function migrateFinanceShadow(ownerId:string,state:State,sourceVersion:number){

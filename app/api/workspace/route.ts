@@ -1,3 +1,4 @@
+import { ensureDailyBackup } from '@/db/automatic-backups';
 import { getAppUser, checkOrigin } from '@/app/local-auth';
 import { AccessDenied, resolveWorkspace } from '@/app/team-access';
 import { visibleState, applyRoleChanges, validateWorkspaceChange } from '@/lib/role-data';
@@ -41,6 +42,7 @@ export async function GET(){
       validateRelations(state,{skipOrderNumberUniqueness:true});
       return state;
     };
+    if(role==='owner')try{await ensureDailyBackup(ownerId)}catch(e){console.error('Automatic safety backup failed',e)}
     const cutover=await ensureRelationalCutover(ownerId);
     if(cutover.enabled){
       try{
@@ -82,6 +84,7 @@ export async function PUT(request:Request){
     const existing=await db.prepare('SELECT data,version FROM crm_workspaces WHERE owner_id = ?').bind(ownerId).first<{data:string;version:number}>();
     if(!existing||existing.version!==body.version)return response({error:'This workspace changed in another window. Refresh records, then try again.'},409);
     const previous=fixedBusinessName(stateSchema.parse(JSON.parse(existing.data)));
+    if(role==='owner')try{await ensureDailyBackup(ownerId)}catch(e){console.error('Automatic safety backup failed',e)}
     const cutover=await ensureRelationalCutover(ownerId);
     if(!canManageBusinessSettings(role)&&(['businessName','businessProfile'] as const).some(key=>JSON.stringify(parsed.data[key])!==JSON.stringify(visibleState(previous,role)[key])))
       return response({error:'Only the owner or an admin can edit Business settings.'},403);
@@ -122,3 +125,4 @@ export async function PUT(request:Request){
     return response({error:'Your changes could not be saved. Please try again.'},503);
   }
 }
+

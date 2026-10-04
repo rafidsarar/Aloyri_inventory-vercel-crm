@@ -583,3 +583,7 @@
   }
 }
 
+
+.recovery-code-list{max-width:100%;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}.account-security-dialog{max-height:90dvh;overflow:auto}
+
+.record-pagination{display:flex;gap:12px;align-items:center;justify-content:flex-end;flex-wrap:wrap;padding:16px}.record-pagination select{min-height:36px;border:1px solid var(--border);border-radius:8px;padding:4px 8px}

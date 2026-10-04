@@ -19,7 +19,7 @@ export async function POST(request:Request){
     if(existing&&existing.owner_id!==access.user!.userId)return response({error:'This email belongs to another workspace.'},409);
     if(body.action==='remove'){
       if(!existing||existing.role==='owner')return response({error:'Staff account not found.'},404);
-      await db.batch([db.prepare('DELETE FROM crm_sessions WHERE user_id=?').bind(existing.id),db.prepare('DELETE FROM crm_invites WHERE user_id=?').bind(existing.id),db.prepare('DELETE FROM crm_users WHERE id=? AND owner_id=?').bind(existing.id,access.user!.userId)]);
+      await db.batch([db.prepare('DELETE FROM crm_sessions WHERE user_id=?').bind(existing.id),db.prepare('DELETE FROM crm_invites WHERE user_id=?').bind(existing.id),db.prepare('DELETE FROM crm_recovery_codes WHERE user_id=?').bind(existing.id),db.prepare('DELETE FROM crm_users WHERE id=? AND owner_id=?').bind(existing.id,access.user!.userId)]);
       return response({ok:true});
     }
     if(body.action!=='save'&&body.action!=='invite')return response({error:'Invalid action.'},400);
@@ -37,3 +37,4 @@ export async function POST(request:Request){
     return response({ok:true,inviteUrl:new URL('/invite?token='+token,request.url).toString()});
   }catch(e){console.error('Team update failed',e);return response({error:'Could not update staff access.'},503)}
 }
+

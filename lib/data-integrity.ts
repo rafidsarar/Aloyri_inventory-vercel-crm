@@ -72,6 +72,7 @@ export function canonicalizeLegacyState(input:unknown){
     setDate(x,'date',`accountOpenings[${i}].date`,false,report);
     setDate(x,'statementDate',`accountOpenings[${i}].statementDate`,true,report);
   });
+  for(const key of ['returnSettlements','creditUses','returnInspections'])each(key,(x,i)=>setDate(x,'date',`${key}[${i}].date`,false,report));
   each('customerRefunds',(x,i)=>setDate(x,'date',`customerRefunds[${i}].date`,false,report));
   each('financeCloses',(x,i)=>setDate(x,'closedAt',`financeCloses[${i}].closedAt`,false,report));
   each('tasks',(x,i)=>{

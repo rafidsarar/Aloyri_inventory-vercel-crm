@@ -17,6 +17,8 @@ async function cleanup(){
     "DELETE FROM crm_invites WHERE user_id IN (SELECT id FROM crm_users WHERE owner_id=?)",
     "DELETE FROM crm_rel_order_allocations WHERE owner_id=?",
     "DELETE FROM crm_rel_order_items WHERE owner_id=?",
+    "DELETE FROM crm_rel_return_records WHERE owner_id=?",
+    "DELETE FROM crm_automatic_backups WHERE owner_id=?",
     "DELETE FROM crm_rel_order_collections WHERE owner_id=?",
     "DELETE FROM crm_rel_orders WHERE owner_id=?",
     "DELETE FROM crm_rel_customers WHERE owner_id=?",

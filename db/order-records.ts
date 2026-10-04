@@ -1,3 +1,4 @@
+import { pageMetadata,type PageRequest } from '../lib/pagination.ts';
 import { database } from './raw.ts';
 import { optionalRelationalDate, relationalDate } from './relational-date.ts';
 import { ensureCustomerRecordApiReady } from './customer-records.ts';
@@ -56,21 +57,25 @@ function mapOrder(row:OrderRow,items:ItemRow[],allocations:AllocationRow[],colle
   };
 }
 
-async function readOrderRows(ownerId:string,id?:string){
+async function readOrderRows(ownerId:string,id?:string,page?:PageRequest){
   const {row}=await ensureCustomerRecordApiReady(ownerId);
   const db=database();
-  const where=id?'owner_id=? AND id=?':'owner_id=?';
-  const binds=id?[ownerId,id]:[ownerId];
-  const parents=await db.prepare('SELECT id,number,customer_id,created,delivered,returned_at,settled_at,channel,payment,status,discount,delivery_charge,courier_cost,packaging,payment_fee,return_fee,settled,restocked,tracking,notes,record_version FROM crm_rel_orders WHERE '+where+' ORDER BY created DESC,id').bind(...binds).all<OrderRow>();
+  let where=id?'owner_id=? AND id=?':'owner_id=?';
+  const binds:unknown[]=id?[ownerId,id]:[ownerId];
+  if(page?.q){where+=' AND (number ILIKE ? OR tracking ILIKE ? OR channel ILIKE ? OR payment ILIKE ? OR customer_id IN (SELECT id FROM crm_rel_customers WHERE owner_id=? AND (name ILIKE ? OR phone ILIKE ? OR city ILIKE ?)))';const q='%'+page.q+'%';binds.push(q,q,q,q,ownerId,q,q,q);}
+  if(page&&page.status!=='All'){where+=' AND status=?';binds.push(page.status);}
+  const total=page?Number((await db.prepare('SELECT COUNT(*) AS n FROM crm_rel_orders WHERE '+where).bind(...binds).first<{n:number}>())?.n||0):0;
+  const parents=await db.prepare('SELECT id,number,customer_id,created,delivered,returned_at,settled_at,channel,payment,status,discount,delivery_charge,courier_cost,packaging,payment_fee,return_fee,settled,restocked,tracking,notes,record_version FROM crm_rel_orders WHERE '+where+' ORDER BY created DESC,id'+(page?' LIMIT ? OFFSET ?':'')).bind(...binds,...(page?[page.pageSize,(page.page-1)*page.pageSize]:[])).all<OrderRow>();
   const orderIds=parents.results.map(r=>r.id);
-  if(!orderIds.length)return {orders:[] as OrderRecord[],workspaceVersion:row.version};
-  const items=await db.prepare('SELECT order_id,line_no,product_id,qty,price FROM crm_rel_order_items WHERE owner_id=?'+(id?' AND order_id=?':'')+' ORDER BY order_id,line_no').bind(...binds).all<ItemRow>();
-  const allocations=await db.prepare('SELECT order_id,line_no,allocation_no,batch_id,qty,unit_cost FROM crm_rel_order_allocations WHERE owner_id=?'+(id?' AND order_id=?':'')+' ORDER BY order_id,line_no,allocation_no').bind(...binds).all<AllocationRow>();
-  const collections=await db.prepare('SELECT order_id,id,date,amount,reference FROM crm_rel_order_collections WHERE owner_id=?'+(id?' AND order_id=?':'')+' ORDER BY order_id,date,id').bind(...binds).all<CollectionRow>();
-  return {orders:parents.results.map(orderRow=>mapOrder(orderRow,items.results,allocations.results,collections.results)),workspaceVersion:row.version};
+  if(!orderIds.length)return {orders:[] as OrderRecord[],workspaceVersion:row.version,pagination:page?pageMetadata(page,total):undefined};
+  const childWhere=' AND order_id IN ('+orderIds.map(()=>'?').join(',')+')',childBinds=[ownerId,...orderIds];
+  const items=await db.prepare('SELECT order_id,line_no,product_id,qty,price FROM crm_rel_order_items WHERE owner_id=?'+childWhere+' ORDER BY order_id,line_no').bind(...childBinds).all<ItemRow>();
+  const allocations=await db.prepare('SELECT order_id,line_no,allocation_no,batch_id,qty,unit_cost FROM crm_rel_order_allocations WHERE owner_id=?'+childWhere+' ORDER BY order_id,line_no,allocation_no').bind(...childBinds).all<AllocationRow>();
+  const collections=await db.prepare('SELECT order_id,id,date,amount,reference FROM crm_rel_order_collections WHERE owner_id=?'+childWhere+' ORDER BY order_id,date,id').bind(...childBinds).all<CollectionRow>();
+  return {orders:parents.results.map(orderRow=>mapOrder(orderRow,items.results,allocations.results,collections.results)),workspaceVersion:row.version,pagination:page?pageMetadata(page,total):undefined};
 }
 
-export const listOrderRecords=(ownerId:string)=>readOrderRows(ownerId);
+export const listOrderRecords=(ownerId:string,page?:PageRequest)=>readOrderRows(ownerId,undefined,page);
 export async function getOrderRecord(ownerId:string,id:string){
   const result=await readOrderRows(ownerId,id);
   return {order:result.orders[0]||null,workspaceVersion:result.workspaceVersion};
@@ -189,3 +194,4 @@ export async function deleteOrderRecord(ownerId:string,id:string,expectedVersion
   ]);
   return {id,workspaceVersion:nextWorkspaceVersion};
 }
+

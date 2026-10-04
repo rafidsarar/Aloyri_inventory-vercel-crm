@@ -1,3 +1,4 @@
+import { parsePageRequest } from '@/lib/pagination';
 import { getAppUser, checkOrigin } from '@/app/local-auth';
 import { AccessDenied, resolveWorkspace } from '@/app/team-access';
 import { roleCanEdit, roleCanViewSection } from '@/lib/roles';
@@ -6,15 +7,16 @@ import { createCustomerRecord, listCustomerRecords } from '@/db/customer-records
 export const dynamic='force-dynamic';
 const response=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
 
-export async function GET(){
+export async function GET(request:Request){
   try{
     const user=await getAppUser();
     if(!user)return response({error:'Sign in to view customers.'},401);
     const {ownerId,role}=await resolveWorkspace(user);
     if(!roleCanViewSection(role,'Customers'))return response({error:'You do not have access to customers.'},403);
-    const result=await listCustomerRecords(ownerId);
-    return response({customers:result.customers,version:result.workspaceVersion});
+    const result=await listCustomerRecords(ownerId,parsePageRequest(request.url));
+    return response({customers:result.customers,version:result.workspaceVersion,pagination:result.pagination});
   }catch(error){
+    if(error instanceof Error&&error.message==='Invalid pagination.')return response({error:error.message},400);
     if(error instanceof AccessDenied)return response({error:error.message},403);
     console.error('Customer list failed',error);
     return response({error:'Could not load customers.'},503);
@@ -41,3 +43,4 @@ export async function POST(request:Request){
     return response({error:message},500);
   }
 }
+

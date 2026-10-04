@@ -1,3 +1,4 @@
+import { readReturnLedger } from './return-ledgers.ts';
 import { database } from './raw.ts';
 import { optionalRelationalDate, relationalDate } from './relational-date.ts';
 import { getDomainVersion,domainVersionBumpStatements } from './domain-version.ts';
@@ -6,7 +7,7 @@ import { fixedBusinessName,stateSchema,validateRelations,type State } from '../l
 import type { WorkspaceRole } from '../lib/roles.ts';
 import { ensureFinanceApiReady,FINANCE_DOMAIN,financeShadowStatements } from './finance-shadow.ts';
 
-export const financeKeys=['expenses','cashEntries','accountOpenings','accountMatches','financeCloses','customerRefunds'] as const;
+export const financeKeys=['expenses','cashEntries','accountOpenings','accountMatches','financeCloses','customerRefunds','returnSettlements','creditUses'] as const;
 export type FinanceKey=typeof financeKeys[number];
 export type FinanceData=Pick<State,FinanceKey>;
 type Actor={userId:string;name:string;role:WorkspaceRole};
@@ -30,6 +31,9 @@ export async function getFinanceDomain(ownerId:string){
   getDomainVersion(ownerId,FINANCE_DOMAIN)
  ]);
  const data={
+  returnSettlements:await readReturnLedger(ownerId,'returnSettlements'),
+  creditUses:await readReturnLedger(ownerId,'creditUses'),
+
   expenses:expenses.results.map((x:any)=>({id:x.id,category:x.category,amount:Number(x.amount),date:relationalDate(x.date),notes:x.notes,vendor:x.vendor,reference:x.reference,recurring:x.recurring,account:x.account||undefined})),
   cashEntries:cashEntries.results.map((x:any)=>({id:x.id,date:relationalDate(x.date),kind:x.kind,category:x.category,description:x.description,amount:Number(x.amount),transferId:x.transfer_id||undefined,reversalOf:x.reversal_of||undefined,reversalReason:x.reversal_reason||undefined})),
   accountOpenings:openings.results.map((x:any)=>({account:x.account,date:relationalDate(x.date),balance:Number(x.balance),statementDate:optionalRelationalDate(x.statement_date),statementBalance:x.statement_balance==null?undefined:Number(x.statement_balance)})),
@@ -37,16 +41,17 @@ export async function getFinanceDomain(ownerId:string){
   customerRefunds:refunds.results.map((x:any)=>({id:x.id,orderId:x.order_id,date:relationalDate(x.date),amount:Number(x.amount),account:x.account,reference:x.reference,reason:x.reason})),
   financeCloses:closes.results.map((x:any)=>({month:x.month,closedAt:relationalDate(x.closed_at),closedBy:x.closed_by,notes:x.notes}))
  };
- const parsed=stateSchema.pick({expenses:true,cashEntries:true,accountOpenings:true,accountMatches:true,financeCloses:true,customerRefunds:true}).parse(data);
+ const parsed=stateSchema.pick({expenses:true,cashEntries:true,accountOpenings:true,accountMatches:true,financeCloses:true,customerRefunds:true,returnSettlements:true,creditUses:true}).parse(data);
  return {data:parsed,version:row.version,domainVersion};
 }
 export async function saveFinanceDomain(ownerId:string,input:unknown,expectedDomainVersion:number,actor:Actor){
  if(!['owner','admin','finance'].includes(actor.role))throw new Error('FINANCE_FORBIDDEN');
  if(!Number.isInteger(expectedDomainVersion)||expectedDomainVersion<0)throw new Error('DOMAIN_VERSION_REQUIRED');
- const parsed=stateSchema.pick({expenses:true,cashEntries:true,accountOpenings:true,accountMatches:true,financeCloses:true,customerRefunds:true}).safeParse(input);
+ const parsed=stateSchema.pick({expenses:true,cashEntries:true,accountOpenings:true,accountMatches:true,financeCloses:true,customerRefunds:true,returnSettlements:true,creditUses:true}).safeParse(input);
  if(!parsed.success)throw new Error('INVALID_FINANCE_DATA');
  const {row,state}=await ensureFinanceApiReady(ownerId);
  if(parsed.data.customerRefunds.length!==state.customerRefunds.length||parsed.data.customerRefunds.some(r=>JSON.stringify(r)!==JSON.stringify(state.customerRefunds.find(p=>p.id===r.id))))throw new Error('Use Record refund to post customer refunds.');
+ for(const key of ['returnSettlements','creditUses'] as const)if(parsed.data[key].length!==state[key].length||parsed.data[key].some(r=>JSON.stringify(r)!==JSON.stringify(state[key].find(p=>p.id===r.id))))throw new Error('Use the dedicated return or credit workflow.');
  const currentDomainVersion=await getDomainVersion(ownerId,FINANCE_DOMAIN);if(currentDomainVersion!==expectedDomainVersion)throw new Error('DOMAIN_VERSION_CONFLICT');
  const candidate=structuredClone(state);for(const key of financeKeys)(candidate[key] as any)=parsed.data[key] as any;
  const next=fixedBusinessName(applyRoleChanges(state,candidate,actor.role));

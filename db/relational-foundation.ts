@@ -1,6 +1,7 @@
 import { database } from './raw.ts';
 
 export const relationalFoundationSql = [
+  `CREATE TABLE IF NOT EXISTS crm_rel_return_records(owner_id TEXT NOT NULL,kind TEXT NOT NULL,id TEXT NOT NULL,data TEXT NOT NULL,PRIMARY KEY(owner_id,kind,id))`,
   `CREATE TABLE IF NOT EXISTS crm_rel_finance_customer_refunds (
  owner_id TEXT NOT NULL, id TEXT NOT NULL, order_id TEXT NOT NULL,
  date DATE NOT NULL, amount NUMERIC NOT NULL CHECK (amount > 0),

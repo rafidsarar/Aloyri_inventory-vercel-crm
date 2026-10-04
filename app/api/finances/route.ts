@@ -23,7 +23,7 @@ export async function PUT(request:Request){
   if(message==='FINANCE_OWNER_MONEY_FORBIDDEN')return response({error:'Owner capital and drawings can only be recorded by the owner or an admin.'},403);
   if(message==='DOMAIN_VERSION_CONFLICT'||message==='WORKSPACE_VERSION_CONFLICT')return response({error:'Finance changed in another window. Refresh and try again.'},409);
   if(message==='DOMAIN_VERSION_REQUIRED'||message==='INVALID_FINANCE_DATA')return response({error:'Check the Finance values.'},400);
-  if(/customer refund|Record refund/i.test(message))return response({error:message},400);
+  if(/customer refund|Record refund|dedicated return|credit workflow|Posted return/i.test(message))return response({error:message},400);
   console.error('Finance save failed',error);return response({error:message},500)
  }
 }

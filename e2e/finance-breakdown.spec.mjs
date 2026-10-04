@@ -40,6 +40,6 @@ for (const role of ['owner', 'finance']) {
     await expect(rows.filter({ hasText: 'Return inventory costs' }).locator('dd')).toHaveText('− ৳1,535');
     await expect(rows.filter({ hasText: 'Recorded operating expenses' }).locator('dd')).toHaveText('− ৳3,500');
     await expect(rows.filter({ hasText: 'Operating result' }).locator('dd')).toHaveText('− ৳3,852');
-    await expect(breakdown).toContainText('Restocked returns are excluded.');
+    await expect(breakdown).toContainText('Sellable and quarantined inspected returns are excluded.');
   });
 }

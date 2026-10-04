@@ -4,12 +4,12 @@ import { listCustomerRecords } from './customer-records.ts';
 import { listOrderRecords } from './order-records.ts';
 import { getInventorySupplierDomain } from './inventory-supplier-records.ts';
 import { getFinanceDomain } from './finance-records.ts';
-import { accountBalance,accountIds,cashflow,customerRefundPayable,fixedBusinessName,orderBalance,stateSchema,validateRelations,type State } from '../lib/crm.ts';
+import { accountBalance,accountIds,cashflow,customerCreditPayable,customerRefundPayable,fixedBusinessName,orderBalance,stateSchema,validateRelations,type State } from '../lib/crm.ts';
 
 type WorkspaceRow={data:string;version:number};
 type CutoverRow={enabled:boolean;enabled_at:string|null;enabled_by:string|null;last_verified_at:string|null;last_verification:string;updated_at:string};
 
-export const relationalCoreKeys=['customers','orders','products','productCategories','suppliers','purchaseOrders','batches','stockAdjustments','inventoryHolds','expenses','cashEntries','accountOpenings','accountMatches','financeCloses','customerRefunds'] as const;
+export const relationalCoreKeys=['customers','orders','products','productCategories','suppliers','purchaseOrders','batches','stockAdjustments','inventoryHolds','returnInspections','expenses','cashEntries','accountOpenings','accountMatches','financeCloses','customerRefunds','returnSettlements','creditUses'] as const;
 
 async function workspace(ownerId:string){
   const row=await database().prepare('SELECT data,version FROM crm_workspaces WHERE owner_id=?').bind(ownerId).first<WorkspaceRow>();
@@ -57,6 +57,7 @@ export async function verifyRelationalParity(ownerId:string){
   const jsonAccountBalances=Object.fromEntries(accountIds.map(account=>[account,accountBalance(json,account)]));
   const relAccountBalances=Object.fromEntries(accountIds.map(account=>[account,accountBalance(rel,account)]));
   const keyTotals={
+    customerCreditPayable:{json:customerCreditPayable(json),relational:customerCreditPayable(rel),match:customerCreditPayable(json)===customerCreditPayable(rel)},
     customerRefundPayable:{json:customerRefundPayable(json),relational:customerRefundPayable(rel),match:customerRefundPayable(json)===customerRefundPayable(rel)},
     orderTotal:{json:jsonOrderTotal,relational:relOrderTotal,match:jsonOrderTotal===relOrderTotal},
     receivables:{json:jsonReceivables,relational:relReceivables,match:jsonReceivables===relReceivables},
@@ -70,8 +71,9 @@ export async function verifyRelationalParity(ownerId:string){
   const ids=Object.fromEntries(relationalCoreKeys.filter(k=>Array.isArray(json[k])&&k!=='productCategories'&&k!=='accountOpenings'&&k!=='accountMatches'&&k!=='financeCloses').map(key=>{
     const j=(json[key] as any[]).map(x=>x.id).sort(),r=(rel[key] as any[]).map(x=>x.id).sort();return [key,{match:JSON.stringify(j)===JSON.stringify(r)}];
   }));
-  const ok=Object.values(counts).every((x:any)=>x.match)&&Object.values(keyTotals).every((x:any)=>x.match)&&Object.values(ids).every((x:any)=>x.match);
-  const result={ok,workspaceVersion:row.version,counts,keyTotals,ids};
+  const returnRecordsMatch=['returnSettlements','creditUses','returnInspections'].every(key=>{const k=key as 'returnSettlements'|'creditUses'|'returnInspections';const sorted=(s:State)=>[...s[k]].sort((a,b)=>a.id.localeCompare(b.id));return JSON.stringify(sorted(json))===JSON.stringify(sorted(rel));});
+  const ok=returnRecordsMatch&&Object.values(counts).every((x:any)=>x.match)&&Object.values(keyTotals).every((x:any)=>x.match)&&Object.values(ids).every((x:any)=>x.match);
+  const result={ok,returnRecordsMatch,workspaceVersion:row.version,counts,keyTotals,ids};
   const now=new Date().toISOString();
   await database().prepare('INSERT INTO crm_relational_cutover (owner_id,enabled,last_verified_at,last_verification,updated_at) VALUES (?,FALSE,?,?,?) ON CONFLICT(owner_id) DO UPDATE SET last_verified_at=EXCLUDED.last_verified_at,last_verification=EXCLUDED.last_verification,updated_at=EXCLUDED.updated_at').bind(ownerId,now,JSON.stringify(result),now).run();
   return result;
