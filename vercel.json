@@ -6,5 +6,11 @@
       "fix/*": false
     }
   },
-  "buildCommand": "pnpm db:migrate && pnpm build"
+  "buildCommand": "pnpm db:migrate && pnpm build",
+  "crons": [
+    {
+      "path": "/api/internal/notifications/process",
+      "schedule": "0 3 * * *"
+    }
+  ]
 }
