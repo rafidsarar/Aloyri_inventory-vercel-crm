@@ -60,7 +60,7 @@ export async function listCustomerRecords(ownerId:string,page?:PageRequest){
 }
 
 export async function getCustomerRecord(ownerId:string,id:string){
-  const {row:workspaceRow}=await ensureCustomerRecordApiReady(ownerId);
+  const workspaceRow=await ensureCustomerListReady(ownerId);
   const customerRow=await database().prepare(
     'SELECT id,name,phone,address,city,preference,notes,consent,created,record_version FROM crm_rel_customers WHERE owner_id=? AND id=?'
   ).bind(ownerId,id).first<CustomerRow>();

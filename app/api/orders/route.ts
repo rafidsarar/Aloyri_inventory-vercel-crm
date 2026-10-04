@@ -13,7 +13,7 @@ export async function GET(request:Request){
     if(!user)return response({error:'Sign in to view orders.'},401);
     const {ownerId,role}=await resolveWorkspace(user);
     if(!roleCanViewSection(role,'Orders'))return response({error:'You do not have access to orders.'},403);
-    const result=await listOrderRecords(ownerId,parsePageRequest(request.url)||defaultPageRequest());
+    const result=await listOrderRecords(ownerId,parsePageRequest(request.url)||defaultPageRequest(),role);
     return response({orders:result.orders.map(order=>orderRecordForRole(order,role)),version:result.workspaceVersion,pagination:result.pagination,customers:result.customers||[]});
   }catch(error){
     if(error instanceof Error&&error.message==='Invalid pagination.')return response({error:error.message},400);

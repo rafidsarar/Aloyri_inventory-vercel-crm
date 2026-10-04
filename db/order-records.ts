@@ -57,12 +57,19 @@ function mapOrder(row:OrderRow,items:ItemRow[],allocations:AllocationRow[],colle
   };
 }
 
-async function readOrderRows(ownerId:string,id?:string,page?:PageRequest){
+function paymentStatusSql(role?:WorkspaceRole){
+ const closed="CASE WHEN status IN ('Cancelled','Returned') THEN 'Closed' ";
+ if(role==='sales')return closed+"WHEN payment='COD' AND status<>'Delivered' THEN 'Due on delivery' ELSE 'Pending' END";
+ const due="GREATEST(0,GREATEST(0,COALESCE((SELECT SUM(qty*price) FROM crm_rel_order_items i WHERE i.owner_id=crm_rel_orders.owner_id AND i.order_id=crm_rel_orders.id),0)-discount)+delivery_charge-CASE WHEN payment='COD' THEN courier_cost+payment_fee ELSE 0 END)",collected="COALESCE((SELECT SUM(amount) FROM crm_rel_order_collections c WHERE c.owner_id=crm_rel_orders.owner_id AND c.order_id=crm_rel_orders.id),0)",legacy="settled AND NOT EXISTS(SELECT 1 FROM crm_rel_order_collections c WHERE c.owner_id=crm_rel_orders.owner_id AND c.order_id=crm_rel_orders.id)";
+ return closed+"WHEN "+due+">0 AND ("+collected+">="+due+"-0.001 OR ("+legacy+")) THEN 'Paid' WHEN "+collected+">0 THEN 'Part paid' WHEN payment='COD' AND status<>'Delivered' THEN 'Due on delivery' ELSE 'Pending' END";
+}
+
+async function readOrderRows(ownerId:string,id?:string,page?:PageRequest,role?:WorkspaceRole){
   const row=await ensureCustomerListReady(ownerId);
   const db=database();
   let where=id?'owner_id=? AND id=?':'owner_id=?';
   const binds:unknown[]=id?[ownerId,id]:[ownerId];
-  if(page?.q){where+=' AND (number ILIKE ? OR tracking ILIKE ? OR channel ILIKE ? OR payment ILIKE ? OR status ILIKE ? OR customer_id IN (SELECT id FROM crm_rel_customers WHERE owner_id=? AND (name ILIKE ? OR phone ILIKE ? OR city ILIKE ?)))';const q=literalLike(page.q);binds.push(q,q,q,q,q,ownerId,q,q,q);}
+  if(page?.q){where+=' AND (number ILIKE ? OR tracking ILIKE ? OR channel ILIKE ? OR payment ILIKE ? OR status ILIKE ? OR ('+paymentStatusSql(role)+') ILIKE ? OR customer_id IN (SELECT id FROM crm_rel_customers WHERE owner_id=? AND (name ILIKE ? OR phone ILIKE ? OR city ILIKE ?)))';const q=literalLike(page.q);binds.push(q,q,q,q,q,q,ownerId,q,q,q);}
   if(page&&page.status!=='All'){where+=' AND status=?';binds.push(page.status);}
   if(page?.customerId){where+=' AND customer_id=?';binds.push(page.customerId);}
   const total=page?Number((await db.prepare('SELECT COUNT(*) AS n FROM crm_rel_orders WHERE '+where).bind(...binds).first<{n:number}>())?.n||0):0;
@@ -79,7 +86,7 @@ async function readOrderRows(ownerId:string,id?:string,page?:PageRequest){
   return {customers,orders:parents.results.map(orderRow=>mapOrder(orderRow,items.results,allocations.results,collections.results)),workspaceVersion:row.version,pagination:page?pageMetadata(page,total):undefined};
 }
 
-export const listOrderRecords=(ownerId:string,page?:PageRequest)=>readOrderRows(ownerId,undefined,page);
+export const listOrderRecords=(ownerId:string,page?:PageRequest,role?:WorkspaceRole)=>readOrderRows(ownerId,undefined,page,role);
 export async function getOrderRecord(ownerId:string,id:string){
   const result=await readOrderRows(ownerId,id);
   return {order:result.orders[0]||null,customers:result.customers||[],workspaceVersion:result.workspaceVersion};
