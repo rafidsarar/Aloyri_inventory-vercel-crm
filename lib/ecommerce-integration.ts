@@ -9,6 +9,7 @@ export const ecommerceOrderInputSchema=z.object({
   customer:z.object({
     name:z.string().trim().min(2).max(200),
     phone:z.string().trim().min(10).max(30),
+    email:z.string().trim().email().max(254).optional().default(''),
     address:z.string().trim().min(8).max(1000),
     district:z.string().trim().min(2).max(100),
     area:z.string().trim().min(2).max(200),
