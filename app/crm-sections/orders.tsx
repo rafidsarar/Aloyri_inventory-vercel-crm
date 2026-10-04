@@ -1,13 +1,31 @@
 'use client';
 
 import { useRecordPagination } from '../record-pagination';
-import type { ReactNode } from 'react';
-import { ArrowRight, Bell, CheckCircle2, ChevronRight, Package, Plus, Search, ShoppingBag, Truck, X } from 'lucide-react';
+import { useEffect,useState,type ReactNode } from 'react';
+import { ArrowRight, Bell, CheckCircle2, ChevronRight, Package, Plus, RotateCcw, Search, ShoppingBag, Truck, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import type { Order } from '@/lib/crm';
 import { statuses, taka } from '@/lib/crm';
+import { toast } from 'sonner';
 import { Choice } from '../forms';
 import { ActionBar, SectionPanel, WorkspaceSection } from '../crm-ui';
+
+
+type ReturnRequest={
+  id:string;
+  orderId:string;
+  orderNumber:string;
+  requestStatus:'Requested'|'Reviewing'|'Approved'|'Rejected'|'Resolved';
+  reason:string;
+  condition:string;
+  preferredResolution:string;
+  customerNote:string;
+  items:{line:number;productId:string;name:string;brand:string;size:string;qty:number}[];
+  staffNote:string;
+  createdAt:string;
+  updatedAt:string;
+  resolvedAt:string;
+};
 
 type Props={
   serverPage?:{rows:Order[];total:number;controls:ReactNode;feedback:ReactNode;loading:boolean;stats:{total:number;todayOrderCount:number;statusCounts:Record<string,number>}};
@@ -41,6 +59,52 @@ export default function OrdersSection({
   filteredOrders,selectedOrderIds,setSelectedOrderIds,busy,bulkAdvanceSelectedOrders,query,
   setQuery,orderTable,serverPage
 }:Props){
+  const [returnRequests,setReturnRequests]=useState<ReturnRequest[]>([]);
+  const [returnRequestsLoading,setReturnRequestsLoading]=useState(true);
+  const [returnRequestBusy,setReturnRequestBusy]=useState('');
+
+  async function loadReturnRequests(){
+    setReturnRequestsLoading(true);
+    try{
+      const response=await fetch('/api/return-requests',{cache:'no-store'});
+      const data=await response.json();
+      if(!response.ok)throw Error(data.error||'Could not load website return requests.');
+      setReturnRequests(Array.isArray(data.requests)?data.requests:[]);
+    }catch(error){
+      toast.error(error instanceof Error?error.message:'Could not load website return requests.');
+    }finally{
+      setReturnRequestsLoading(false);
+    }
+  }
+
+  useEffect(()=>{void loadReturnRequests()},[]);
+
+  async function updateReturnRequest(request:ReturnRequest,status:ReturnRequest['requestStatus']){
+    if(returnRequestBusy)return;
+    setReturnRequestBusy(request.id);
+    try{
+      const response=await fetch('/api/return-requests',{
+        method:'PATCH',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({id:request.id,status,staffNote:request.staffNote||''})
+      });
+      const data=await response.json();
+      if(!response.ok)throw Error(data.error||'Could not update return request.');
+      setReturnRequests(current=>current.map(item=>item.id===request.id?data.request:item));
+      toast.success('Return request updated.');
+    }catch(error){
+      toast.error(error instanceof Error?error.message:'Could not update return request.');
+    }finally{
+      setReturnRequestBusy('');
+    }
+  }
+
+  function findReturnOrder(request:ReturnRequest){
+    setFilter('All');
+    setQuery(request.orderNumber);
+  }
+
+  const activeReturnRequests=returnRequests.filter(request=>!['Rejected','Resolved'].includes(request.requestStatus));
   const pagination=useRecordPagination(filteredOrders,query+"|"+filter);
   const matchedCount=serverPage?.total??filteredOrders.length,allCount=serverPage?.stats.total??orders.length,todayCount=serverPage?.stats.todayOrderCount??todayOrders.length;
   const statusCount=(status:string)=>serverPage?.stats.statusCounts[status]??orders.filter(o=>o.status===status).length;
@@ -62,6 +126,38 @@ export default function OrdersSection({
       <button className={filter==='Out for delivery'?'active':''} onClick={()=>setFilter('Out for delivery')}><span className="order-kpi-icon"><Truck size={18}/></span><span><small>Out for delivery</small><strong>{outForDeliveryOrders}</strong><em>With courier</em></span><ChevronRight size={16}/></button>
       <button className={filter==='Delivered'?'active':''} onClick={()=>setFilter('Delivered')}><span className="order-kpi-icon"><CheckCircle2 size={18}/></span><span><small>Delivered</small><strong>{deliveredCount}</strong><em>{returnRate}% return rate</em></span><ChevronRight size={16}/></button>
     </div>
+    <SectionPanel className="order-workspace order-workspace-pro">
+      <div className="panel-heading order-workspace-heading">
+        <div><span className="orders-section-label">WEBSITE RETURNS</span><h2>Customer return requests</h2><p>Review customer requests here first. Approval does not refund money, mark stock as returned, or restock anything.</p></div>
+        <div className="order-workspace-count"><strong>{activeReturnRequests.length}</strong><span>open</span></div>
+      </div>
+      {returnRequestsLoading?<p className="muted">Loading website return requests…</p>:returnRequests.length===0?
+        <div className="table-footer"><span>No website return requests yet.</span><span>New requests will appear here after a customer verifies a delivered website order.</span></div>:
+        <div className="grid gap-3">
+          {returnRequests.slice(0,12).map(request=><article key={request.id} className="rounded-xl border border-border bg-card p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="flex flex-wrap items-center gap-2"><strong>#{request.orderNumber}</strong><span className="status-pill">{request.requestStatus}</span></div>
+                <p className="mt-1 text-sm muted">{request.reason} · {request.condition} · Customer prefers {request.preferredResolution}</p>
+                <p className="mt-2 text-sm">{request.items.map(item=>(item.brand?item.brand+' ':'')+item.name+' × '+item.qty).join(' · ')}</p>
+                {request.customerNote&&<p className="mt-2 text-sm muted">Customer note: {request.customerNote}</p>}
+                <p className="mt-2 text-xs muted">Submitted {new Date(request.createdAt).toLocaleString('en-GB',{timeZone:'Asia/Dhaka'})}</p>
+              </div>
+              <button className="btn secondary small" onClick={()=>findReturnOrder(request)}><Search size={14}/>Find order</button>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {request.requestStatus==='Requested'&&<button className="btn secondary small" disabled={returnRequestBusy===request.id} onClick={()=>void updateReturnRequest(request,'Reviewing')}>Start review</button>}
+              {!['Approved','Rejected','Resolved'].includes(request.requestStatus)&&<>
+                <button className="btn secondary small" disabled={returnRequestBusy===request.id} onClick={()=>void updateReturnRequest(request,'Approved')}><CheckCircle2 size={14}/>Approve request</button>
+                <button className="btn secondary small" disabled={returnRequestBusy===request.id} onClick={()=>void updateReturnRequest(request,'Rejected')}><X size={14}/>Reject</button>
+              </>}
+              {request.requestStatus==='Approved'&&<button className="btn secondary small" disabled={returnRequestBusy===request.id} onClick={()=>void updateReturnRequest(request,'Resolved')}><RotateCcw size={14}/>Mark reviewed / resolved</button>}
+            </div>
+            {request.requestStatus==='Approved'&&<p className="mt-3 text-xs muted">Next: when the returned parcel is physically received, move the order through the existing Returned workflow. Inventory inspection and Finance settlement remain separate protected actions.</p>}
+          </article>)}
+        </div>}
+    </SectionPanel>
+
     <SectionPanel className="order-workspace order-workspace-pro">
       <div className="panel-heading order-workspace-heading">
         <div><span className="orders-section-label">FULFILLMENT QUEUE</span><h2>Order pipeline</h2><p>Select a stage, search an order, or move it to the next step directly from the queue.</p></div>
