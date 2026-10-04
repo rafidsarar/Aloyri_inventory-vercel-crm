@@ -34,7 +34,7 @@ test('order conflict handling refreshes the safe workspace state',()=>{
 });
 
 test('direct order status updates use record-level save',()=>{
-  assert.match(crm,/async function updateOrder[\s\S]*saveOrderRecord\(next\)/);
+  assert.match(crm,/async function updateOrder[\s\S]*saveOrderRecord\(next,recordVersion\)/);
   assert.match(crm,/function changeStatus[\s\S]*updateOrder/);
 });
 

@@ -11,18 +11,18 @@ import { Empty,WorkspaceSection,type View } from '../crm-ui';
 
 type AnyFn=(...args:any[])=>any;
 type Ctx={
-  reportMonth:string; reportPulseTone:string; reportPulse:string; reportOrders:Order[];
+  reportMonth:string; reportPulseTone:string; reportPulse:string; reportOrders:{length:number};
   setReportMonth:(value:string)=>void; reportMonths:string[]; changeView:(view:View)=>void; canExport:boolean;
   exportManagementReport:AnyFn; reportRevenue:number; reportRevenueDelta:number|null; reportProfit:number;
   reportMargin:number; reportAov:number; reportRepeatRate:number; reportRepeatCustomers:number;
-  reportCustomerIds:string[]; reportReturnRate:number; reportReturnedOrders:Order[]; reportNewCustomers:number;
-  reportInsightTone:{revenue:string;retention:string;operations:string}; inventoryOut:Product[]; inventoryLow:Product[];
+  reportCustomerIds:{length:number}; reportReturnRate:number; reportReturnedOrders:{length:number}; reportNewCustomers:number;
+  reportInsightTone:{revenue:string;retention:string;operations:string}; inventoryOut:{length:number}; inventoryLow:{length:number};
   monthlyTrend:any[]; signedTaka:(amount:number)=>string; reportWorkingCapital:number; reportChannelRows:any[];
-  reportTopChannel:any|null; reportProductRows:any[]; reportProductMax:number; m:any; reportPurchaseOrders:any[];
+  reportTopChannel:any|null; reportProductRows:any[]; reportProductMax:number; m:any; reportPurchaseOrders:{length:number};
   reportPurchasingValue:number; reportTopProduct:any|null; reportProductProfitability:any[]; reportCustomerValue:any[];
   setDetail:AnyFn; inventoryAgeing:any[]; inventoryAgeingTotal:number; supplierPerformance:any[];
   managementActionQueue:any[]; managementControlScore:number; integrityIssues:any[]; unassignedMovements:number;
-  automationActiveRules:number; inventoryExpired:Batch[]; projected30:number; reportCollectionRate:number;
+  automationActiveRules:number; inventoryExpired:{length:number}; projected30:number; reportCollectionRate:number;
   role:WorkspaceRole; openModal:AnyFn;
 };
 type Props={ctx:Ctx};
@@ -309,3 +309,4 @@ export default function ReportsSection({ctx}:Props){
 </section>
 </WorkspaceSection>;
 }
+

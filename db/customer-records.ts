@@ -1,4 +1,4 @@
-import { pageMetadata,type PageRequest } from '../lib/pagination.ts';
+import { pageMetadata,literalLike,type PageRequest } from '../lib/pagination.ts';
 import { database } from './raw.ts';
 import { relationalDate } from './relational-date.ts';
 import { ensureRelationalFoundation } from './relational-foundation.ts';
@@ -39,12 +39,24 @@ export async function ensureCustomerRecordApiReady(ownerId:string){
   return {row,state};
 }
 
+/** Verified lists need only readiness and version metadata, not a full workspace parse. */
+export async function ensureCustomerListReady(ownerId:string){
+ await ensureRelationalFoundation();
+ const row=await database().prepare('SELECT version FROM crm_workspaces WHERE owner_id=?').bind(ownerId).first<{version:number}>();
+ if(!row)throw new Error('Workspace not found.');
+ const migration=await getCustomersOrdersMigrationStatus(ownerId);
+ if(!migration||migration.status!=='verified')return (await ensureCustomerRecordApiReady(ownerId)).row;
+ return row;
+}
 export async function listCustomerRecords(ownerId:string,page?:PageRequest){
-  const {row}=await ensureCustomerRecordApiReady(ownerId);
-  const db=database(),where='owner_id=?'+(page?.q?' AND (name ILIKE ? OR phone ILIKE ? OR city ILIKE ? OR preference ILIKE ? OR notes ILIKE ?)':''),binds:unknown[]=[ownerId,...(page?.q?Array(5).fill('%'+page.q+'%'):[])];
+  const row=await ensureCustomerListReady(ownerId);
+  const db=database(),where='owner_id=?'+(page?.q?' AND (name ILIKE ? OR phone ILIKE ? OR city ILIKE ? OR preference ILIKE ? OR notes ILIKE ?)':''),binds:unknown[]=[ownerId,...(page?.q?Array(5).fill(literalLike(page.q)):[])];
   const total=page?Number((await db.prepare('SELECT COUNT(*) AS n FROM crm_rel_customers WHERE '+where).bind(...binds).first<{n:number}>())?.n||0):0;
   const result=await db.prepare('SELECT id,name,phone,address,city,preference,notes,consent,created,record_version FROM crm_rel_customers WHERE '+where+' ORDER BY created DESC,id'+(page?' LIMIT ? OFFSET ?':'')).bind(...binds,...(page?[page.pageSize,(page.page-1)*page.pageSize]:[])).all<CustomerRow>();
-  return {customers:result.results.map(mapCustomer),workspaceVersion:row.version,pagination:page?pageMetadata(page,total):undefined};
+  const ids=result.results.map(c=>c.id);
+  const stats=ids.length?await db.prepare("SELECT o.customer_id,COUNT(*) AS orders,COALESCE(SUM(CASE WHEN o.status='Delivered' THEN GREATEST(0,COALESCE(i.value,0)-o.discount) ELSE 0 END),0) AS spend FROM crm_rel_orders o LEFT JOIN (SELECT owner_id,order_id,SUM(qty*price) AS value FROM crm_rel_order_items WHERE owner_id=? GROUP BY owner_id,order_id) i ON i.owner_id=o.owner_id AND i.order_id=o.id WHERE o.owner_id=? AND o.customer_id IN ("+ids.map(()=>'?').join(',')+") GROUP BY o.customer_id").bind(ownerId,ownerId,...ids).all<{customer_id:string;orders:number;spend:number}>():{results:[]};
+  const orderStats=Object.fromEntries(stats.results.map(r=>[r.customer_id,{orders:Number(r.orders),deliveredSpend:Number(r.spend)}]));
+  return {customers:result.results.map(mapCustomer),orderStats,workspaceVersion:row.version,pagination:page?pageMetadata(page,total):undefined};
 }
 
 export async function getCustomerRecord(ownerId:string,id:string){
