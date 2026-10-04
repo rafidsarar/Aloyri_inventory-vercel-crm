@@ -16,6 +16,7 @@ type AlertFilter='All'|'Critical'|'Action needed'|'Upcoming';
 
 type Props={
   roleAlerts:AutoAlert[];
+  totalAlerts?:number;
   shownAlerts:AutoAlert[];
   alertFocus?:AutoAlert;
   alertCritical:number;
@@ -29,6 +30,7 @@ type Props={
 
 export default function AlertsSection({
   roleAlerts,
+  totalAlerts=roleAlerts.length,
   shownAlerts,
   alertFocus,
   alertCritical,
@@ -75,7 +77,7 @@ export default function AlertsSection({
         <Stat label="Critical" value={String(alertCritical)} detail="Needs prompt attention" icon={AlertTriangle}/>
         <Stat label="Action needed" value={String(alertAction)} detail="Work to complete" icon={Bell}/>
         <Stat label="Upcoming" value={String(alertUpcoming)} detail="Due soon" icon={Clock}/>
-        <Stat label="Open alerts" value={String(roleAlerts.length)} detail="Filtered for your role" icon={ShieldCheck} green/>
+        <Stat label="Open alerts" value={String(totalAlerts)} detail="Filtered for your role" icon={ShieldCheck} green/>
       </div>
     </section>
 
@@ -128,3 +130,4 @@ export default function AlertsSection({
     </section>
   </WorkspaceSection>;
 }
+

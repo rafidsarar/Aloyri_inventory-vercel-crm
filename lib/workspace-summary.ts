@@ -5,7 +5,7 @@ import type { View } from '../app/crm-ui.tsx';
 import type { AutoAlert } from '../app/crm-sections/alerts.tsx';
 const calculate=<T>(fn:()=>T,_deps:unknown[])=>fn();
 const isCollectible=(o:Order)=>o.status==='Delivered'||(o.payment!=='COD'&&!['Cancelled','Returned'].includes(o.status));
-export function workspaceSummary(s:State,role:WorkspaceRole,reportMonth=today().slice(0,7),range='7'){
+export function workspaceSummary(s:State,role:WorkspaceRole,reportMonth=today().slice(0,7),range='7',alertLimit:number|null=100){
 const filter='All',deferredQuery='',cashRange:string='30',closeMonth=reportMonth,alertFilter='All';
 const m=calculate(()=>metrics(s),[s]);const flow=calculate(()=>cashflow(s),[s]);
 const customerById=calculate(()=>new Map(s.customers.map(x=>[x.id,x])),[s.customers]);
@@ -180,6 +180,6 @@ automationActiveRules,
 inventoryExpired:{length:inventoryExpired.length},
 projected30,
 reportCollectionRate,
-role},orderStats:{openOrderCount,readyToPackOrders,outForDeliveryOrders,outstandingOrderValue,todayOrderCount:todayOrders.length,todayOrderValue,deliveredCount:m.delivered,returnRate,total:s.orders.length,statusCounts:Object.fromEntries(statuses.map(status=>[status,s.orders.filter(o=>o.status===status).length]))},roleAlerts:roleAlerts.slice(0,100),alertCounts:{critical:alertCritical,action:alertAction,upcoming:alertUpcoming}};
+role},orderStats:{openOrderCount,readyToPackOrders,outForDeliveryOrders,outstandingOrderValue,todayOrderCount:todayOrders.length,todayOrderValue,deliveredCount:m.delivered,returnRate,total:s.orders.length,statusCounts:Object.fromEntries(statuses.map(status=>[status,s.orders.filter(o=>o.status===status).length]))},roleAlerts:alertLimit===null?roleAlerts:roleAlerts.slice(0,alertLimit),alertCounts:{critical:alertCritical,action:alertAction,upcoming:alertUpcoming}};
 }
 export type WorkspaceSummary=ReturnType<typeof workspaceSummary>;

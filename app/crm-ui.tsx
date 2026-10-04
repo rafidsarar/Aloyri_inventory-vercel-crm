@@ -146,6 +146,7 @@ export function Nav({view,onView,openOrders,onSettings,onPassword,onLogout,membe
               ? <SidebarMenuItem key={section}>
                   <SidebarMenuButton
                     className="nav-button"
+                    aria-label={section}
                     isActive={view===section}
                     onClick={()=>{onView(section);setOpenMobile(false)}}
                   >
@@ -214,3 +215,4 @@ export function OrderProgress({order}:{order:Order}){
       <div className={'order-progress-final '+order.status.toLowerCase()}><Status value={order.status}/></div>}
   </div>;
 }
+

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { workspaceSummary } from '../lib/workspace-summary.ts';
 import { compactWorkspace } from '../lib/workspace-projection.ts';
 import { workspaceSearch } from '../lib/workspace-search.ts';
 import { visibleState } from '../lib/role-data.ts';
@@ -12,3 +13,5 @@ test('compact staff bootstrap does not expose management reports or supplier cos
 test('search terms treat SQL wildcards literally and customer history has bounded query input',()=>{assert.equal(literalLike('100%_\\'),'%'+'100\\%\\_\\\\'+'%');assert.equal(parsePageRequest('https://x.test/?page=1&pageSize=25&customerId=c69')?.customerId,'c69');assert.throws(()=>parsePageRequest('https://x.test/?page=1&customerId='+('a'.repeat(121))));});
 
 test('reused date formatter still changes the business day at Dhaka midnight',context=>{context.mock.timers.enable({apis:['Date'],now:Date.UTC(2026,9,3,17,59,0)});assert.equal(today(),'2026-10-03');context.mock.timers.tick(60000);assert.equal(today(),'2026-10-04');});
+
+test('alert summary keeps complete counts and the alert page source includes every eligible signal',()=>{const s=largeWorkspace();s.tasks=Array.from({length:120},(_,i)=>({id:'alert-'+i,customerId:'c0',orderId:'',title:'Reminder '+i,due:'2026-01-01',done:false,kind:'Follow-up',priority:'High',channel:'WhatsApp',notes:'',completedAt:''}));const compact=workspaceSummary(s,'owner'),complete=workspaceSummary(s,'owner',undefined,undefined,null);assert.equal(compact.roleAlerts.length,100);assert.ok(complete.roleAlerts.length>=120);assert.deepEqual(compact.alertCounts,complete.alertCounts);assert.equal(Object.values(complete.alertCounts).reduce((n,x)=>n+x,0),complete.roleAlerts.length);assert.ok(complete.roleAlerts.some(x=>x.id==='task-alert-119'));});
