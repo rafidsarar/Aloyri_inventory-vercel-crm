@@ -1,5 +1,6 @@
 import { getAppUser,checkOrigin } from '@/app/local-auth';
 import { AccessDenied,resolveWorkspace } from '@/app/team-access';
+import { roleCanEdit,roleCanViewSection } from '@/lib/roles';
 import {
   listEcommerceReturnRequests,
   returnRequestStatuses,
@@ -13,7 +14,8 @@ export async function GET(){
   try{
     const user=await getAppUser();
     if(!user)return response({error:'Sign in to view return requests.'},401);
-    const {ownerId}=await resolveWorkspace(user);
+    const {ownerId,role}=await resolveWorkspace(user);
+    if(!roleCanViewSection(role,'Orders'))return response({error:'You do not have access to orders.'},403);
     return response({requests:await listEcommerceReturnRequests(ownerId)});
   }catch(error){
     if(error instanceof AccessDenied)return response({error:error.message},403);
@@ -28,7 +30,7 @@ export async function PATCH(request:Request){
     if(!user)return response({error:'Sign in to update return requests.'},401);
     if(!checkOrigin(request))return response({error:'Invalid request origin.'},403);
     const {ownerId,role}=await resolveWorkspace(user);
-    if(!['owner','admin','sales','inventory','finance'].includes(role)){
+    if(!roleCanEdit(role,'orders')){
       return response({error:'Your role cannot update return requests.'},403);
     }
 
