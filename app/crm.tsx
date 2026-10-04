@@ -714,7 +714,7 @@ const localGlobalResults=useMemo<GlobalResult[]>(()=>{
   }
   return results.sort((a,b)=>b.score-a.score||a.view.localeCompare(b.view)||a.title.localeCompare(b.title)).slice(0,18);
 },[globalNeedle,role,s]);
-const globalSearchPage=useServerPagination<{results:GlobalResult[]}>({path:'/api/search',enabled:compactMode&&globalNeedle.length>1,query:globalNeedle,refresh:listRefresh});
+const globalSearchPage=useServerPagination<{results:GlobalResult[]}>({path:'/api/search',enabled:compactMode&&globalNeedle.length>0,query:globalNeedle,refresh:listRefresh});
 const globalResults=compactMode?(globalSearchPage.data?.results||[]):localGlobalResults;
 useEffect(()=>{const onKey=(event:KeyboardEvent)=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='k'){event.preventDefault();globalSearchRef.current?.focus();globalSearchRef.current?.select();}};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey)},[]);
 const globalGroups=useMemo(()=>sections.map(section=>({section,items:globalResults.filter(result=>result.view===section)})).filter(group=>group.items.length),[globalResults]);

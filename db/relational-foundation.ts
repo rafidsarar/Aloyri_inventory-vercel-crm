@@ -297,6 +297,8 @@ export const relationalFoundationSql = [
     last_verification TEXT NOT NULL DEFAULT '{}',
     updated_at TEXT NOT NULL
   )`,
+  `CREATE INDEX IF NOT EXISTS crm_orders_owner_customer_queue_idx ON crm_rel_orders(owner_id,customer_id,status,created,id)`,
+  `CREATE INDEX IF NOT EXISTS crm_orders_owner_status_queue_idx ON crm_rel_orders(owner_id,status,created,number,id)`,
   `CREATE INDEX IF NOT EXISTS crm_stage4_orders_status_created_idx ON crm_rel_orders(owner_id,status,created DESC)`,
   `CREATE INDEX IF NOT EXISTS crm_stage4_purchase_orders_status_expected_idx ON crm_rel_purchase_orders(owner_id,status,expected)`,
   `CREATE INDEX IF NOT EXISTS crm_stage4_batches_product_expiry_idx ON crm_rel_batches(owner_id,product_id,expiry)`,
