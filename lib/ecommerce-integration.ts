@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { database } from '@/db/raw';
+import { database } from '../db/raw.ts';
 
 const enc=new TextEncoder();
 const hex=(bytes:Uint8Array)=>Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
