@@ -1,4 +1,4 @@
-import { parsePageRequest } from '@/lib/pagination';
+import { parsePageRequest,defaultPageRequest } from '@/lib/pagination';
 import { getAppUser, checkOrigin } from '@/app/local-auth';
 import { AccessDenied, resolveWorkspace } from '@/app/team-access';
 import { roleCanEdit, roleCanViewSection } from '@/lib/roles';
@@ -13,8 +13,8 @@ export async function GET(request:Request){
     if(!user)return response({error:'Sign in to view orders.'},401);
     const {ownerId,role}=await resolveWorkspace(user);
     if(!roleCanViewSection(role,'Orders'))return response({error:'You do not have access to orders.'},403);
-    const result=await listOrderRecords(ownerId,parsePageRequest(request.url));
-    return response({orders:result.orders.map(order=>orderRecordForRole(order,role)),version:result.workspaceVersion,pagination:result.pagination});
+    const result=await listOrderRecords(ownerId,parsePageRequest(request.url)||defaultPageRequest(),role);
+    return response({orders:result.orders.map(order=>orderRecordForRole(order,role)),version:result.workspaceVersion,pagination:result.pagination,customers:result.customers||[]});
   }catch(error){
     if(error instanceof Error&&error.message==='Invalid pagination.')return response({error:error.message},400);
     if(error instanceof AccessDenied)return response({error:error.message},403);

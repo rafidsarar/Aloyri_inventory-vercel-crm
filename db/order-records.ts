@@ -1,7 +1,7 @@
-import { pageMetadata,type PageRequest } from '../lib/pagination.ts';
+import { pageMetadata,literalLike,type PageRequest } from '../lib/pagination.ts';
 import { database } from './raw.ts';
 import { optionalRelationalDate, relationalDate } from './relational-date.ts';
-import { ensureCustomerRecordApiReady } from './customer-records.ts';
+import { ensureCustomerListReady,ensureCustomerRecordApiReady } from './customer-records.ts';
 import { CUSTOMER_ORDER_DOMAIN } from './customer-order-shadow.ts';
 import { applyRoleChanges, validateWorkspaceChange, visibleState } from '../lib/role-data.ts';
 import type { WorkspaceRole } from '../lib/roles.ts';
@@ -57,28 +57,39 @@ function mapOrder(row:OrderRow,items:ItemRow[],allocations:AllocationRow[],colle
   };
 }
 
-async function readOrderRows(ownerId:string,id?:string,page?:PageRequest){
-  const {row}=await ensureCustomerRecordApiReady(ownerId);
+function paymentStatusSql(role?:WorkspaceRole){
+ const closed="CASE WHEN status IN ('Cancelled','Returned') THEN 'Closed' ";
+ if(role==='sales')return closed+"WHEN payment='COD' AND status<>'Delivered' THEN 'Due on delivery' ELSE 'Pending' END";
+ const due="GREATEST(0,GREATEST(0,COALESCE((SELECT SUM(qty*price) FROM crm_rel_order_items i WHERE i.owner_id=crm_rel_orders.owner_id AND i.order_id=crm_rel_orders.id),0)-discount)+delivery_charge-CASE WHEN payment='COD' THEN courier_cost+payment_fee ELSE 0 END)",collected="COALESCE((SELECT SUM(amount) FROM crm_rel_order_collections c WHERE c.owner_id=crm_rel_orders.owner_id AND c.order_id=crm_rel_orders.id),0)",legacy="settled AND NOT EXISTS(SELECT 1 FROM crm_rel_order_collections c WHERE c.owner_id=crm_rel_orders.owner_id AND c.order_id=crm_rel_orders.id)";
+ return closed+"WHEN "+due+">0 AND ("+collected+">="+due+"-0.001 OR ("+legacy+")) THEN 'Paid' WHEN "+collected+">0 THEN 'Part paid' WHEN payment='COD' AND status<>'Delivered' THEN 'Due on delivery' ELSE 'Pending' END";
+}
+
+async function readOrderRows(ownerId:string,id?:string,page?:PageRequest,role?:WorkspaceRole){
+  const row=await ensureCustomerListReady(ownerId);
   const db=database();
   let where=id?'owner_id=? AND id=?':'owner_id=?';
   const binds:unknown[]=id?[ownerId,id]:[ownerId];
-  if(page?.q){where+=' AND (number ILIKE ? OR tracking ILIKE ? OR channel ILIKE ? OR payment ILIKE ? OR customer_id IN (SELECT id FROM crm_rel_customers WHERE owner_id=? AND (name ILIKE ? OR phone ILIKE ? OR city ILIKE ?)))';const q='%'+page.q+'%';binds.push(q,q,q,q,ownerId,q,q,q);}
+  if(page?.q){where+=' AND (number ILIKE ? OR tracking ILIKE ? OR channel ILIKE ? OR payment ILIKE ? OR status ILIKE ? OR ('+paymentStatusSql(role)+') ILIKE ? OR customer_id IN (SELECT id FROM crm_rel_customers WHERE owner_id=? AND (name ILIKE ? OR phone ILIKE ? OR city ILIKE ?)))';const q=literalLike(page.q);binds.push(q,q,q,q,q,q,ownerId,q,q,q);}
   if(page&&page.status!=='All'){where+=' AND status=?';binds.push(page.status);}
+  if(page?.customerId){where+=' AND customer_id=?';binds.push(page.customerId);}
   const total=page?Number((await db.prepare('SELECT COUNT(*) AS n FROM crm_rel_orders WHERE '+where).bind(...binds).first<{n:number}>())?.n||0):0;
-  const parents=await db.prepare('SELECT id,number,customer_id,created,delivered,returned_at,settled_at,channel,payment,status,discount,delivery_charge,courier_cost,packaging,payment_fee,return_fee,settled,restocked,tracking,notes,record_version FROM crm_rel_orders WHERE '+where+' ORDER BY created DESC,id'+(page?' LIMIT ? OFFSET ?':'')).bind(...binds,...(page?[page.pageSize,(page.page-1)*page.pageSize]:[])).all<OrderRow>();
+  const parents=await db.prepare('SELECT id,number,customer_id,created,delivered,returned_at,settled_at,channel,payment,status,discount,delivery_charge,courier_cost,packaging,payment_fee,return_fee,settled,restocked,tracking,notes,record_version FROM crm_rel_orders WHERE '+where+" ORDER BY CASE status WHEN 'New' THEN 0 WHEN 'Confirmed' THEN 1 WHEN 'Ready to pack' THEN 2 WHEN 'Packed' THEN 3 WHEN 'Shipped' THEN 4 WHEN 'Out for delivery' THEN 5 WHEN 'Delivered' THEN 6 WHEN 'Returned' THEN 7 WHEN 'Cancelled' THEN 8 ELSE 99 END,CASE WHEN status IN ('Delivered','Returned','Cancelled') THEN NULL ELSE created END ASC,CASE WHEN status IN ('Delivered','Returned','Cancelled') THEN created ELSE NULL END DESC,number,id"+(page?' LIMIT ? OFFSET ?':'')).bind(...binds,...(page?[page.pageSize,(page.page-1)*page.pageSize]:[])).all<OrderRow>();
   const orderIds=parents.results.map(r=>r.id);
   if(!orderIds.length)return {orders:[] as OrderRecord[],workspaceVersion:row.version,pagination:page?pageMetadata(page,total):undefined};
   const childWhere=' AND order_id IN ('+orderIds.map(()=>'?').join(',')+')',childBinds=[ownerId,...orderIds];
   const items=await db.prepare('SELECT order_id,line_no,product_id,qty,price FROM crm_rel_order_items WHERE owner_id=?'+childWhere+' ORDER BY order_id,line_no').bind(...childBinds).all<ItemRow>();
   const allocations=await db.prepare('SELECT order_id,line_no,allocation_no,batch_id,qty,unit_cost FROM crm_rel_order_allocations WHERE owner_id=?'+childWhere+' ORDER BY order_id,line_no,allocation_no').bind(...childBinds).all<AllocationRow>();
   const collections=await db.prepare('SELECT order_id,id,date,amount,reference FROM crm_rel_order_collections WHERE owner_id=?'+childWhere+' ORDER BY order_id,date,id').bind(...childBinds).all<CollectionRow>();
-  return {orders:parents.results.map(orderRow=>mapOrder(orderRow,items.results,allocations.results,collections.results)),workspaceVersion:row.version,pagination:page?pageMetadata(page,total):undefined};
+  const customerIds=[...new Set(parents.results.map(o=>o.customer_id))];
+  const customerRows=await db.prepare('SELECT id,name,phone,address,city,preference,notes,consent,created,record_version FROM crm_rel_customers WHERE owner_id=? AND id IN ('+customerIds.map(()=>'?').join(',')+')').bind(ownerId,...customerIds).all<{id:string;name:string;phone:string;address:string;city:string;preference:string;notes:string;consent:boolean;created:string;record_version:number}>();
+  const customers=customerRows.results.map(c=>({id:c.id,name:c.name,phone:c.phone,address:c.address,city:c.city,preference:c.preference,notes:c.notes,consent:Boolean(c.consent),created:relationalDate(c.created),recordVersion:Number(c.record_version)}));
+  return {customers,orders:parents.results.map(orderRow=>mapOrder(orderRow,items.results,allocations.results,collections.results)),workspaceVersion:row.version,pagination:page?pageMetadata(page,total):undefined};
 }
 
-export const listOrderRecords=(ownerId:string,page?:PageRequest)=>readOrderRows(ownerId,undefined,page);
+export const listOrderRecords=(ownerId:string,page?:PageRequest,role?:WorkspaceRole)=>readOrderRows(ownerId,undefined,page,role);
 export async function getOrderRecord(ownerId:string,id:string){
   const result=await readOrderRows(ownerId,id);
-  return {order:result.orders[0]||null,workspaceVersion:result.workspaceVersion};
+  return {order:result.orders[0]||null,customers:result.customers||[],workspaceVersion:result.workspaceVersion};
 }
 
 function proposedWithOrder(state:State,order:Order,role:WorkspaceRole){

@@ -1,8 +1,9 @@
+import { compactWorkspace } from '@/lib/workspace-projection';
 import { ensureDailyBackup } from '@/db/automatic-backups';
 import { getAppUser, checkOrigin } from '@/app/local-auth';
 import { AccessDenied, resolveWorkspace } from '@/app/team-access';
 import { visibleState, applyRoleChanges, validateWorkspaceChange } from '@/lib/role-data';
-import { canManageBusinessSettings } from '@/lib/roles';
+import { canManageBusinessSettings,roleCanViewSection } from '@/lib/roles';
 import { database } from '@/db/raw';
 import { ensureRelationalFoundation } from '@/db/relational-foundation';
 import { customerOrderSectionsChanged, markCustomersOrdersShadowStale, migrateCustomersOrdersShadow } from '@/db/customer-order-shadow';
@@ -27,16 +28,25 @@ function validateTransitions(previous:State,next:State){
   for(const before of previous.purchaseOrders)if(!next.purchaseOrders.some(p=>p.id===before.id)&&before.items.some(i=>i.receivedQty>0))throw new Error('A purchase order with received stock cannot be deleted.');
 }
 
-export async function GET(){
+export async function GET(request:Request){
   try{
     const user=await getAppUser();
     if(!user)return response({error:'Sign in to open the workspace.'},401);
     const {ownerId,role}=await resolveWorkspace(user);
+    const params=new URL(request.url).searchParams;
+    const compact=params.get('compact')==='1',month=params.get('month')||undefined,range=params.get('range')||'7';
+    if(month&&!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)||!['7','30','90'].includes(range))return response({error:'Invalid report period.'},400);
+    const project=(state:State)=>compact?compactWorkspace(visibleState(state,role),role,month,range):{data:visibleState(state,role)};
     await ensureRelationalFoundation();
     const db=database();
     if(role==='owner')await db.prepare('INSERT OR IGNORE INTO crm_workspaces (owner_id,data,version,updated_at) VALUES (?,?,0,?)').bind(ownerId,JSON.stringify(initialState()),new Date().toISOString()).run();
     const row=await db.prepare('SELECT data,version,updated_at FROM crm_workspaces WHERE owner_id = ?').bind(ownerId).first<{data:string;version:number;updated_at:string}>();
     if(!row)return response({error:'The shared workspace is not ready. Ask the owner to sign in first.'},404);
+    const versions=params.get('versions')==='1'&&!compact?await Promise.all([
+      roleCanViewSection(role,'Orders')?database().prepare('SELECT id,record_version FROM crm_rel_orders WHERE owner_id=?').bind(ownerId).all<{id:string;record_version:number}>():Promise.resolve({results:[]}),
+      roleCanViewSection(role,'Customers')?database().prepare('SELECT id,record_version FROM crm_rel_customers WHERE owner_id=?').bind(ownerId).all<{id:string;record_version:number}>():Promise.resolve({results:[]})
+    ]):null;
+    const recordVersions=versions?{orderVersions:Object.fromEntries(versions[0].results.map(o=>[o.id,Number(o.record_version)])),customerVersions:Object.fromEntries(versions[1].results.map(c=>[c.id,Number(c.record_version)]))}:{};
     const compatibility=()=>{
       const state=fixedBusinessName(stateSchema.parse(JSON.parse(row.data)));
       validateRelations(state,{skipOrderNumberUniqueness:true});
@@ -47,18 +57,18 @@ export async function GET(){
     if(cutover.enabled){
       try{
         const workspace=(await relationalCoreState(ownerId)).state;
-        return response({data:visibleState(workspace,role),version:row.version,role,userName:user.displayName,relationalCutover:true,recoveryMode:false,readSource:'relational'});
+        return response({...project(workspace),...recordVersions,version:row.version,role,userName:user.displayName,relationalCutover:true,recoveryMode:false,readSource:'relational'});
       }catch(relationalError){
         const incidentId=crypto.randomUUID();
         console.error('Relational workspace read failed; serving compatibility recovery snapshot',{incidentId,relationalError});
         return response({
-          data:visibleState(compatibility(),role),version:row.version,role,userName:user.displayName,relationalCutover:true,
+          ...project(compatibility()),...recordVersions,version:row.version,role,userName:user.displayName,relationalCutover:true,
           recoveryMode:true,readSource:'compatibility-recovery',incidentId,
           warning:'Relational records are temporarily unavailable. Showing the latest synchronized records in read-only recovery mode.'
         });
       }
     }
-    return response({data:visibleState(compatibility(),role),version:row.version,role,userName:user.displayName,relationalCutover:false,recoveryMode:false,readSource:'compatibility'});
+    return response({...project(compatibility()),...recordVersions,version:row.version,role,userName:user.displayName,relationalCutover:false,recoveryMode:false,readSource:'compatibility'});
   }catch(e){
     if(e instanceof AccessDenied)return response({error:e.message},403);
     console.error('Workspace read failed',e);

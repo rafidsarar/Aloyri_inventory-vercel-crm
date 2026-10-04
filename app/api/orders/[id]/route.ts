@@ -14,7 +14,7 @@ export async function GET(_request:Request,{params}:{params:Promise<{id:string}>
     if(!roleCanViewSection(role,'Orders'))return response({error:'You do not have access to orders.'},403);
     const {id}=await params;
     const result=await getOrderRecord(ownerId,id);
-    return result.order?response({order:orderRecordForRole(result.order,role),version:result.workspaceVersion}):response({error:'Order not found.'},404);
+    return result.order?response({order:orderRecordForRole(result.order,role),version:result.workspaceVersion,customers:result.customers||[]}):response({error:'Order not found.'},404);
   }catch(error){
     if(error instanceof AccessDenied)return response({error:error.message},403);
     console.error('Order read failed',error);
@@ -69,3 +69,4 @@ export async function DELETE(request:Request,{params}:{params:Promise<{id:string
     return response({error:message},500);
   }
 }
+
