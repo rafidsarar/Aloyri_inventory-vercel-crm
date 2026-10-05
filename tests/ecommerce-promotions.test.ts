@@ -79,6 +79,18 @@ test('rejects invalid, expired and ineligible codes',()=>{
   }),/PROMOTION_NOT_ELIGIBLE/);
 });
 
+test('supports a free-shipping-only promotion',()=>{
+  const quote=evaluatePromotionQuote({
+    promotions:[base({kind:'fixed',value:0,freeShipping:true})],
+    lines:[{productId:'cosrx',category:'Cleanser',qty:1,price:580}],
+    deliveryCharge:150,
+    now:new Date('2026-10-05T12:00:00.000Z')
+  });
+  assert.equal(quote.discount,0);
+  assert.equal(quote.shippingDiscount,150);
+  assert.equal(quote.total,580);
+});
+
 test('validates campaign configuration safely',()=>{
   assert.equal(ecommercePromotionInputSchema.parse({
     name:'Sunscreen Sale',
@@ -92,5 +104,17 @@ test('validates campaign configuration safely',()=>{
     name:'Broken percentage',
     kind:'percentage',
     value:120
+  }));
+  assert.doesNotThrow(()=>ecommercePromotionInputSchema.parse({
+    name:'Free delivery',
+    kind:'fixed',
+    value:0,
+    freeShipping:true
+  }));
+  assert.throws(()=>ecommercePromotionInputSchema.parse({
+    name:'No actual offer',
+    kind:'fixed',
+    value:0,
+    freeShipping:false
   }));
 });
