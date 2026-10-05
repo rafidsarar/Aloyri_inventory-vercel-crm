@@ -6,8 +6,7 @@ export E2E_TEST_MODE=1
 pnpm db:migrate
 node --experimental-strip-types scripts/e2e-seed.ts
 pnpm exec next build
-pnpm add --save-dev --lockfile=false @playwright/test@1.55.0
-pnpm exec playwright install chromium
-E2E_PRODUCTION_BUILD=1 pnpm exec playwright test
+pnpm add --save-dev --lockfile=false @playwright/test@1.55.0 @sparticuz/chromium@140.0.0
+E2E_SERVERLESS_CHROMIUM=1 E2E_PRODUCTION_BUILD=1 pnpm exec playwright test
 mkdir -p e2e-out
 printf '%s\n' 'PASS' > e2e-out/index.html
