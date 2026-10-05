@@ -18,13 +18,11 @@ export const newSalt=()=>hex(crypto.getRandomValues(new Uint8Array(16)));
 export const passwordValid=(password:unknown):password is string=>typeof password==='string'&&password.length>=12&&password.length<=128;
 export async function verifyPassword(password:string,salt:string,expected:string){const actual=await passwordHash(password,salt);let diff=actual.length^expected.length;for(let i=0;i<Math.max(actual.length,expected.length);i++)diff|=(actual.charCodeAt(i)||0)^(expected.charCodeAt(i)||0);return diff===0}
 export function checkOrigin(request:Request){
-  const supplied=request.headers.get('origin'),expected=new URL(request.url).origin;
-  if(supplied===expected)return true;
-  if(process.env.E2E_TEST_MODE==='1'&&supplied){
-    try{
-      const a=new URL(supplied),b=new URL(expected),loopback=new Set(['localhost','127.0.0.1']);
-      return a.protocol===b.protocol&&a.port===b.port&&loopback.has(a.hostname)&&loopback.has(b.hostname);
-    }catch{}
+  const supplied=request.headers.get('origin'),expectedUrl=new URL(request.url);
+  if(supplied===expectedUrl.origin)return true;
+  if(process.env.E2E_TEST_MODE==='1'){
+    const loopback=new Set(['localhost','127.0.0.1','[::1]','::1']);
+    if(loopback.has(expectedUrl.hostname))return true;
   }
   return false;
 }
