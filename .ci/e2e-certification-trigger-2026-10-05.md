@@ -5,3 +5,5 @@ This branch exists only to trigger the isolated CRM CI certification suite again
 Retry preview compute after resource provisioning failure.
 
 Retry after forcing Vercel basic fixed build machine.
+
+Deployment action fixed; run full isolated certification now.
