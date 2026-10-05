@@ -23,10 +23,12 @@ test('storefront order contract accepts operational fields only',()=>{
       notes:'Call before delivery'
     },
     items:[{productId:'cosrx',qty:2}],
+    promotionCode:'GLOW10',
     deliveryZone:'inside-dhaka',
     paymentMethod:'COD'
   });
   assert.equal(parsed.items[0].productId,'cosrx');
+  assert.equal(parsed.promotionCode,'GLOW10');
   assert.throws(()=>ecommerceOrderInputSchema.parse({
     externalOrderId:'checkout_12345678',
     customer:{name:'Website Customer',phone:'01712345678',address:'House 1, Road 2, Dhaka',district:'Dhaka',area:'Dhanmondi'},
