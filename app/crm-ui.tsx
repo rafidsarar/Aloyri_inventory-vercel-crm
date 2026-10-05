@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   ShoppingBag,
   Sun,
+  Tag,
   TrendingUp,
   Truck,
   Users,
@@ -166,6 +167,10 @@ export function Nav({view,onView,openOrders,onSettings,onPassword,onLogout,membe
       </div>
     </SidebarContent>
     <SidebarFooter>
+      {canManageBusinessSettings(role)&&
+        <SidebarMenuButton className="nav-button" onClick={()=>{window.location.href='/promotions'}}>
+          <Tag/><span>Promotions</span>
+        </SidebarMenuButton>}
       {canManageBusinessSettings(role)&&
         <SidebarMenuButton className="nav-button" onClick={onSettings}>
           <Settings/><span>Business settings</span>

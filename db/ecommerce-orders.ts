@@ -6,6 +6,7 @@ import {
   attemptImmediateCustomerNotifications,
   initialWebsiteNotificationStatements
 } from './customer-notifications.ts';
+import { quoteEcommercePromotion } from './ecommerce-promotions.ts';
 import {
   batchRemaining,
   customerSchema,
@@ -31,8 +32,12 @@ export type EcommerceOrderResponse={
   status:'New';
   payment:'COD';
   productsSubtotal:number;
+  discount:number;
+  shippingDiscount:number;
   deliveryCharge:number;
   total:number;
+  savings:number;
+  promotion:null|{id:string;name:string;code:string;badgeText:string};
   duplicate?:boolean;
 };
 
@@ -75,13 +80,14 @@ function allocateItems(state:State,requested:EcommerceOrderInput['items']){
   return items;
 }
 
-function orderNotes(input:EcommerceOrderInput){
+function orderNotes(input:EcommerceOrderInput,promotion?:{name:string;code:string}|null){
   const lines=[
     'Website order',
     'Delivery zone: '+(input.deliveryZone==='inside-dhaka'?'Inside Dhaka':'Outside Dhaka'),
     'Delivery address: '+input.customer.address,
     'Area: '+input.customer.area+', '+input.customer.district
   ];
+  if(promotion)lines.push('Promotion: '+promotion.name+(promotion.code?' · '+promotion.code:''));
   if(input.customer.landmark)lines.push('Landmark: '+input.customer.landmark);
   if(input.customer.notes)lines.push('Customer note: '+input.customer.notes);
   return lines.join('\n').slice(0,2000);
@@ -115,8 +121,15 @@ export async function createEcommerceOrder(input:{
   if(input.order.paymentMethod!=='COD')throw new Error('ONLINE_PAYMENT_NOT_READY');
   const phone=normalizeBangladeshPhone(input.order.customer.phone);
   if(!validBangladeshPhone(phone))throw new Error('INVALID_CUSTOMER_PHONE');
-  const deliveryCharge=ecommerceDeliveryCharge(input.order.deliveryZone);
+  const deliveryChargeBeforeDiscount=ecommerceDeliveryCharge(input.order.deliveryZone);
   const {row,state}=await ensureCustomerRecordApiReady(input.ownerId);
+  const promotionQuote=await quoteEcommercePromotion({
+    ownerId:input.ownerId,
+    state,
+    items:input.order.items,
+    deliveryCharge:deliveryChargeBeforeDiscount,
+    code:input.order.promotionCode
+  });
   const next=structuredClone(state);
 
   const existing=findCustomerByPhone(state,phone);
@@ -154,8 +167,8 @@ export async function createEcommerceOrder(input:{
     payment:'COD',
     status:'New',
     items,
-    discount:0,
-    deliveryCharge,
+    discount:promotionQuote.discount,
+    deliveryCharge:promotionQuote.deliveryCharge,
     courierCost:0,
     packaging:0,
     paymentFee:0,
@@ -163,14 +176,13 @@ export async function createEcommerceOrder(input:{
     settled:false,
     restocked:false,
     tracking:'',
-    notes:orderNotes(input.order)
+    notes:orderNotes(input.order,promotionQuote.promotion)
   });
   if(state.orders.some(candidate=>candidate.id===order.id))throw new Error('IDEMPOTENCY_CONFLICT');
   next.orders.unshift(order);
   validateWorkspaceChange(state,next);
 
   const productsSubtotal=rounded(order.items.reduce((sum,item)=>sum+item.qty*item.price,0));
-  const total=rounded(productsSubtotal+deliveryCharge);
   const response:EcommerceOrderResponse={
     orderId:order.id,
     orderNumber:order.number,
@@ -178,13 +190,43 @@ export async function createEcommerceOrder(input:{
     status:'New',
     payment:'COD',
     productsSubtotal,
-    deliveryCharge,
-    total
+    discount:promotionQuote.discount,
+    shippingDiscount:promotionQuote.shippingDiscount,
+    deliveryCharge:promotionQuote.deliveryCharge,
+    total:promotionQuote.total,
+    savings:promotionQuote.savings,
+    promotion:promotionQuote.promotion
+      ? {
+          id:promotionQuote.promotion.id,
+          name:promotionQuote.promotion.name,
+          code:promotionQuote.promotion.code,
+          badgeText:promotionQuote.promotion.badgeText
+        }
+      : null
   };
 
   const now=new Date().toISOString(),nextVersion=row.version+1,db=database();
   await ensureAuditTable();
   const statements:any[]=[];
+
+  if(promotionQuote.promotion){
+    const promotion=promotionQuote.promotion;
+    const redemptionId='promo-redemption-'+crypto.randomUUID();
+    const lockKey=input.ownerId+':'+promotion.id;
+    statements.push(
+      db.prepare('SELECT pg_advisory_xact_lock(hashtext(?))').bind(lockKey),
+      db.prepare(
+        "INSERT INTO crm_ecommerce_promotion_redemptions (owner_id,id,promotion_id,order_id,order_number,customer_phone,promotion_code,merchandise_discount,shipping_discount,created_at) "+
+        "SELECT ?,?,?,?,?,?,?,?,?,? FROM crm_ecommerce_promotions p WHERE p.owner_id=? AND p.id=? AND (p.usage_limit IS NULL OR (SELECT COUNT(*) FROM crm_ecommerce_promotion_redemptions r WHERE r.owner_id=p.owner_id AND r.promotion_id=p.id)<p.usage_limit) ON CONFLICT (owner_id,order_id) DO NOTHING"
+      ).bind(
+        input.ownerId,redemptionId,promotion.id,order.id,order.number,phone,promotion.code,
+        promotionQuote.discount,promotionQuote.shippingDiscount,now,input.ownerId,promotion.id
+      ),
+      db.prepare(
+        "SELECT CASE WHEN EXISTS (SELECT 1 FROM crm_ecommerce_promotion_redemptions WHERE owner_id=? AND order_id=? AND promotion_id=?) THEN 1 ELSE CAST('PROMOTION_LIMIT_REACHED' AS INTEGER) END"
+      ).bind(input.ownerId,order.id,promotion.id)
+    );
+  }
 
   if(existing){
     const version=await db.prepare('SELECT record_version FROM crm_rel_customers WHERE owner_id=? AND id=?')
