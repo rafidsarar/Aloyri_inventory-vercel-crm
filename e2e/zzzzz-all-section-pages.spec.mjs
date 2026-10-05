@@ -2,7 +2,7 @@ import { test,expect as baseExpect } from '@playwright/test';
 const expect=baseExpect.configure({timeout:20000});
 test.use({actionTimeout:30000});
 const date=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Dhaka',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
-async function session(browser,role){const context=await browser.newContext({baseURL:'http://localhost:3100'}),fixture=await (await context.request.get('/api/e2e/fixture?role=viewer')).json(),origin=fixture.requestOrigin;expect((await context.request.post('/api/auth/login',{headers:{Origin:origin},data:{email:`e2e-${role}@aloyri.test`,password:process.env.E2E_PASSWORD||'Aloyri-E2E-Password-2026!'}})).status()).toBe(200);return {context,request:context.request,origin};}
+async function session(browser,role){const context=await browser.newContext({baseURL:'http://127.0.0.1:3100'}),fixture=await (await context.request.get('/api/e2e/fixture?role=viewer')).json(),origin=fixture.requestOrigin;expect((await context.request.post('/api/auth/login',{headers:{Origin:origin},data:{email:`e2e-${role}@aloyri.test`,password:process.env.E2E_PASSWORD||'Aloyri-E2E-Password-2026!'}})).status()).toBe(200);return {context,request:context.request,origin};}
 test('all CRM operating lists use server pages, complete totals, safe cross-page actions and role restrictions',async({browser})=>{
  test.setTimeout(300000);const owner=await session(browser,'owner'),put=(path,data)=>owner.request.put(path,{headers:{Origin:owner.origin},data});
  const inventory=await (await owner.request.get('/api/inventory-suppliers')).json(),template=inventory.data.products[0];
