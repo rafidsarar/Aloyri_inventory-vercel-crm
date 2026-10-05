@@ -1,4 +1,5 @@
 import { database } from './raw.ts';
+import { catalogPromotionMap } from './ecommerce-promotions.ts';
 import {
   fixedBusinessName,
   stateSchema,
@@ -18,11 +19,14 @@ export type PublicCatalogProduct={
   price:number;
   active:boolean;
   availableStock:number;
+  salePrice?:number;
+  promotionBadge?:string;
 };
 
 export function publicCatalogProduct(
   product:Pick<Product,'id'|'name'|'brand'|'size'|'category'|'price'|'active'>,
-  availableStock:number
+  availableStock:number,
+  promotion?:{salePrice:number;badgeText:string}|null
 ):PublicCatalogProduct{
   return {
     id:product.id,
@@ -32,7 +36,10 @@ export function publicCatalogProduct(
     category:product.category,
     price:product.price,
     active:product.active,
-    availableStock:Math.max(0,Math.floor(availableStock))
+    availableStock:Math.max(0,Math.floor(availableStock)),
+    ...(promotion&&promotion.salePrice<product.price
+      ? {salePrice:promotion.salePrice,promotionBadge:promotion.badgeText}
+      : {})
   };
 }
 
@@ -45,8 +52,13 @@ export async function readEcommerceCatalog(ownerId:string){
   const state=fixedBusinessName(stateSchema.parse(JSON.parse(row.data)));
   validateRelations(state,{skipOrderNumberUniqueness:true});
 
+  const promotionMap=await catalogPromotionMap(ownerId,state);
   const products=state.products.map(product=>
-    publicCatalogProduct(product,stockPosition(state,product.id).available)
+    publicCatalogProduct(
+      product,
+      stockPosition(state,product.id).available,
+      promotionMap.get(product.id)
+    )
   );
 
   return {
