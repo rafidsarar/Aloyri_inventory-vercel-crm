@@ -6,7 +6,7 @@
       "fix/*": false
     }
   },
-  "buildCommand": "pnpm db:migrate && pnpm build",
+  "buildCommand": "pnpm db:migrate && node --experimental-strip-types scripts/e2e-seed.ts && pnpm build",
   "crons": [
     {
       "path": "/api/internal/notifications/process",
