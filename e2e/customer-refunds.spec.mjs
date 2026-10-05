@@ -1,7 +1,7 @@
 import { test,expect } from '@playwright/test';
 const date=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Dhaka',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 async function session(browser,role){
- const context=await browser.newContext({baseURL:'http://localhost:3100'});
+ const context=await browser.newContext({baseURL:'http://127.0.0.1:3100'});
  const fixture=await (await context.request.get('/api/e2e/fixture?role=viewer')).json();
  const origin=fixture.requestOrigin;
  const login=await context.request.post('/api/auth/login',{headers:{Origin:origin},data:{email:`e2e-${role}@aloyri.test`,password:process.env.E2E_PASSWORD||'Aloyri-E2E-Password-2026!'}});expect(login.status()).toBe(200);
