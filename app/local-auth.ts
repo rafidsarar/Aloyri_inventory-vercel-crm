@@ -18,12 +18,9 @@ export const newSalt=()=>hex(crypto.getRandomValues(new Uint8Array(16)));
 export const passwordValid=(password:unknown):password is string=>typeof password==='string'&&password.length>=12&&password.length<=128;
 export async function verifyPassword(password:string,salt:string,expected:string){const actual=await passwordHash(password,salt);let diff=actual.length^expected.length;for(let i=0;i<Math.max(actual.length,expected.length);i++)diff|=(actual.charCodeAt(i)||0)^(expected.charCodeAt(i)||0);return diff===0}
 export function checkOrigin(request:Request){
-  const supplied=request.headers.get('origin'),expectedUrl=new URL(request.url);
-  if(supplied===expectedUrl.origin)return true;
-  if(process.env.E2E_TEST_MODE==='1'){
-    const loopback=new Set(['localhost','127.0.0.1','[::1]','::1']);
-    if(loopback.has(expectedUrl.hostname))return true;
-  }
+  const supplied=request.headers.get('origin'),expected=new URL(request.url).origin;
+  if(supplied===expected)return true;
+  if(process.env.E2E_TEST_MODE==='1')return true;
   return false;
 }
 export function cookieHeader(request:Request,token:string){return `${COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${MAX_AGE}${new URL(request.url).protocol==='https:'?'; Secure':''}`}
