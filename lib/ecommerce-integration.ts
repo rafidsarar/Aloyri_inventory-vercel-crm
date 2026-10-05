@@ -20,6 +20,7 @@ export const ecommerceOrderInputSchema=z.object({
     productId:z.string().trim().min(1).max(100),
     qty:z.number().int().min(1).max(100)
   }).strict()).min(1).max(50),
+  promotionCode:z.string().trim().max(40).regex(/^[A-Za-z0-9_-]*$/).optional().default(''),
   deliveryZone:z.enum(['inside-dhaka','outside-dhaka']),
   paymentMethod:z.enum(['COD','bKash','Nagad'])
 }).strict();
