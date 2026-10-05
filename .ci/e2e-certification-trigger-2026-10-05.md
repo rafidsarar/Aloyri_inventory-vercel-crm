@@ -15,3 +15,5 @@ Restored Vercel build machine selection to elastic; retry certification.
 Runner database connected; execute full isolated certification.
 
 Trigger seed probe.
+
+Reauthorized runner; execute authenticated seed probe.
