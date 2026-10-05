@@ -6,7 +6,7 @@
       "fix/*": false
     }
   },
-  "buildCommand": "bash scripts/e2e-certification.sh seed-probe",
+  "buildCommand": "pnpm db:migrate && pnpm build",
   "crons": [
     {
       "path": "/api/internal/notifications/process",
