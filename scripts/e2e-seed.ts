@@ -30,7 +30,14 @@ state.batches=[{
 state.accountOpenings=[{account:'cash',date:shiftDate(-90),balance:10000}];
 validateRelations(state,{skipOrderNumberUniqueness:true});
 
+if(process.env.E2E_TEST_MODE!=='1'||!process.env.E2E_DATABASE_URL||process.env.DATABASE_URL!==process.env.E2E_DATABASE_URL)
+  throw new Error('Refusing destructive E2E reset outside the isolated test database.');
+
 const db=database(),now=new Date().toISOString();
+const disposableTables=await db.prepare("SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename LIKE 'crm_%' AND tablename<>'crm_schema_migrations' ORDER BY tablename").all<{tablename:string}>();
+const tableNames=disposableTables.results.map(row=>row.tablename).filter(name=>/^crm_[a-z0-9_]+$/.test(name));
+if(tableNames.length)await db.prepare('TRUNCATE TABLE '+tableNames.map(name=>`"${name}"`).join(', ')+' CASCADE').run();
+
 await db.prepare('DELETE FROM crm_sessions WHERE user_id IN (SELECT id FROM crm_users WHERE owner_id=?)').bind(ownerId).run();
 await db.prepare('DELETE FROM crm_invites WHERE user_id IN (SELECT id FROM crm_users WHERE owner_id=?)').bind(ownerId).run();
 await db.prepare('DELETE FROM crm_users WHERE owner_id=?').bind(ownerId).run();
