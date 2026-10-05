@@ -17,12 +17,7 @@ export async function passwordHash(password:string,salt:string){
 export const newSalt=()=>hex(crypto.getRandomValues(new Uint8Array(16)));
 export const passwordValid=(password:unknown):password is string=>typeof password==='string'&&password.length>=12&&password.length<=128;
 export async function verifyPassword(password:string,salt:string,expected:string){const actual=await passwordHash(password,salt);let diff=actual.length^expected.length;for(let i=0;i<Math.max(actual.length,expected.length);i++)diff|=(actual.charCodeAt(i)||0)^(expected.charCodeAt(i)||0);return diff===0}
-export function checkOrigin(request:Request){
-  const supplied=request.headers.get('origin'),expected=new URL(request.url).origin;
-  if(supplied===expected)return true;
-  if(process.env.E2E_TEST_MODE==='1')return true;
-  return false;
-}
+export function checkOrigin(request:Request){return request.headers.get('origin')===new URL(request.url).origin}
 export function cookieHeader(request:Request,token:string){return `${COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${MAX_AGE}${new URL(request.url).protocol==='https:'?'; Secure':''}`}
 export function clearCookie(request:Request){return `${COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${new URL(request.url).protocol==='https:'?'; Secure':''}`}
 function cookieValue(cookie:string|null){return cookie?.split(';').map(x=>x.trim()).find(x=>x.startsWith(COOKIE+'='))?.slice(COOKIE.length+1)||''}
