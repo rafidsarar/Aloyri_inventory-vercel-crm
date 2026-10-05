@@ -302,7 +302,7 @@ export default function PromotionsClient({memberName}:{memberName:string}){
 
             <div className="grid grid-cols-2 gap-3">
               <label><span className={label}>Discount type</span><select className={input} value={form.kind} onChange={e=>setField('kind',e.target.value as FormState['kind'])}><option value="percentage">Percentage</option><option value="fixed">Fixed BDT</option></select></label>
-              <label><span className={label}>{form.kind==='percentage'?'Percent':'Amount'}</span><input className={input} type="number" min="0.01" step="0.01" max={form.kind==='percentage'?100:1000000} value={form.value} onChange={e=>setField('value',e.target.value)} required/></label>
+              <label><span className={label}>{form.kind==='percentage'?'Percent':'Amount'}</span><input className={input} type="number" min="0" step="0.01" max={form.kind==='percentage'?100:1000000} value={form.value} onChange={e=>setField('value',e.target.value)} required/></label>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
