@@ -11,6 +11,61 @@ import {
   type PromotionLine
 } from '../lib/ecommerce-promotions.ts';
 
+let promotionsSchemaReady=false;
+
+async function ensureEcommercePromotionsSchema(){
+  if(promotionsSchemaReady)return;
+  const db=database();
+  await db.batch([
+    db.prepare(`CREATE TABLE IF NOT EXISTS crm_ecommerce_promotions (
+      owner_id TEXT NOT NULL,
+      id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      code TEXT,
+      description TEXT NOT NULL DEFAULT '',
+      kind TEXT NOT NULL,
+      value NUMERIC NOT NULL,
+      minimum_subtotal NUMERIC NOT NULL DEFAULT 0,
+      starts_at TEXT,
+      ends_at TEXT,
+      usage_limit INTEGER,
+      target_type TEXT NOT NULL DEFAULT 'all',
+      target_ids_json TEXT NOT NULL DEFAULT '[]',
+      free_shipping BOOLEAN NOT NULL DEFAULT FALSE,
+      badge_text TEXT NOT NULL DEFAULT '',
+      priority INTEGER NOT NULL DEFAULT 0,
+      active BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY(owner_id,id),
+      UNIQUE(owner_id,code),
+      CHECK(kind IN ('percentage','fixed')),
+      CHECK(target_type IN ('all','products','categories')),
+      CHECK(value>=0),
+      CHECK(value>0 OR free_shipping=TRUE),
+      CHECK(minimum_subtotal>=0),
+      CHECK(usage_limit IS NULL OR usage_limit>0)
+    )`),
+    db.prepare('CREATE INDEX IF NOT EXISTS crm_ecommerce_promotions_owner_active_idx ON crm_ecommerce_promotions(owner_id,active,priority DESC,updated_at DESC)'),
+    db.prepare(`CREATE TABLE IF NOT EXISTS crm_ecommerce_promotion_redemptions (
+      owner_id TEXT NOT NULL,
+      id TEXT NOT NULL,
+      promotion_id TEXT NOT NULL,
+      order_id TEXT NOT NULL,
+      order_number TEXT NOT NULL,
+      customer_phone TEXT NOT NULL,
+      promotion_code TEXT NOT NULL DEFAULT '',
+      merchandise_discount NUMERIC NOT NULL DEFAULT 0,
+      shipping_discount NUMERIC NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY(owner_id,id),
+      UNIQUE(owner_id,order_id)
+    )`),
+    db.prepare('CREATE INDEX IF NOT EXISTS crm_ecommerce_promo_redemptions_promotion_idx ON crm_ecommerce_promotion_redemptions(owner_id,promotion_id,created_at DESC)')
+  ]);
+  promotionsSchemaReady=true;
+}
+
 type PromotionRow={
   id:string;
   name:string;
@@ -63,6 +118,7 @@ function rowToPromotion(row:PromotionRow):EcommercePromotion{
 }
 
 export async function listEcommercePromotions(ownerId:string,includeInactive=true){
+  await ensureEcommercePromotionsSchema();
   const where=includeInactive?'':' AND p.active=TRUE';
   const rows=await database().prepare(
     `SELECT p.*,
@@ -97,6 +153,7 @@ export async function listPromotionCatalogOptions(ownerId:string){
 }
 
 export async function createEcommercePromotion(ownerId:string,input:unknown){
+  await ensureEcommercePromotionsSchema();
   const promotion=ecommercePromotionInputSchema.parse(input);
   const now=new Date().toISOString();
   const id='promo-'+crypto.randomUUID();
@@ -119,6 +176,7 @@ export async function createEcommercePromotion(ownerId:string,input:unknown){
 }
 
 export async function updateEcommercePromotion(ownerId:string,id:string,input:unknown){
+  await ensureEcommercePromotionsSchema();
   const promotion=ecommercePromotionInputSchema.parse(input);
   const code=normalizePromotionCode(promotion.code);
   const targetIds=[...new Set(promotion.targetIds)];
@@ -141,6 +199,7 @@ export async function updateEcommercePromotion(ownerId:string,id:string,input:un
 }
 
 export async function deleteEcommercePromotion(ownerId:string,id:string){
+  await ensureEcommercePromotionsSchema();
   const used=await database().prepare(
     'SELECT COUNT(*) AS n FROM crm_ecommerce_promotion_redemptions WHERE owner_id=? AND promotion_id=?'
   ).bind(ownerId,id).first<{n:number|string}>();
