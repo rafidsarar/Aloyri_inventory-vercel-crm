@@ -6,7 +6,7 @@ if(useServerlessChromium){
   const {default:serverlessChromium}=await import('@sparticuz/chromium');
   launchOptions={
     executablePath:await serverlessChromium.executablePath(),
-    args:serverlessChromium.args,
+    args:serverlessChromium.args.filter(arg=>arg!=='--single-process'),
   };
 }
 
@@ -15,7 +15,7 @@ export default defineConfig({
   testIgnore:['**/live-production-usability.spec.mjs'],
   fullyParallel:false,
   retries:0,
-  timeout:120000,
+  timeout:process.env.E2E_SERVERLESS_CHROMIUM==='1'?300000:120000,
   workers:1,
   reporter:'line',
   use:{
