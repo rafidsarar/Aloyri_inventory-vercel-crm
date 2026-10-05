@@ -71,6 +71,12 @@ export async function POST(request:Request){
       return response({error:'Online payment verification is not enabled yet. Choose Cash on Delivery.',code:'ONLINE_PAYMENT_NOT_READY'},409);
     if(message==='INVALID_CUSTOMER_PHONE')
       return response({error:'Enter a valid Bangladesh mobile number.',code:'INVALID_CUSTOMER_PHONE'},400);
+    if(message==='PROMOTION_CODE_INVALID')
+      return response({error:'That promotion code is not recognized.',code:'PROMOTION_CODE_INVALID'},400);
+    if(message==='PROMOTION_NOT_AVAILABLE'||message.includes('PROMOTION_LIMIT_REACHED'))
+      return response({error:'That promotion is no longer available.',code:'PROMOTION_NOT_AVAILABLE'},409);
+    if(message==='PROMOTION_NOT_ELIGIBLE')
+      return response({error:'This order does not meet the promotion requirements.',code:'PROMOTION_NOT_ELIGIBLE'},409);
     if(message==='DELIVERY_RATE_NOT_CONFIGURED')
       return response({error:'Delivery pricing is not configured yet.',code:'ORDERING_NOT_CONFIGURED'},503);
     if(message==='ECOMMERCE_WORKSPACE_NOT_CONFIGURED'||message==='INTEGRATION_NOT_CONFIGURED')
