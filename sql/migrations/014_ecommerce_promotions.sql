@@ -22,7 +22,8 @@ CREATE TABLE IF NOT EXISTS crm_ecommerce_promotions (
   UNIQUE(owner_id,code),
   CHECK(kind IN ('percentage','fixed')),
   CHECK(target_type IN ('all','products','categories')),
-  CHECK(value>0),
+  CHECK(value>=0),
+  CHECK(value>0 OR free_shipping=TRUE),
   CHECK(minimum_subtotal>=0),
   CHECK(usage_limit IS NULL OR usage_limit>0)
 );
