@@ -6,7 +6,7 @@
       "fix/*": false
     }
   },
-  "buildCommand": "pnpm db:migrate && node --experimental-strip-types scripts/e2e-seed.ts && pnpm add --save-dev --lockfile=false @playwright/test@1.55.0 && pnpm build && pnpm exec playwright install chromium && E2E_PRODUCTION_BUILD=1 pnpm exec playwright test",
+  "buildCommand": "export DATABASE_URL=\"$E2E_DATABASE_URL\" && pnpm db:migrate && node --experimental-strip-types scripts/e2e-seed.ts && pnpm add --save-dev --lockfile=false @playwright/test@1.55.0 && pnpm build && pnpm exec playwright install chromium && E2E_PRODUCTION_BUILD=1 pnpm exec playwright test",
   "crons": [
     {
       "path": "/api/internal/notifications/process",
