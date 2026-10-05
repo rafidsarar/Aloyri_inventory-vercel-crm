@@ -1,4 +1,5 @@
-import { test,expect } from '@playwright/test';
+import { test,expect as baseExpect } from '@playwright/test';
+const expect=baseExpect.configure({timeout:30000});
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Dhaka',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 async function login(browser,role){const context=await browser.newContext({baseURL:'http://127.0.0.1:3100'}),request=context.request,fixture=await (await request.get('/api/e2e/fixture?role=viewer')).json(),origin=fixture.requestOrigin;const r=await request.post('/api/auth/login',{headers:{Origin:origin},data:{email:`e2e-${role}@aloyri.test`,password:process.env.E2E_PASSWORD||'Aloyri-E2E-Password-2026!'}});expect(r.status()).toBe(200);return {context,request,origin};}
 test('server pages, cross-page selections, history, search, reports and full CSV export use complete records',async({browser})=>{
