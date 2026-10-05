@@ -17,3 +17,5 @@ Runner database connected; execute full isolated certification.
 Trigger seed probe.
 
 Reauthorized runner; execute authenticated seed probe.
+
+Preview deployments re-enabled; trigger seed probe again.
