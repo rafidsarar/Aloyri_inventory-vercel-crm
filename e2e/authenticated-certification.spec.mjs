@@ -1,6 +1,6 @@
 import { test,expect } from '@playwright/test';
 
-const BASE='http://localhost:3100';
+const BASE='http://127.0.0.1:3100';
 const PASSWORD=process.env.E2E_PASSWORD||'Aloyri-E2E-Password-2026!';
 const roles=['owner','admin','sales','inventory','finance','viewer'];
 const email=role=>`e2e-${role}@aloyri.test`;
