@@ -11,3 +11,5 @@ Deployment action fixed; run full isolated certification now.
 Storage connection removed; retry isolated certification deployment.
 
 Restored Vercel build machine selection to elastic; retry certification.
+
+Runner database connected; execute full isolated certification.
