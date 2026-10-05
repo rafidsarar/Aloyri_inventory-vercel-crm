@@ -5,7 +5,7 @@ export const ecommercePromotionInputSchema=z.object({
   code:z.string().trim().max(40).regex(/^[A-Za-z0-9_-]*$/).optional().default(''),
   description:z.string().trim().max(500).optional().default(''),
   kind:z.enum(['percentage','fixed']),
-  value:z.number().positive().max(1000000),
+  value:z.number().min(0).max(1000000),
   minimumSubtotal:z.number().min(0).max(10000000).optional().default(0),
   startsAt:z.string().trim().max(40).optional().default(''),
   endsAt:z.string().trim().max(40).optional().default(''),
@@ -19,6 +19,8 @@ export const ecommercePromotionInputSchema=z.object({
 }).strict().superRefine((promotion,ctx)=>{
   if(promotion.kind==='percentage'&&promotion.value>100)
     ctx.addIssue({code:z.ZodIssueCode.custom,path:['value'],message:'Percentage discount cannot exceed 100%.'});
+  if(promotion.value<=0&&!promotion.freeShipping)
+    ctx.addIssue({code:z.ZodIssueCode.custom,path:['value'],message:'Enter a discount value or enable free shipping.'});
   if(promotion.startsAt&&Number.isNaN(Date.parse(promotion.startsAt)))
     ctx.addIssue({code:z.ZodIssueCode.custom,path:['startsAt'],message:'Start date is invalid.'});
   if(promotion.endsAt&&Number.isNaN(Date.parse(promotion.endsAt)))
