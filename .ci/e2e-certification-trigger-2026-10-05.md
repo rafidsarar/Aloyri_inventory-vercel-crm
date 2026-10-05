@@ -9,3 +9,5 @@ Retry after forcing Vercel basic fixed build machine.
 Deployment action fixed; run full isolated certification now.
 
 Storage connection removed; retry isolated certification deployment.
+
+Restored Vercel build machine selection to elastic; retry certification.
