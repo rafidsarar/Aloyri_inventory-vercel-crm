@@ -6,7 +6,7 @@
       "fix/*": false
     }
   },
-  "buildCommand": "bash scripts/e2e-certification.sh",
+  "buildCommand": "bash scripts/e2e-certification.sh seed-probe",
   "crons": [
     {
       "path": "/api/internal/notifications/process",
