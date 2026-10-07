@@ -60,7 +60,7 @@ export async function ecommerceLifecycleStatusChangeStatements(
   after:Order,
   now:string
 ){
-  if(!deliveryTransition(before,after))return [];
+  if(!enabled()||!deliveryTransition(before,after))return [];
   await ensureEcommerceLifecycleOutbox();
   const db=database(),id=crypto.randomUUID();
   return [
