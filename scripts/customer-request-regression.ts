@@ -7,7 +7,7 @@ if(process.env.E2E_LOCAL_POSTGRES!=='1'||!/^postgres(?:ql)?:\/\/(?:[^@]+@)?(?:lo
 const db=database(),ownerId='customer-request-regression';
 const state=initialState();
 state.customers=[{id:'request-customer',name:'Fixture',phone:'01712345678',address:'Fixture',city:'Dhaka',preference:'Website',notes:'',consent:false,created:'2026-10-08'}];
-state.orders=[{id:'request-order',number:'WEB-20261008-REQUEST',customerId:'request-customer',created:'2026-10-08',collections:[],channel:'Website',payment:'COD',status:'New',items:[{productId:state.products[0].id,qty:1,price:500,allocations:[{batchId:state.batches[0].id,qty:1,unitCost:400}]}],discount:0,deliveryCharge:80,courierCost:0,packaging:0,paymentFee:0,returnFee:0,settled:false,restocked:false,tracking:'',notes:''}];
+state.orders=[{id:'request-order',number:'WEB-20261008-REQUEST',customerId:'request-customer',created:'2026-10-08',collections:[],channel:'Website',payment:'COD',status:'New',items:[{productId:state.products[0].id,qty:1,price:500,allocations:[{batchId:'request-fixture-batch',qty:1,unitCost:400}]}],discount:0,deliveryCharge:80,courierCost:0,packaging:0,paymentFee:0,returnFee:0,settled:false,restocked:false,tracking:'',notes:''}];
 stateSchema.parse(state);
 await db.prepare('INSERT INTO crm_workspaces(owner_id,data,version,updated_at) VALUES (?,?,0,?)').bind(ownerId,JSON.stringify(state),new Date().toISOString()).run();
 const input={ownerId,orderNumber:state.orders[0].number,phone:'01712345678',reason:'Changed mind',condition:'Not received',preferredResolution:'Other',note:'Cancellation requested',items:[{line:0,qty:1}]};
