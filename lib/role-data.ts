@@ -58,7 +58,7 @@ export function validateRoleRelations(state:State,role:WorkspaceRole){
  * Reject missing, duplicate, added, or changed posted entries, including for the owner.
  * Workflows that legitimately post new entries use dedicated validated endpoints.
  */
-export function samePostedRecords<A extends {id:string},B extends {id:string}>(stored:readonly A[],submitted:readonly B[]):boolean {
+export function samePostedRecords(stored:readonly {id:string}[],submitted:readonly {id:string}[]):boolean {
   if(stored.length!==submitted.length)return false;
   const byId=new Map(stored.map(record=>[record.id,JSON.stringify(record)]));
   if(byId.size!==stored.length)return false;
