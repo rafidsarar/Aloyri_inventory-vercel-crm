@@ -47,8 +47,8 @@ test('six-role return inspection and settlement authorization survives reordered
       const advanced=await api(owner,'POST','/api/orders/bulk-advance',{
         orders:ids.map(id=>({id,recordVersion:versions[id]}))
       });
-      expect(advanced.status(),'fulfillment stage '+step+': '+await advanced.text()).toBe(200);
       const payload=await advanced.json();
+      expect(advanced.status(),'fulfillment stage '+step+': '+JSON.stringify(payload)).toBe(200);
       expect(payload.results.every(row=>row.ok),'all seeded orders advance').toBe(true);
       versions={...versions,...payload.recordVersions};
     }
