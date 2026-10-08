@@ -15,6 +15,7 @@ export const dynamic='force-dynamic';
 const PATH='/api/integrations/ecommerce/return-requests';
 
 const inputSchema=z.object({
+  requestType:z.enum(['return','cancellation']).default('return'),
   orderNumber:z.string().trim().min(8).max(100),
   phone:z.string().trim().min(10).max(30),
   reason:z.enum(returnReasons),
@@ -74,7 +75,7 @@ export async function POST(request:Request){
       return response({error:'Check the order number and mobile number and try again.',code:'RETURN_ORDER_NOT_FOUND'},404);
     }
     if(message==='RETURN_ORDER_NOT_ELIGIBLE'){
-      return response({error:'This order is not currently eligible for a return request.',code:'RETURN_ORDER_NOT_ELIGIBLE'},409);
+      return response({error:'This order is not currently eligible for this request.',code:'RETURN_ORDER_NOT_ELIGIBLE'},409);
     }
     if(message==='INVALID_RETURN_ITEMS'||message==='INVALID_RETURN_REQUEST'){
       return response({error:'Check the selected products and return details.',code:'INVALID_RETURN_REQUEST'},400);

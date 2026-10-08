@@ -43,6 +43,7 @@ export type ReturnRequestRecord={
   orderId:string;
   orderNumber:string;
   requestStatus:ReturnRequestStatus;
+  requestType:'return'|'cancellation';
   reason:string;
   condition:string;
   preferredResolution:string;
@@ -60,6 +61,7 @@ type DbRow={
   order_id:string;
   order_number:string;
   request_status:string;
+  request_type:'return'|'cancellation';
   reason:string;
   condition:string;
   preferred_resolution:string;
@@ -115,6 +117,7 @@ function mapRow(row:DbRow):ReturnRequestRecord{
     orderId:row.order_id,
     orderNumber:row.order_number,
     requestStatus:row.request_status as ReturnRequestStatus,
+    requestType:row.request_type,
     reason:row.reason,
     condition:row.condition,
     preferredResolution:row.preferred_resolution,
@@ -127,8 +130,14 @@ function mapRow(row:DbRow):ReturnRequestRecord{
   };
 }
 
+export function assertCustomerRequestEligibility(status:Order['status'],requestType:'return'|'cancellation'){
+  const allowed=requestType==='cancellation'?['New','Confirmed']:['Delivered','Returned'];
+  if(!allowed.includes(status))throw new Error('RETURN_ORDER_NOT_ELIGIBLE');
+}
+
 export async function createEcommerceReturnRequest(input:{
   ownerId:string;
+  requestType?:'return'|'cancellation';
   orderNumber:string;
   phone:string;
   reason:string;
@@ -140,7 +149,8 @@ export async function createEcommerceReturnRequest(input:{
   const state=await readState(input.ownerId);
   const order=matchedWebsiteOrder(state,input.orderNumber,input.phone);
   if(!order)throw new Error('RETURN_ORDER_NOT_FOUND');
-  if(!['Delivered','Returned'].includes(order.status))throw new Error('RETURN_ORDER_NOT_ELIGIBLE');
+  const requestType=input.requestType||'return';
+  assertCustomerRequestEligibility(order.status,requestType);
   if(!returnReasons.includes(input.reason as any) ||
      !returnConditions.includes(input.condition as any) ||
      !returnResolutions.includes(input.preferredResolution as any)){
@@ -155,33 +165,30 @@ export async function createEcommerceReturnRequest(input:{
 
   const db=database();
   const existing=await db.prepare(
-    'SELECT id,order_id,order_number,request_status,reason,condition,preferred_resolution,customer_note,items_json,staff_note,created_at,updated_at,resolved_at FROM crm_ecommerce_return_requests WHERE owner_id=? AND order_id=?'
-  ).bind(input.ownerId,order.id).first<DbRow>();
+    'SELECT id,order_id,order_number,request_status,request_type,reason,condition,preferred_resolution,customer_note,items_json,staff_note,created_at,updated_at,resolved_at FROM crm_ecommerce_return_requests WHERE owner_id=? AND order_id=? AND request_type=?'
+  ).bind(input.ownerId,order.id,requestType).first<DbRow>();
   if(existing)return {duplicate:true,request:mapRow(existing)};
 
   const now=new Date().toISOString(),id=crypto.randomUUID();
   await db.prepare(
     'INSERT INTO crm_ecommerce_return_requests '+
-    '(id,owner_id,order_id,order_number,request_status,reason,condition,preferred_resolution,customer_note,items_json,staff_note,created_at,updated_at,resolved_at) '+
-    'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+    '(id,owner_id,order_id,order_number,request_status,request_type,reason,condition,preferred_resolution,customer_note,items_json,staff_note,created_at,updated_at,resolved_at) '+
+    'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (owner_id,order_id,request_type) DO NOTHING'
   ).bind(
-    id,input.ownerId,order.id,order.number,'Requested',input.reason,input.condition,
+    id,input.ownerId,order.id,order.number,'Requested',requestType,input.reason,input.condition,
     input.preferredResolution,input.note.trim(),JSON.stringify(items),'',now,now,null
   ).run();
 
-  return {
-    duplicate:false,
-    request:{
-      id,orderId:order.id,orderNumber:order.number,requestStatus:'Requested' as const,
-      reason:input.reason,condition:input.condition,preferredResolution:input.preferredResolution,
-      customerNote:input.note.trim(),items,staffNote:'',createdAt:now,updatedAt:now,resolvedAt:''
-    }
-  };
+  const saved=await db.prepare(
+    'SELECT id,order_id,order_number,request_status,request_type,reason,condition,preferred_resolution,customer_note,items_json,staff_note,created_at,updated_at,resolved_at FROM crm_ecommerce_return_requests WHERE owner_id=? AND order_id=? AND request_type=?'
+  ).bind(input.ownerId,order.id,requestType).first<DbRow>();
+  if(!saved)throw new Error('RETURN_REQUEST_SAVE_FAILED');
+  return {duplicate:saved.id!==id,request:mapRow(saved)};
 }
 
 export async function listEcommerceReturnRequests(ownerId:string){
   const rows=await database().prepare(
-    'SELECT id,order_id,order_number,request_status,reason,condition,preferred_resolution,customer_note,items_json,staff_note,created_at,updated_at,resolved_at '+
+    'SELECT id,order_id,order_number,request_status,request_type,reason,condition,preferred_resolution,customer_note,items_json,staff_note,created_at,updated_at,resolved_at '+
     'FROM crm_ecommerce_return_requests WHERE owner_id=? ORDER BY '+
     "CASE request_status WHEN 'Requested' THEN 0 WHEN 'Reviewing' THEN 1 WHEN 'Approved' THEN 2 WHEN 'Rejected' THEN 3 WHEN 'Resolved' THEN 4 ELSE 9 END, created_at DESC"
   ).bind(ownerId).all<DbRow>();
@@ -198,14 +205,14 @@ export async function updateEcommerceReturnRequest(
   if(input.staffNote.length>2000)throw new Error('INVALID_RETURN_REQUEST_NOTE');
   const db=database(),now=new Date().toISOString();
   const before=await db.prepare(
-    'SELECT id,order_id,order_number,request_status,reason,condition,preferred_resolution,customer_note,items_json,staff_note,created_at,updated_at,resolved_at FROM crm_ecommerce_return_requests WHERE owner_id=? AND id=?'
+    'SELECT id,order_id,order_number,request_status,request_type,reason,condition,preferred_resolution,customer_note,items_json,staff_note,created_at,updated_at,resolved_at FROM crm_ecommerce_return_requests WHERE owner_id=? AND id=?'
   ).bind(ownerId,id).first<DbRow>();
   if(!before)throw new Error('RETURN_REQUEST_NOT_FOUND');
 
   const resolved=['Rejected','Resolved'].includes(input.status)?now:null;
   const updated=await db.prepare(
     'UPDATE crm_ecommerce_return_requests SET request_status=?,staff_note=?,updated_at=?,resolved_at=? WHERE owner_id=? AND id=? '+
-    'RETURNING id,order_id,order_number,request_status,reason,condition,preferred_resolution,customer_note,items_json,staff_note,created_at,updated_at,resolved_at'
+    'RETURNING id,order_id,order_number,request_status,request_type,reason,condition,preferred_resolution,customer_note,items_json,staff_note,created_at,updated_at,resolved_at'
   ).bind(input.status,input.staffNote.trim(),now,resolved,ownerId,id).first<DbRow>();
   if(!updated)throw new Error('RETURN_REQUEST_NOT_FOUND');
 

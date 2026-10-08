@@ -54,3 +54,14 @@ test('return workflow remains separate from refund and restock decisions',()=>{
   });
   assert.equal(after,before);
 });
+
+import { assertCustomerRequestEligibility } from '../db/ecommerce-return-requests.ts';
+
+test('cancellation requests are accepted only before fulfillment',()=>{
+  for(const status of ['New','Confirmed'] as const)assert.doesNotThrow(()=>assertCustomerRequestEligibility(status,'cancellation'));
+  for(const status of ['Packed','Shipped','Delivered','Cancelled'] as const)assert.throws(()=>assertCustomerRequestEligibility(status,'cancellation'),/RETURN_ORDER_NOT_ELIGIBLE/);
+});
+test('return requests still require delivery or a recorded return',()=>{
+  for(const status of ['Delivered','Returned'] as const)assert.doesNotThrow(()=>assertCustomerRequestEligibility(status,'return'));
+  for(const status of ['New','Confirmed','Packed','Cancelled'] as const)assert.throws(()=>assertCustomerRequestEligibility(status,'return'),/RETURN_ORDER_NOT_ELIGIBLE/);
+});
