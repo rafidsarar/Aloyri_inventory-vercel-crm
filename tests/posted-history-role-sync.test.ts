@@ -46,7 +46,7 @@ test('all six roles can submit their untouched, role-projected workspace',()=>{
 
 test('reordered posted ledgers are never mistaken for staff permission changes',()=>{
   for(const role of ['owner','admin','finance','viewer'] as const){
-    const source=fixture(),proposed=visibleState(source,role);
+    const source=fixture(),proposed=structuredClone(visibleState(source,role));
     for(const key of ['customerRefunds','returnSettlements','creditUses','returnInspections'] as const)
       proposed[key].reverse();
     assert.deepEqual(applyRoleChanges(source,proposed,role),source,role);
@@ -59,7 +59,7 @@ test('reordered posted ledgers are never mistaken for staff permission changes',
 test('generic workspace replacement cannot create, change or remove posted history for any role',()=>{
   for(const role of roles){
     for(const key of ['customerRefunds','returnSettlements','creditUses','returnInspections'] as const){
-      const source=fixture(),proposed=visibleState(source,role);
+      const source=fixture(),proposed=structuredClone(visibleState(source,role));
       const original=proposed[key].length?proposed[key]:source[key];
       // A staff role with a redacted ledger still cannot inject records.
       proposed[key]=[...original.slice(1)] as never;
