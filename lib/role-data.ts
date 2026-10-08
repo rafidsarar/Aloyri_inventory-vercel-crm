@@ -54,6 +54,22 @@ export function validateRoleRelations(state:State,role:WorkspaceRole){
   validateRelations(state,{skipOrderNumberUniqueness:role==='inventory'});
 }
 
+/** Compare posted ledgers by record ID rather than API ordering.
+ * Reject missing, duplicate, added, or changed posted entries, including for the owner.
+ * Workflows that legitimately post new entries use dedicated validated endpoints.
+ */
+export function samePostedRecords<T extends {id:string}>(stored:readonly T[],submitted:readonly T[]):boolean {
+  if(stored.length!==submitted.length)return false;
+  const byId=new Map(stored.map(record=>[record.id,JSON.stringify(record)]));
+  if(byId.size!==stored.length)return false;
+  const seen=new Set<string>();
+  return submitted.every(record=>{
+    if(seen.has(record.id)||byId.get(record.id)!==JSON.stringify(record))return false;
+    seen.add(record.id);
+    return true;
+  });
+}
+
 /** Allow untouched legacy duplicate order numbers, but reject any new/changed number collision. */
 export function validateWorkspaceChange(current:State,next:State,options:{allowNewRefunds?:boolean;allowSettlements?:boolean;allowCreditUses?:boolean;allowInspections?:boolean}={}){
   if(!options.allowNewRefunds&&next.customerRefunds.some(r=>!current.customerRefunds.some(p=>p.id===r.id)))throw new Error('Use Record refund to post customer refunds.');
