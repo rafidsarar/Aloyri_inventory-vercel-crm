@@ -34,6 +34,10 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  serverExternalPackages: ["pdfkit"],
+  outputFileTracingIncludes: {
+    "/api/integrations/ecommerce/order-invoice": ["./public/fonts/NotoSansBengali.ttf"],
+  },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },
