@@ -15,6 +15,7 @@ type ReturnRequest={
   id:string;
   orderId:string;
   orderNumber:string;
+  requestType?:'return'|'cancellation';
   requestStatus:'Requested'|'Reviewing'|'Approved'|'Rejected'|'Resolved';
   reason:string;
   condition:string;
@@ -128,16 +129,16 @@ export default function OrdersSection({
     </div>
     <SectionPanel className="order-workspace order-workspace-pro">
       <div className="panel-heading order-workspace-heading">
-        <div><span className="orders-section-label">WEBSITE RETURNS</span><h2>Customer return requests</h2><p>Review customer requests here first. Approval does not refund money, mark stock as returned, or restock anything.</p></div>
-        <div className="order-workspace-count"><strong>{activeReturnRequests.length}</strong><span>open</span></div>
+        <div><span className="orders-section-label">WEBSITE RETURNS</span><h2>Customer return requests</h2><p>Review website return and cancellation requests here first. Approval does not refund money, mark stock as returned, or restock anything.</p></div>
+        <div className="flex items-center gap-3"><button className="btn secondary small" disabled={returnRequestsLoading} onClick={()=>void loadReturnRequests()}><RotateCcw size={14}/>{returnRequestsLoading?'Refreshing…':'Refresh requests'}</button><div className="order-workspace-count"><strong>{activeReturnRequests.length}</strong><span>open</span></div></div>
       </div>
       {returnRequestsLoading?<p className="muted">Loading website return requests…</p>:returnRequests.length===0?
-        <div className="table-footer"><span>No website return requests yet.</span><span>New requests will appear here after a customer verifies a delivered website order.</span></div>:
+        <div className="table-footer"><span>No website return requests yet.</span><span>New requests will appear here after a customer submits a return or an eligible cancellation.</span></div>:
         <div className="grid gap-3">
           {returnRequests.slice(0,12).map(request=><article key={request.id} className="rounded-xl border border-border bg-card p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <div className="flex flex-wrap items-center gap-2"><strong>#{request.orderNumber}</strong><span className="status-pill">{request.requestStatus}</span></div>
+                <div className="flex flex-wrap items-center gap-2"><strong>#{request.orderNumber}</strong><span className="status-pill">{request.requestType==='cancellation'?'Cancellation':'Return'}</span><span className="status-pill">{request.requestStatus}</span></div>
                 <p className="mt-1 text-sm muted">{request.reason} · {request.condition} · Customer prefers {request.preferredResolution}</p>
                 <p className="mt-2 text-sm">{request.items.map(item=>(item.brand?item.brand+' ':'')+item.name+' × '+item.qty).join(' · ')}</p>
                 {request.customerNote&&<p className="mt-2 text-sm muted">Customer note: {request.customerNote}</p>}

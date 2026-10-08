@@ -23,3 +23,4 @@ sed '/^[[:space:]]*-- statement-break[[:space:]]*$/d' sql/migrations/005_domain_
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$tmp"
 rm -f "$tmp"
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/postgres-integration.sql
+node --experimental-strip-types scripts/customer-request-regression.ts
