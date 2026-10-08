@@ -6,6 +6,7 @@ import {
   attemptImmediateCustomerNotifications,
   initialWebsiteNotificationStatements
 } from './customer-notifications.ts';
+import { promotionRedemptionGuardSql } from '../lib/ecommerce-promotion-redemption.ts';
 import { quoteEcommercePromotion } from './ecommerce-promotions.ts';
 import {
   batchRemaining,
@@ -223,7 +224,7 @@ export async function createEcommerceOrder(input:{
         promotionQuote.discount,promotionQuote.shippingDiscount,now,input.ownerId,promotion.id
       ),
       db.prepare(
-        "SELECT CASE WHEN EXISTS (SELECT 1 FROM crm_ecommerce_promotion_redemptions WHERE owner_id=? AND order_id=? AND promotion_id=?) THEN 1 ELSE CAST('PROMOTION_LIMIT_REACHED' AS INTEGER) END"
+        promotionRedemptionGuardSql
       ).bind(input.ownerId,order.id,promotion.id)
     );
   }
