@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { database } from '../db/raw.ts';
 import { promotionRedemptionGuardSql } from '../lib/ecommerce-promotion-redemption.ts';
 
-if(process.env.E2E_LOCAL_POSTGRES!=='1'||!/^postgres(?:ql)?:\/\/(?:[^@]+@)?(?:localhost|127\.0\.0\.1)(?::\d+)?\//i.test(process.env.DATABASE_URL||''))throw new Error('Disposable local PostgreSQL required.');
+const testDatabaseUrl=process.env.SKINVENTORY_DB_DATABASE_URL||process.env.DATABASE_URL||'';
+if(process.env.E2E_LOCAL_POSTGRES!=='1'||!/^postgres(?:ql)?:\/\/(?:[^@]+@)?(?:localhost|127\.0\.0\.1)(?::\d+)?\//i.test(testDatabaseUrl))throw new Error('Disposable local PostgreSQL required.');
 const db=database(),ownerId='promotion-redemption-regression',promoId='active-fixture',now=new Date().toISOString();
 await db.prepare("INSERT INTO crm_ecommerce_promotions(owner_id,id,name,code,kind,value,usage_limit,active,created_at,updated_at) VALUES (?,?,?,'FIXTURE','percentage',10,1,TRUE,?,?)").bind(ownerId,promoId,'Active fixture',now,now).run();
 const redemption=(id:string)=>db.prepare(
