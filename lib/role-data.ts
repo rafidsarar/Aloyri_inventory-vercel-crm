@@ -173,6 +173,12 @@ export function applyRoleChanges(current:State,proposed:State,role:WorkspaceRole
     }
   }
 
+  // Role permission to use a dedicated workflow does not permit writing its
+  // append-only ledger through a generic workspace replacement.
+  for(const key of ['returnInspections','returnSettlements','creditUses'] as const){
+    if(JSON.stringify(proposed[key])!==JSON.stringify(visible[key]))
+      throw new Error('Use the dedicated return or credit workflow to update '+key+'.');
+  }
   const merged=structuredClone(current);
   for(const key of Object.keys(current) as (keyof State)[])
     if(roleCanEdit(role,key)){
