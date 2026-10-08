@@ -54,6 +54,22 @@ export function validateRoleRelations(state:State,role:WorkspaceRole){
   validateRelations(state,{skipOrderNumberUniqueness:role==='inventory'});
 }
 
+/** Compare posted ledgers by record ID rather than API ordering.
+ * Reject missing, duplicate, added, or changed posted entries, including for the owner.
+ * Workflows that legitimately post new entries use dedicated validated endpoints.
+ */
+export function samePostedRecords(stored:readonly {id:string}[],submitted:readonly {id:string}[]):boolean {
+  if(stored.length!==submitted.length)return false;
+  const byId=new Map(stored.map(record=>[record.id,JSON.stringify(record)]));
+  if(byId.size!==stored.length)return false;
+  const seen=new Set<string>();
+  return submitted.every(record=>{
+    if(seen.has(record.id)||byId.get(record.id)!==JSON.stringify(record))return false;
+    seen.add(record.id);
+    return true;
+  });
+}
+
 /** Allow untouched legacy duplicate order numbers, but reject any new/changed number collision. */
 export function validateWorkspaceChange(current:State,next:State,options:{allowNewRefunds?:boolean;allowSettlements?:boolean;allowCreditUses?:boolean;allowInspections?:boolean}={}){
   if(!options.allowNewRefunds&&next.customerRefunds.some(r=>!current.customerRefunds.some(p=>p.id===r.id)))throw new Error('Use Record refund to post customer refunds.');
@@ -121,7 +137,16 @@ function restoreInventoryPaymentFields(next:State,current:State){
 
 export function applyRoleChanges(current:State,proposed:State,role:WorkspaceRole):State {
   const visible=visibleState(current,role);
+  const postedKeys=['customerRefunds','returnSettlements','creditUses','returnInspections'] as const;
+  // A caller may receive the relational ledger in a different order from the
+  // compatibility workspace. Order is not permission to edit posted history.
+  // All changes to these append-only ledgers must use their dedicated workflows.
+  for(const key of postedKeys){
+    if(!samePostedRecords(visible[key],proposed[key]))
+      throw new Error('Use the dedicated return, refund or credit workflow to change '+key+'.');
+  }
   for(const key of Object.keys(current) as (keyof State)[]){
+    if((postedKeys as readonly string[]).includes(key))continue;
     if(!roleCanEdit(role,key)&&!(role==='inventory'&&key==='orders')&&JSON.stringify(proposed[key])!==JSON.stringify(visible[key]))
       throw new Error('Your role cannot change '+key+'. Ask the owner to update your access.');
   }
@@ -175,7 +200,7 @@ export function applyRoleChanges(current:State,proposed:State,role:WorkspaceRole
 
   const merged=structuredClone(current);
   for(const key of Object.keys(current) as (keyof State)[])
-    if(roleCanEdit(role,key))(merged as any)[key]=proposed[key];
+    if(roleCanEdit(role,key)&&!(postedKeys as readonly string[]).includes(key))(merged as any)[key]=proposed[key];
 
   if(role==='sales'){
     restoreSalesOrderProtectedFields(merged,current);

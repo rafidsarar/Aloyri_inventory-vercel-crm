@@ -37,6 +37,7 @@ export async function PUT(request:Request){
     const message=error instanceof Error?error.message:'Could not save Inventory and Supplier records.';
     if(message==='DOMAIN_VERSION_CONFLICT'||message==='WORKSPACE_VERSION_CONFLICT')return response({error:'Inventory or Supplier records changed in another window. Refresh and try again.'},409);
     if(message==='DOMAIN_VERSION_REQUIRED'||message==='INVALID_INVENTORY_SUPPLIER_DATA')return response({error:'Check the values in your form.'},400);
+    if(message==='Use return inspection to record its history.')return response({error:message},400);
     if(message.includes('cannot')||message.includes('Only')||message.includes('role'))return response({error:message},403);
     console.error('Inventory supplier domain save failed',error);return response({error:message},500);
   }

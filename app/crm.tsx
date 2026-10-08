@@ -292,16 +292,18 @@ async function loadOrderRecords(nextRole:WorkspaceRole){
   setOrderRecordVersions(Object.fromEntries(records.map(order=>[order.id,order.recordVersion])));
   setLive(current=>({...current,orders:records.map(({recordVersion:_,...order})=>order)}));
 }
-async function loadInventorySupplierRecords(nextRole:WorkspaceRole){
+async function loadInventorySupplierRecords(nextRole:WorkspaceRole,expectedSequence?:number){
   if(!visibleSections(nextRole).some(section=>section==='Inventory'||section==='Suppliers'))return;
   const res=await fetch('/api/inventory-suppliers',{cache:'no-store'}),data:any=await res.json();
+  if(expectedSequence!==undefined&&expectedSequence!==loadSequence.current)return;
   if(!res.ok)throw Error(data.error||'Could not load Inventory and Supplier records.');
   setInventorySupplierVersion(Number(data.domainVersion||0));
   setLive(current=>({...current,...data.data}));
 }
-async function loadFinanceRecords(nextRole:WorkspaceRole){
+async function loadFinanceRecords(nextRole:WorkspaceRole,expectedSequence?:number){
   if(!visibleSections(nextRole).includes('Finances'))return;
   const res=await fetch('/api/finances',{cache:'no-store'}),data:any=await res.json();
+  if(expectedSequence!==undefined&&expectedSequence!==loadSequence.current)return;
   if(!res.ok)throw Error(data.error||'Could not load Finance records.');
   setFinanceDomainVersion(Number(data.domainVersion||0));
   setLive(current=>({...current,...data.data}));
@@ -321,7 +323,7 @@ async function loadLive(showErrors=true,manageBusy=true,full=false){
     if(manageBusy)setView('Overview');
     setMemberName(d.userName||'Team member');setLoaded(true);setError(recovery?(d.warning||'Saved records are visible in read-only recovery mode.'):'');setAuthRequired(false);
     if(d.orderVersions)setOrderRecordVersions(d.orderVersions);if(d.customerVersions)setCustomerRecordVersions(d.customerVersions);
-    if(fixture&&!recovery)await Promise.all([loadCustomerRecords(nextRole),loadOrderRecords(nextRole),loadInventorySupplierRecords(nextRole),loadFinanceRecords(nextRole)]);
+    if(fixture&&!recovery)await Promise.all([loadCustomerRecords(nextRole),loadOrderRecords(nextRole),loadInventorySupplierRecords(nextRole,sequence),loadFinanceRecords(nextRole,sequence)]);
     if(needsFull&&!fixture&&!recovery)await Promise.all([loadInventorySupplierRecords(nextRole),loadFinanceRecords(nextRole)]);
     if(sequence!==loadSequence.current)return false;
     setListRefresh(n=>n+1);return true;
@@ -453,7 +455,7 @@ async function saveInventorySupplierDomain(next:State):Promise<boolean>{
     const data=Object.fromEntries(inventorySupplierKeys.map(key=>[key,next[key]]));
     const res=await fetch('/api/inventory-suppliers',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({data,domainVersion:inventorySupplierVersion})}),result:any=await res.json();
     if(!res.ok){if(res.status===409)await loadLive(false,false);throw Error(result.error||'Could not save Inventory or Supplier records.')}
-    const synced=await loadLive(false,false);if(!synced)throw Error('Changes saved, but the workspace could not be refreshed.');
+    const synced=await loadLive(false,false,true);if(!synced)throw Error('Changes saved, but the full Inventory and Finance state could not be refreshed. Reload before editing more records.');
     setError('');toast.success('Changes saved');return true;
   }catch(e){const message=e instanceof Error?e.message:'Could not save Inventory or Supplier records.';setError(message);toast.error(message);return false}
   finally{saving.current=false;setBusy(false)}
@@ -471,7 +473,7 @@ async function saveFinanceDomain(next:State):Promise<boolean>{
     const data=Object.fromEntries(financeKeys.map(key=>[key,next[key]]));
     const res=await fetch('/api/finances',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({data,domainVersion:financeDomainVersion})}),result:any=await res.json();
     if(!res.ok){if(res.status===409)await loadLive(false,false);throw Error(result.error||'Could not save Finance.')}
-    const synced=await loadLive(false,false);if(!synced)throw Error('Finance saved, but the workspace could not be refreshed.');
+    const synced=await loadLive(false,false,true);if(!synced)throw Error('Finance saved, but the full Inventory and Finance state could not be refreshed. Reload before editing more records.');
     setError('');toast.success('Finance changes saved');return true;
   }catch(e){const message=e instanceof Error?e.message:'Could not save Finance.';setError(message);toast.error(message);return false}
   finally{saving.current=false;setBusy(false)}
@@ -606,9 +608,9 @@ function openPurchaseOrderReceipt(id:string){if(!canEdit('purchaseOrders')||!can
 async function submitPurchaseOrderReceipt(){if(!poReceiveId)return;if(!canEdit('purchaseOrders')||!canEdit('batches')){toast.error('Your role cannot receive purchase orders into stock.');return}setBusy(true);try{const received=poReceiveLines.reduce((n,line)=>n+line.qty,0);const res=await fetch('/api/purchase-orders/'+encodeURIComponent(poReceiveId)+'/receive',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({received:poReceiveDate,invoice:poReceiveInvoice,dueDate:poReceiveDue||undefined,lines:poReceiveLines,domainVersion:inventorySupplierVersion})}),data:any=await res.json();if(!res.ok){if(res.status===409)await loadLive(false,false);throw Error(data.error||'Could not receive this purchase order.')}await loadLive(false,false);setPoReceiveId(null);toast.success(received+' units received into inventory.')}catch(e){toast.error(e instanceof Error?e.message:'Could not receive this purchase order.')}finally{setBusy(false)}}
 async function returnAction(action:'settlement'|'credit',payload:unknown,orderId?:string){
  if(!canFinance)throw Error('Your role cannot settle returns.');setBusy(true);
- try{const url=action==='settlement'?'/api/finances/return-settlements':'/api/finances/customer-credit';const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(action==='settlement'?{settlement:payload,domainVersion:financeDomainVersion}:{credit:payload,recordVersion:orderRecordVersions[orderId||'']})}),data=await res.json();if(!res.ok){if(res.status===409)await loadLive(false,false);throw Error(data.error||'Could not settle return.');}if(!await loadLive(false,false))throw Error('Saved, but records did not fully refresh. Reload before continuing.');}finally{setBusy(false)}
+ try{const url=action==='settlement'?'/api/finances/return-settlements':'/api/finances/customer-credit';const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(action==='settlement'?{settlement:payload,domainVersion:financeDomainVersion}:{credit:payload,recordVersion:orderRecordVersions[orderId||'']})}),data=await res.json();if(!res.ok){if(res.status===409)await loadLive(false,false);throw Error(data.error||'Could not settle return.');}if(!await loadLive(false,false,true))throw Error('Saved, but return history and Finance did not fully refresh. Reload before continuing.');}finally{setBusy(false)}
 }
-async function postRefund(refund:State['customerRefunds'][number]){if(!canFinance)throw Error('Your role cannot record customer refunds.');setBusy(true);try{const res=await fetch('/api/finances/customer-refunds',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refund,domainVersion:financeDomainVersion})}),data=await res.json();if(!res.ok){if(res.status===409)await loadLive(false,false);throw Error(data.error||'Could not record refund.')}const synced=await loadLive(false,false);if(!synced)throw Error('Refund recorded, but Finance could not refresh. Reload the CRM before recording another payment.');}finally{setBusy(false)}}
+async function postRefund(refund:State['customerRefunds'][number]){if(!canFinance)throw Error('Your role cannot record customer refunds.');setBusy(true);try{const res=await fetch('/api/finances/customer-refunds',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refund,domainVersion:financeDomainVersion})}),data=await res.json();if(!res.ok){if(res.status===409)await loadLive(false,false);throw Error(data.error||'Could not record refund.')}const synced=await loadLive(false,false,true);if(!synced)throw Error('Refund recorded, but return history and Finance could not refresh. Reload the CRM before recording another payment.');}finally{setBusy(false)}}
 function openOwnerMoney(kind:'capital'|'drawing'){if(!canOwnerMoney){toast.error('Only the owner or an admin can post owner capital or drawings.');return}setOwnerMoneyKind(kind);setOwnerMoneyAmount('');setOwnerMoneyDate(today());setOwnerMoneyAccount('bank');setOwnerMoneyReference('');setOwnerMoneyOpen(true)}
 async function submitOwnerMoney(){if(!canOwnerMoney){toast.error('Only the owner or an admin can post owner capital or drawings.');return}const amount=Number(ownerMoneyAmount);if(!Number.isFinite(amount)||amount<=0){toast.error('Enter an amount above zero.');return}setBusy(true);try{const res=await fetch('/api/finances/owner-money',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:ownerMoneyKind,amount,date:ownerMoneyDate,account:ownerMoneyAccount,reference:ownerMoneyReference.trim(),domainVersion:financeDomainVersion})}),data:any=await res.json();if(!res.ok){if(res.status===409)await loadLive(false,false);throw Error(data.error||'Could not post owner money.')}await loadLive(false,false);setOwnerMoneyOpen(false);toast.success((ownerMoneyKind==='capital'?'Owner capital':'Owner drawing')+' posted and reconciled.')}catch(e){toast.error(e instanceof Error?e.message:'Could not post owner money.')}finally{setBusy(false)}}
 function openPaymentDialog(kind:'collection'|'supplier',id:string,max:number,label:string){if(!canFinance){toast.error('Your role cannot post finance payments.');return}setPaymentDialog({kind,id,max,label});setPaymentAmount(String(Math.round(max)));setPaymentDate(today());setPaymentAccount(kind==='collection'?'bkash':'bank');setPaymentReference('')}
@@ -678,7 +680,7 @@ async function inspectReturnedOrder(o:Order,outcome:'Sellable'|'Quarantine'|'Dam
   try{
     const res=await fetch('/api/orders/'+encodeURIComponent(o.id)+'/inspection',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({recordVersion,outcome})}),data:any=await res.json();
     if(!res.ok){if(res.status===409)await loadLive(false,false);throw Error(data.error||'Could not inspect return.')}
-    await loadLive(false,false);toast.success('Return inspection saved.');
+    if(!await loadLive(false,false,true))throw Error('Inspection recorded, but Inventory and Finance did not fully refresh. Reload before continuing.');toast.success('Return inspection saved.');
   }catch(e){toast.error(e instanceof Error?e.message:'Could not inspect return.')}finally{setBusy(false)}
 }
 function changeStatus(o:Order,status:Order['status']){if(!canEdit('orders')){toast.error('Your role cannot update order status.');return}if(!nextStatuses(o).includes(status))return;if(status==='Cancelled'){setConfirm({title:'Cancel '+o.number+'?',text:'Reserved products will move into Quarantine for Inventory inspection before they can be sold again. The order stays in your history.',action:()=>{void updateOrder(o,{status})}});return;}if(status==='Returned'){setConfirm({title:'Record return for '+o.number+'?',text:o.status==='Delivered'?'This marks the delivered order as returned. Review refund handling separately in Finance and inspect the products in Inventory → Holds & returns.':'This marks the delivery as returned. The products stay blocked until Inventory completes inspection.',action:()=>{void updateOrder(o,{status,returnedAt:today(),restocked:false})}});return;}void updateOrder(o,{status,...(status==='Delivered'?{delivered:today()}: {})})}

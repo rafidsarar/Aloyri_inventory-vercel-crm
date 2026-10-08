@@ -2,7 +2,7 @@ import { readReturnLedger } from './return-ledgers.ts';
 import { database } from './raw.ts';
 import { optionalRelationalDate, relationalDate } from './relational-date.ts';
 import { getDomainVersion,domainVersionBumpStatements } from './domain-version.ts';
-import { applyRoleChanges,validateWorkspaceChange } from '../lib/role-data.ts';
+import { applyRoleChanges,samePostedRecords,validateWorkspaceChange } from '../lib/role-data.ts';
 import { fixedBusinessName,stateSchema,validateRelations,type State } from '../lib/crm.ts';
 import type { WorkspaceRole } from '../lib/roles.ts';
 import { ensureFinanceApiReady,FINANCE_DOMAIN,financeShadowStatements } from './finance-shadow.ts';
@@ -50,10 +50,18 @@ export async function saveFinanceDomain(ownerId:string,input:unknown,expectedDom
  const parsed=stateSchema.pick({expenses:true,cashEntries:true,accountOpenings:true,accountMatches:true,financeCloses:true,customerRefunds:true,returnSettlements:true,creditUses:true}).safeParse(input);
  if(!parsed.success)throw new Error('INVALID_FINANCE_DATA');
  const {row,state}=await ensureFinanceApiReady(ownerId);
- if(parsed.data.customerRefunds.length!==state.customerRefunds.length||parsed.data.customerRefunds.some(r=>JSON.stringify(r)!==JSON.stringify(state.customerRefunds.find(p=>p.id===r.id))))throw new Error('Use Record refund to post customer refunds.');
- for(const key of ['returnSettlements','creditUses'] as const)if(parsed.data[key].length!==state[key].length||parsed.data[key].some(r=>JSON.stringify(r)!==JSON.stringify(state[key].find(p=>p.id===r.id))))throw new Error('Use the dedicated return or credit workflow.');
+ // API read order differs from the workspace insertion order. Authorize by identity,
+ // then retain the authoritative posted records when applying ordinary finance edits.
+ if(!samePostedRecords(state.customerRefunds,parsed.data.customerRefunds))throw new Error('Use Record refund to post customer refunds.');
+ for(const key of ['returnSettlements','creditUses'] as const)
+  if(!samePostedRecords(state[key],parsed.data[key]))throw new Error('Use the dedicated return or credit workflow.');
  const currentDomainVersion=await getDomainVersion(ownerId,FINANCE_DOMAIN);if(currentDomainVersion!==expectedDomainVersion)throw new Error('DOMAIN_VERSION_CONFLICT');
- const candidate=structuredClone(state);for(const key of financeKeys)(candidate[key] as any)=parsed.data[key] as any;
+ const candidate=structuredClone(state);
+ for(const key of financeKeys){
+  // Never replace append-only history during a generic Finance save.
+  if(key==='customerRefunds'||key==='returnSettlements'||key==='creditUses')continue;
+  (candidate[key] as any)=parsed.data[key] as any;
+ }
  const next=fixedBusinessName(applyRoleChanges(state,candidate,actor.role));
  if(actor.role==='finance'){
   const before=new Map(state.cashEntries.map(entry=>[entry.id,entry]));

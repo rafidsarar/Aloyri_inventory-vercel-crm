@@ -2,7 +2,7 @@ import { readReturnLedger } from './return-ledgers.ts';
 import { database } from './raw.ts';
 import { optionalRelationalDate, relationalDate } from './relational-date.ts';
 import { getDomainVersion,domainVersionBumpStatements } from './domain-version.ts';
-import { applyRoleChanges, validateWorkspaceChange, visibleState } from '../lib/role-data.ts';
+import { applyRoleChanges, samePostedRecords, validateWorkspaceChange, visibleState } from '../lib/role-data.ts';
 import { today,uid,fixedBusinessName, stateSchema, validateRelations, type State } from '../lib/crm.ts';
 import type { WorkspaceRole } from '../lib/roles.ts';
 import { ensureInventorySupplierApiReady, INVENTORY_SUPPLIER_DOMAIN, inventorySupplierShadowStatements } from './inventory-supplier-shadow.ts';
@@ -65,11 +65,16 @@ export async function saveInventorySupplierDomain(ownerId:string,input:unknown,e
   }).safeParse(input);
   if(!parsed.success)throw new Error('INVALID_INVENTORY_SUPPLIER_DATA');
   const {row,state}=await ensureInventorySupplierApiReady(ownerId);
-  if(parsed.data.returnInspections.length!==state.returnInspections.length||parsed.data.returnInspections.some(r=>JSON.stringify(r)!==JSON.stringify(state.returnInspections.find(p=>p.id===r.id))))throw new Error('Use return inspection to record its history.');
+  if(!samePostedRecords(state.returnInspections,parsed.data.returnInspections))throw new Error('Use return inspection to record its history.');
   const currentDomainVersion=await getDomainVersion(ownerId,INVENTORY_SUPPLIER_DOMAIN);
   if(currentDomainVersion!==expectedDomainVersion)throw new Error('DOMAIN_VERSION_CONFLICT');
   const candidate=structuredClone(visibleState(state,actor.role));
-  for(const key of inventorySupplierKeys)(candidate[key] as any)=parsed.data[key] as any;
+  for(const key of inventorySupplierKeys){
+    // Inspection history is immutable through this generic save. The dedicated
+    // inspection workflow appends new records with its own authorization.
+    if(key==='returnInspections')continue;
+    (candidate[key] as any)=parsed.data[key] as any;
+  }
   let next:State;
   try{next=fixedBusinessName(applyRoleChanges(state,candidate,actor.role));}catch(error){throw new Error(error instanceof Error?error.message:'ROLE_FORBIDDEN')}
   for(const before of state.inventoryHolds){if(before.source!=='Return'||!before.sourceOrderId)continue;const after=next.inventoryHolds.find(h=>h.id===before.id);if(!after)throw new Error('Returned-stock history cannot be deleted.');const cost=state.batches.find(b=>b.id===before.batchId)?.unitCost||0,beforeLoss=before.type==='Damaged'&&!before.releasedAt?before.qty*cost:0,afterLoss=after.type==='Damaged'&&!after.releasedAt?after.qty*cost:0,delta=afterLoss-beforeLoss;if(delta)next.returnInspections.push({id:uid(),orderId:before.sourceOrderId,date:today(),outcome:after.type,event:delta>0?'Written off':'Recovered',amount:Math.abs(delta)});}
