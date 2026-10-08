@@ -55,13 +55,18 @@ export async function renderInvoicePdf(state:State,order:Order,logo:string):Prom
   const totals:[string,number][]=[['Subtotal',order.items.reduce((sum,item)=>sum+item.qty*item.price,0)]];
   if(order.discount>0)totals.push(['Discount',-order.discount]);
   totals.push(['Delivery',order.deliveryCharge],['Total',total(order)]);
-  y=space(totals.length*28+16);
+  const footer=profile.invoiceFooter||'Thank you for choosing ALOYRI.';
+  const contact=[profile.phone,profile.email].filter(Boolean).join(' · ')||'Let Your Skin Glow.';
+  const notesHeight=profile.returnPolicy?25+height(profile.returnPolicy,width)+16:0;
+  const footerHeight=25+height(footer,width)+16+height(contact,width,9);
+  y=space(Math.min(bottom-42,totals.length*28+36+notesHeight+footerHeight));
   for(const [label,value] of totals){if(label==='Total'){doc.rect(300,y,253,28).fill('#f8f2ee');doc.fillColor(accent);}text(label,308,y+6,100,11);text(taka(value),410,y+6,135,11,'right');doc.fillColor(color);y+=28;}
   doc.y=y+20;
-  const paragraph=(title:string,value:string)=>{if(!value)return;section(title);text(value,left,doc.y,width,10);doc.y+=16;};
+  const paragraph=(title:string,value:string)=>{if(!value)return;space(25+height(value,width)+16);section(title);text(value,left,doc.y,width,10);doc.y+=16;};
   paragraph('RETURNS AND EXCHANGES',profile.returnPolicy);
-  paragraph('ALOYRI',profile.invoiceFooter||'Thank you for choosing ALOYRI.');
-  text([profile.phone,profile.email].filter(Boolean).join(' · ')||'Let Your Skin Glow.',left,space(26),width,9);
+  space(footerHeight);
+  paragraph('ALOYRI',footer);
+  text(contact,left,doc.y,width,9);
   const pages=doc.bufferedPageRange();
   for(let i=0;i<pages.count;i++){doc.switchToPage(pages.start+i);doc.fillColor(muted);text('Page '+(i+1)+' of '+pages.count,left,788,width,8,'right');}
   doc.end();
