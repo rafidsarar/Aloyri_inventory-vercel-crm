@@ -11,7 +11,8 @@ const PATH='/api/integrations/ecommerce/order-invoice';
 
 const trackingInput=z.object({
   orderNumber:z.string().trim().min(8).max(100),
-  phone:z.string().trim().min(10).max(30)
+  phone:z.string().trim().min(10).max(30),
+  format:z.literal('pdf').optional()
 }).strict();
 
 const response=(data:unknown,status=200)=>Response.json(data,{
@@ -58,7 +59,8 @@ export async function POST(request:Request){
     const result=await readEcommerceOrderInvoice(
       ownerId,
       parsed.data.orderNumber,
-      parsed.data.phone
+      parsed.data.phone,
+      parsed.data.format
     );
 
     if(!result){

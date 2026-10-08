@@ -73,3 +73,18 @@ test('CRM invoice escapes customer and business content and reflects recorded pa
  state.orders[0].status='Cancelled';
  assert.ok(renderInvoiceBody(state,state.orders[0]).includes('<b>Status</b> Cancelled'));
 });
+
+test('PDF downloads contain a genuine embedded-font invoice and paginate long orders',async()=>{
+ const {renderInvoicePdf}=await import('../lib/invoice-pdf.ts');
+ const {readFile}=await import('node:fs/promises');
+ const state=trackingState();
+ state.customers[0].name='রাফিদ / Customer Name';
+ const logo='data:image/webp;base64,'+(await readFile('public/aloyri-logo.webp')).toString('base64');
+ const pdf=await renderInvoicePdf(state,state.orders[0],logo);
+ assert.equal(pdf.subarray(0,5).toString(),'%PDF-');
+ assert.ok(pdf.toString('latin1').includes('/FontFile2'));
+ assert.equal((pdf.toString('latin1').match(/\/Type \/Page\b/g)||[]).length,1);
+ state.orders[0].items=Array.from({length:50},()=>({...state.orders[0].items[0]}));
+ const long=await renderInvoicePdf(state,state.orders[0],logo);
+ assert.ok((long.toString('latin1').match(/\/Type \/Page\b/g)||[]).length>1);
+});
