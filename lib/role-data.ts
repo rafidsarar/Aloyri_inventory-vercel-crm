@@ -175,7 +175,11 @@ export function applyRoleChanges(current:State,proposed:State,role:WorkspaceRole
 
   const merged=structuredClone(current);
   for(const key of Object.keys(current) as (keyof State)[])
-    if(roleCanEdit(role,key))(merged as any)[key]=proposed[key];
+    if(roleCanEdit(role,key)){
+      // Posted return records must be created through their dedicated, audited APIs.
+      if(key==='returnInspections'||key==='returnSettlements'||key==='creditUses')continue;
+      (merged as any)[key]=proposed[key];
+    }
 
   if(role==='sales'){
     restoreSalesOrderProtectedFields(merged,current);
