@@ -62,7 +62,7 @@ test('generic workspace replacement cannot create, change or remove posted histo
       const source=fixture(),proposed=visibleState(source,role);
       const original=proposed[key].length?proposed[key]:source[key];
       // A staff role with a redacted ledger still cannot inject records.
-      (proposed as any)[key]=[...original.slice(1)];
+      proposed[key]=[...original.slice(1)] as never;
       assert.throws(()=>applyRoleChanges(source,proposed,role),/dedicated|cannot change/,role+' '+key);
     }
   }
