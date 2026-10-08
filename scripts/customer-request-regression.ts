@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict';
 import { database } from '../db/raw.ts';
-import { initialState } from '../lib/crm.ts';
+import { initialState,stateSchema } from '../lib/crm.ts';
 import { createEcommerceReturnRequest,listEcommerceReturnRequests } from '../db/ecommerce-return-requests.ts';
 
 if(process.env.E2E_LOCAL_POSTGRES!=='1'||!/^postgres(?:ql)?:\/\/(?:[^@]+@)?(?:localhost|127\.0\.0\.1)(?::\d+)?\//i.test(process.env.DATABASE_URL||''))throw new Error('Disposable local PostgreSQL required.');
 const db=database(),ownerId='customer-request-regression';
 const state=initialState();
 state.customers=[{id:'request-customer',name:'Fixture',phone:'01712345678',address:'Fixture',city:'Dhaka',preference:'Website',notes:'',consent:false,created:'2026-10-08'}];
-state.orders=[{id:'request-order',number:'WEB-20261008-REQUEST',customerId:'request-customer',created:'2026-10-08',collections:[],channel:'Website',payment:'COD',status:'New',items:[{productId:state.products[0].id,qty:1,price:500,allocations:[]}],discount:0,deliveryCharge:80,courierCost:0,packaging:0,paymentFee:0,returnFee:0,settled:false,restocked:false,tracking:'',notes:''}];
+state.orders=[{id:'request-order',number:'WEB-20261008-REQUEST',customerId:'request-customer',created:'2026-10-08',collections:[],channel:'Website',payment:'COD',status:'New',items:[{productId:state.products[0].id,qty:1,price:500,allocations:[{batchId:state.batches[0].id,qty:1,unitCost:400}]}],discount:0,deliveryCharge:80,courierCost:0,packaging:0,paymentFee:0,returnFee:0,settled:false,restocked:false,tracking:'',notes:''}];
+stateSchema.parse(state);
 await db.prepare('INSERT INTO crm_workspaces(owner_id,data,version,updated_at) VALUES (?,?,0,?)').bind(ownerId,JSON.stringify(state),new Date().toISOString()).run();
 const input={ownerId,orderNumber:state.orders[0].number,phone:'01712345678',reason:'Changed mind',condition:'Not received',preferredResolution:'Other',note:'Cancellation requested',items:[{line:0,qty:1}]};
 const cancellation=await createEcommerceReturnRequest({...input,requestType:'cancellation'});
