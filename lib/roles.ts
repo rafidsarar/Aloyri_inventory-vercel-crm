@@ -3,12 +3,12 @@ export type WorkspaceRole='owner'|'admin'|'sales'|'inventory'|'finance'|'viewer'
 export const roleCapabilities={
   owner:{
     sections:['Overview','Reports','Alerts','Automation','Orders','Inventory','Customers','Suppliers','Finances','Follow-ups','Activity'],
-    edit:['products','productCategories','customers','suppliers','purchaseOrders','batches','stockAdjustments','inventoryHolds','orders','expenses','cashEntries','accountOpenings','accountMatches','financeCloses','customerRefunds','returnInspections','returnSettlements','creditUses','tasks','businessName','businessProfile','automationSettings'],
+    edit:['products','productCategories','customers','suppliers','purchaseOrders','batches','stockAdjustments','inventoryHolds','orders','expenses','cashEntries','accountOpenings','accountMatches','financeCloses','customerRefunds','tasks','businessName','businessProfile','automationSettings'],
     settings:true,team:true,reset:true,backup:true,recordImport:true,starterCatalog:true,audit:true,invoice:true,finance:true,financeClose:true,dataExport:true,returnInspection:true
   },
   admin:{
     sections:['Overview','Reports','Alerts','Automation','Orders','Inventory','Customers','Suppliers','Finances','Follow-ups','Activity'],
-    edit:['products','productCategories','customers','suppliers','purchaseOrders','batches','stockAdjustments','inventoryHolds','orders','expenses','cashEntries','accountOpenings','accountMatches','financeCloses','customerRefunds','returnInspections','returnSettlements','creditUses','tasks','businessName','businessProfile','automationSettings'],
+    edit:['products','productCategories','customers','suppliers','purchaseOrders','batches','stockAdjustments','inventoryHolds','orders','expenses','cashEntries','accountOpenings','accountMatches','financeCloses','customerRefunds','tasks','businessName','businessProfile','automationSettings'],
     settings:true,team:false,reset:false,backup:false,recordImport:true,starterCatalog:true,audit:true,invoice:true,finance:true,financeClose:true,dataExport:true,returnInspection:true
   },
   sales:{
@@ -18,12 +18,12 @@ export const roleCapabilities={
   },
   inventory:{
     sections:['Overview','Alerts','Inventory','Suppliers'],
-    edit:['products','productCategories','batches','suppliers','purchaseOrders','stockAdjustments','inventoryHolds','returnInspections'],
+    edit:['products','productCategories','batches','suppliers','purchaseOrders','stockAdjustments','inventoryHolds'],
     settings:false,team:false,reset:false,backup:false,recordImport:false,starterCatalog:true,audit:false,invoice:false,finance:false,financeClose:false,dataExport:false,returnInspection:true
   },
   finance:{
     sections:['Overview','Alerts','Orders','Inventory','Customers','Suppliers','Finances'],
-    edit:['expenses','cashEntries','accountOpenings','accountMatches','financeCloses','customerRefunds','returnSettlements','creditUses'],
+    edit:['expenses','cashEntries','accountOpenings','accountMatches','financeCloses','customerRefunds'],
     settings:false,team:false,reset:false,backup:false,recordImport:false,starterCatalog:false,audit:false,invoice:true,finance:true,financeClose:true,dataExport:true,returnInspection:false
   },
   viewer:{
