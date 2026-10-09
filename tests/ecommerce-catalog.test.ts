@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { publicCatalogProduct } from '../db/ecommerce-catalog.ts';
+import { publicCatalogCategories, publicCatalogProduct } from '../db/ecommerce-catalog.ts';
 
 test('public ecommerce catalog whitelists customer-safe product fields',()=>{
   const source={
@@ -43,4 +43,17 @@ test('public ecommerce catalog never exposes negative available stock',()=>{
     active:true
   },-4);
   assert.equal(result.availableStock,0);
+});
+
+test('read-only ecommerce category registry contains newly created empty categories',()=>{
+  const categories=publicCatalogCategories(
+    ['Cleanser','Moisturizer','Lip care','Hair care','hair CARE','  New essentials  '],
+    [{category:'Cleanser'},{category:'Sunscreen'},{category:'Lip care'}]
+  );
+  assert.deepEqual(categories,['Cleanser','Moisturizer','Lip care','Hair care','New essentials','Sunscreen']);
+  assert.equal(categories.includes(''),false);
+});
+
+test('category registry follows CRM, not a fixed list of website categories',()=>{
+  assert.deepEqual(publicCatalogCategories(['Other','Body care'],[]),['Other','Body care']);
 });
