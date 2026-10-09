@@ -43,6 +43,19 @@ export function publicCatalogProduct(
   };
 }
 
+export function publicCatalogCategories(categoryNames:readonly string[], products:readonly Pick<Product,'category'>[]){
+  const seen=new Set<string>();
+  const result:string[]=[];
+  for(const category of [...categoryNames,...products.map(item=>item.category)]){
+    const name=category.trim();
+    const key=name.toLocaleLowerCase('en');
+    if(!name||seen.has(key))continue;
+    seen.add(key);
+    result.push(name);
+  }
+  return result;
+}
+
 export async function readEcommerceCatalog(ownerId:string){
   const row=await database().prepare(
     'SELECT data,updated_at FROM crm_workspaces WHERE owner_id=?'
@@ -64,6 +77,9 @@ export async function readEcommerceCatalog(ownerId:string){
   return {
     generatedAt:new Date().toISOString(),
     workspaceUpdatedAt:row.updated_at,
+    // Public category labels only; include newly created empty categories.
+    // Never expose internal product costs, stock batches, or workspace state.
+    categories:publicCatalogCategories(state.productCategories,state.products),
     products
   };
 }
