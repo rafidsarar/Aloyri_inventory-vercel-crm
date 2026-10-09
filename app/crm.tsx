@@ -648,6 +648,20 @@ function requestDeleteCategory(name:string){
     const next=structuredClone(s);next.productCategories=next.productCategories.filter(c=>c!==name);void saveInventorySupplierDomain(next);
   }});
 }
+function requestDeleteProduct(product:Product){
+  if(!canEdit('products')){toast.error('Your role cannot delete products.');return;}
+  const id=product.id;
+  // Never delete an item linked to financial, stock, supplier, or customer history.
+  const hasHistory=s.batches.some(b=>b.productId===id)
+    ||s.orders.some(o=>o.items.some(i=>i.productId===id))
+    ||s.purchaseOrders.some(po=>po.items.some(i=>i.productId===id))
+; // Adjustments and holds reference batches, which are already protected above.
+  if(hasHistory){
+    toast.error('This product has inventory or transaction history. Set it inactive instead to preserve accounting and audit records.');
+    return;
+  }
+  requestDelete('products',id,product.name);
+}
 function requestDelete(kind:'products'|'customers'|'suppliers',id:string,name:string){
   if(!canEdit(kind)){toast.error('Your role cannot delete this record.');return;}
   if(kind==='products'&&(s.batches.some(b=>b.productId===id)||s.orders.some(o=>o.items.some(i=>i.productId===id))||s.purchaseOrders.some(po=>po.items.some(i=>i.productId===id)))){toast.error('This product has stock or order history. Keep it inactive to preserve those records.');return;}
@@ -947,7 +961,7 @@ return <SectionPaginationProvider value={{enabled:loaded&&!compactMode&&!recover
   pendingReturnOrders,cancelledInspectionGroups,managedInventoryHolds,canInspectReturns,query,
   inventorySort,setInventorySort,filter,visibleInventoryProducts,busy,setConfirm,inspectReturnedOrder,
   releaseCancelledInspection,markCancelledInspectionDamaged,markInventoryHoldDamaged,
-  releaseInventoryHold,requestDeleteCategory,currentInventoryMonth,match,productById,supplierById,
+  releaseInventoryHold,requestDeleteCategory,requestDeleteProduct,currentInventoryMonth,match,productById,supplierById,
   role,canFinance,setView,setFinanceTab
 }}/></div>}{view==='Customers'&&<CustomersSection
   query={query}
