@@ -12,6 +12,10 @@ import {
   attemptImmediateCustomerNotifications,
   notificationStatusChangeStatements
 } from './customer-notifications.ts';
+import {
+  attemptImmediateEcommerceLifecycleEvents,
+  ecommerceLifecycleStatusChangeStatements
+} from '../lib/ecommerce-lifecycle-events.ts';
 
 export type OrderRecord=Order&{recordVersion:number};
 export type OrderActor={userId:string;name:string;role:WorkspaceRole};
@@ -172,6 +176,7 @@ export async function updateOrderRecord(ownerId:string,id:string,input:unknown,e
   await ensureAuditTable();
   const db=database(),inventoryChanged=JSON.stringify(state.inventoryHolds)!==JSON.stringify(merged.inventoryHolds);
   const expectedInventoryVersion=inventoryChanged?await getDomainVersion(ownerId,INVENTORY_SUPPLIER_DOMAIN):undefined;
+  const lifecycleStatements=await ecommerceLifecycleStatusChangeStatements(ownerId,before,order,now);
   const statements:any[]=[
     db.prepare('UPDATE crm_rel_orders SET number=?,customer_id=?,created=?,delivered=?,returned_at=?,settled_at=?,channel=?,payment=?,status=?,discount=?,delivery_charge=?,courier_cost=?,packaging=?,payment_fee=?,return_fee=?,settled=?,restocked=?,tracking=?,notes=?,record_version=record_version+1,updated_at=? WHERE owner_id=? AND id=? AND record_version=?')
       .bind(order.number,order.customerId,order.created,order.delivered||null,order.returnedAt||null,order.settledAt||null,order.channel,order.payment,order.status,order.discount,order.deliveryCharge,order.courierCost,order.packaging,order.paymentFee,order.returnFee,order.settled,order.restocked,order.tracking,order.notes,now,ownerId,id,expectedVersion),
@@ -183,9 +188,11 @@ export async function updateOrderRecord(ownerId:string,id:string,input:unknown,e
   ];
   if(inventoryChanged&&expectedInventoryVersion!==undefined)statements.push(...inventorySupplierShadowStatements(ownerId,merged,nextWorkspaceVersion,now),...domainVersionBumpStatements(ownerId,INVENTORY_SUPPLIER_DOMAIN,expectedInventoryVersion,now));
   statements.push(...notificationStatusChangeStatements(ownerId,before,order,now));
+  statements.push(...lifecycleStatements);
   statements.push(db.prepare('INSERT INTO crm_audit_log (id,owner_id,actor_id,actor_name,role,summary,sections,created_at) VALUES (?,?,?,?,?,?,?,?)').bind(auditId,ownerId,actor.userId,actor.name,actor.role,'Updated order '+order.number,JSON.stringify(['orders',...(inventoryChanged?['inventoryHolds']:[])]),now));
   await db.batch(statements);
   await attemptImmediateCustomerNotifications(ownerId);
+  await attemptImmediateEcommerceLifecycleEvents(ownerId);
   return {order:{...order,recordVersion:nextRecordVersion} satisfies OrderRecord,workspaceVersion:nextWorkspaceVersion};
 }
 
