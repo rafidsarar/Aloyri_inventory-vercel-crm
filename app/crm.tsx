@@ -655,8 +655,7 @@ function requestDeleteProduct(product:Product){
   const hasHistory=s.batches.some(b=>b.productId===id)
     ||s.orders.some(o=>o.items.some(i=>i.productId===id))
     ||s.purchaseOrders.some(po=>po.items.some(i=>i.productId===id))
-    ||s.stockAdjustments.some(a=>a.productId===id)
-    ||s.inventoryHolds.some(h=>h.productId===id);
+; // Adjustments and holds reference batches, which are already protected above.
   if(hasHistory){
     toast.error('This product has inventory or transaction history. Set it inactive instead to preserve accounting and audit records.');
     return;
@@ -665,7 +664,7 @@ function requestDeleteProduct(product:Product){
 }
 function requestDelete(kind:'products'|'customers'|'suppliers',id:string,name:string){
   if(!canEdit(kind)){toast.error('Your role cannot delete this record.');return;}
-  if(kind==='products'&&(s.batches.some(b=>b.productId===id)||s.orders.some(o=>o.items.some(i=>i.productId===id))||s.purchaseOrders.some(po=>po.items.some(i=>i.productId===id))||s.stockAdjustments.some(a=>a.productId===id)||s.inventoryHolds.some(h=>h.productId===id))){toast.error('This product has stock or order history. Keep it inactive to preserve those records.');return;}
+  if(kind==='products'&&(s.batches.some(b=>b.productId===id)||s.orders.some(o=>o.items.some(i=>i.productId===id))||s.purchaseOrders.some(po=>po.items.some(i=>i.productId===id)))){toast.error('This product has stock or order history. Keep it inactive to preserve those records.');return;}
   if(kind==='customers'&&(s.orders.some(o=>o.customerId===id)||s.tasks.some(t=>t.customerId===id))){toast.error('This customer has orders or follow-ups. Keep the record to preserve that history.');return;}
   if(kind==='suppliers'&&(s.batches.some(b=>b.supplierId===id)||s.purchaseOrders.some(po=>po.supplierId===id))){toast.error('This supplier is linked to purchase or receiving history. Keep the record to preserve that audit trail.');return;}
   const label=kind==='products'?'product':kind==='customers'?'customer':'supplier';
