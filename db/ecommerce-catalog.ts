@@ -64,6 +64,12 @@ export async function readEcommerceCatalog(ownerId:string){
   return {
     generatedAt:new Date().toISOString(),
     workspaceUpdatedAt:row.updated_at,
+    // Public category labels only; include newly created empty categories.
+    // Never expose internal product costs, stock batches, or workspace state.
+    categories:[...new Set([
+      ...state.productCategories,
+      ...state.products.map(product=>product.category)
+    ].map(name=>name.trim()).filter(Boolean))],
     products
   };
 }
