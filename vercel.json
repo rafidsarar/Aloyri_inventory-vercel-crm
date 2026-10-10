@@ -3,6 +3,7 @@
   "git": {
     "deploymentEnabled": {
       "feature/*": false,
+      "ecommerce-e2e-bridge-*": true,
       "fix/*": false
     }
   },
