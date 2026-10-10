@@ -13,5 +13,6 @@
       "path": "/api/internal/notifications/process",
       "schedule": "0 3 * * *"
     }
-  ]
+  ],
+  "outputDirectory": ".next"
 }
