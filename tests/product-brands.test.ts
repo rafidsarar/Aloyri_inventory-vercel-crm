@@ -1,3 +1,4 @@
+import { publicCatalogBrands } from '../db/ecommerce-catalog.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { initialState,stateSchema,fixedBusinessName,validateRelations } from '../lib/crm.ts';
@@ -58,4 +59,12 @@ test('legacy workspaces produce deterministic public-safe brand IDs',()=>{
   const second=normalizeProductBrands(stateSchema.parse(state));
   assert.deepEqual(first.productBrandIds,second.productBrandIds);
   assert.equal(Object.keys(first.productBrandIds).length,first.productBrands.length);
+});
+
+test('signed storefront catalog includes empty brands but never internal brand metadata',()=>{
+  const state=saveProductBrand(normalizeProductBrands(initialState()),'Unassigned');
+  const directory=publicCatalogBrands(state);
+  assert.ok(directory.some(brand=>brand.name==='Unassigned'));
+  assert.ok(directory.every(brand=>Object.keys(brand).sort().join(',')==='id,name'));
+  assert.equal(new Set(directory.map(brand=>brand.id)).size,directory.length);
 });
