@@ -17,7 +17,7 @@ export async function GET(request:Request){
     customers:{customers:data.customers.map(customer=>({...customer,recordVersion:0}))},
     orders:{orders:data.orders.map(order=>({...order,recordVersion:0}))},
     inventory:{data:{
-      products:data.products,productCategories:data.productCategories,suppliers:data.suppliers,
+      products:data.products,productCategories:data.productCategories,productBrands:data.productBrands,suppliers:data.suppliers,
       purchaseOrders:data.purchaseOrders,batches:data.batches,stockAdjustments:data.stockAdjustments,
       inventoryHolds:data.inventoryHolds
     },domainVersion:1},

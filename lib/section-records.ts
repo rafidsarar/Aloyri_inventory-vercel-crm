@@ -3,7 +3,7 @@ import { workspaceSummary } from './workspace-summary.ts';
 import type { PageRequest } from './pagination.ts';
 import { pageMetadata } from './pagination.ts';
 
-export const sectionKinds={products:'Inventory',batches:'Inventory',categories:'Inventory',returns:'Inventory',cancelledHolds:'Inventory',holds:'Inventory',purchaseOrders:'Suppliers',suppliers:'Suppliers',tasks:'Follow-ups',collections:'Finances',collectionHistory:'Finances',payables:'Finances',expenses:'Finances',cashflow:'Finances',refundOrders:'Finances',refundHistory:'Finances',credits:'Finances',creditHistory:'Finances',assigned:'Finances',unassigned:'Finances',automation:'Automation',integrity:'Finances'} as const;
+export const sectionKinds={products:'Inventory',batches:'Inventory',categories:'Inventory',brands:'Inventory',returns:'Inventory',cancelledHolds:'Inventory',holds:'Inventory',purchaseOrders:'Suppliers',suppliers:'Suppliers',tasks:'Follow-ups',collections:'Finances',collectionHistory:'Finances',payables:'Finances',expenses:'Finances',cashflow:'Finances',refundOrders:'Finances',refundHistory:'Finances',credits:'Finances',creditHistory:'Finances',assigned:'Finances',unassigned:'Finances',automation:'Automation',integrity:'Finances'} as const;
 export type SectionKind=keyof typeof sectionKinds;
 export type SectionOptions={sort?:string;month?:string;range?:string;account?:string};
 /** Stable server-side ordering includes an ID tie-breaker for records with equal dates. */
@@ -17,6 +17,7 @@ export function sectionRecordIds(s:State,kind:SectionKind,page:PageRequest,optio
   rows.sort((a,b)=>{let n=0;switch(options.sort){case 'Available ↑':n=a.available-b.available;break;case 'Available ↓':n=b.available-a.available;break;case 'Expiry soonest':n=a.expiry.localeCompare(b.expiry);break;case '30d movement':n=b.movement-a.movement;break;case 'Stock value':n=b.value-a.value;break;case 'Name A–Z':break;default:n=ranks[a.health]-ranks[b.health]||a.available-b.available}return n||a.product.name.localeCompare(b.product.name)||id(a.product,b.product)});return rows.map(r=>r.product.id);
  }
  case 'batches':return s.batches.filter(b=>filter==='All'||filter==='Expiring'&&b.expiry>today()&&b.expiry<=shiftDate(90)&&batchRemaining(s,b)>0||filter==='Expired'&&b.expiry<=today()&&batchRemaining(s,b)>0||filter==='Received this month'&&b.received.slice(0,7)===(options.month||today().slice(0,7))).filter(b=>match(products.get(b.productId)?.name,b.invoice)).sort((a,b)=>a.expiry.localeCompare(b.expiry)||id(a,b)).map(b=>b.id);
+ case 'brands':return s.productBrands.filter(c=>match(c)).sort();
  case 'categories':return s.productCategories.filter(c=>match(c)).sort().map(c=>c);
  case 'returns':return s.orders.filter(o=>o.status==='Returned'&&!o.restocked).sort((a,b)=>(a.returnedAt||a.created).localeCompare(b.returnedAt||b.created)||id(a,b)).map(o=>o.id);
  case 'cancelledHolds':return [...new Set(s.inventoryHolds.filter(h=>!h.releasedAt&&h.source==='Cancelled'&&h.type==='Quarantine').map(h=>h.sourceOrderId).filter((x):x is string=>Boolean(x)))].sort();
