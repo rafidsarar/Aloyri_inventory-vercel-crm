@@ -53,3 +53,16 @@ test('Brands UI creates, searches, renames and removes an unused brand',async({b
  await row.getByRole('button',{name:'Rename',exact:true}).click();await page.getByLabel('Brand name',{exact:true}).fill(name+' renamed');await page.getByRole('dialog').getByRole('button',{name:/Save/}).click();await expect(page.getByRole('dialog')).toBeHidden();
  const renamed=page.getByRole('row').filter({hasText:name+' renamed'});await expect(renamed).toBeVisible();await renamed.getByRole('button',{name:'Delete',exact:true}).click();await page.getByRole('alertdialog').getByRole('button',{name:/Confirm|Delete/}).click();await expect(renamed).toBeHidden();await context.close();
 });
+test('Add Product can select and quickly create a persisted brand',async({browser})=>{
+ const {context,request,headers}=await login(browser,'owner');const page=await context.newPage();await page.goto('/');
+ await page.getByRole('button',{name:'Inventory',exact:true}).first().click();await page.getByRole('button',{name:'Add product',exact:true}).first().click();
+ const dialog=page.getByRole('dialog'),name='Brand product '+Date.now(),brand='Quick brand '+Date.now();
+ await dialog.getByLabel('name',{exact:true}).fill(name);
+ await dialog.getByLabel('New brand name',{exact:true}).fill(brand);await dialog.getByRole('button',{name:'Use new brand',exact:true}).click();
+ await expect(dialog.getByRole('combobox',{name:'Product brand',exact:true})).toContainText(brand);
+ await dialog.getByRole('button',{name:'Save changes',exact:true}).click();await expect(dialog).toBeHidden();
+ await page.reload();const current=await (await request.get('/api/inventory-suppliers')).json();
+ expect(current.data.productBrands).toContain(brand);expect(current.data.products.find(p=>p.name===name).brand).toBe(brand);
+ current.data.products=current.data.products.filter(p=>p.name!==name);current.data.productBrands=current.data.productBrands.filter(b=>b!==brand);
+ const result=await request.put('/api/inventory-suppliers',{headers,data:{data:current.data,domainVersion:current.domainVersion}});expect(result.status(),await result.text()).toBe(200);await context.close();
+});

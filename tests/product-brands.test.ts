@@ -6,7 +6,7 @@ import { applyRoleChanges,visibleState,validateWorkspaceChange } from '../lib/ro
 import type { WorkspaceRole } from '../lib/roles.ts';
 
 test('legacy brands migrate without losing products, prices or quantities',()=>{
- const {productBrands:_brands,...legacy}=initialState();
+ const {productBrands:_brands,...legacy}=initialState();void _brands;
  legacy.products=[{...legacy.products[0],brand:' COSRX '},{...legacy.products[0],id:'second',brand:'cosrx'},{...legacy.products[0],id:'third',brand:''}];
  const migrated=fixedBusinessName(stateSchema.parse(legacy));
  assert.deepEqual(migrated.productBrands,['COSRX']);assert.deepEqual(migrated.products.map(p=>p.brand),['COSRX','COSRX','']);
