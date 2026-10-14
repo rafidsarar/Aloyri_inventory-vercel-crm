@@ -45,7 +45,7 @@ const FinancesSection=dynamic(()=>import('./crm-sections/finances'));
 type GlobalResult={id:string;view:View;title:string;meta:string;query:string;score:number;detail?:{type:'order'|'customer'|'supplier';id:string}};
 type CustomerApiRecord=Customer&{recordVersion:number};
 type OrderApiRecord=Order&{recordVersion:number};
-const inventorySupplierKeys=['products','productCategories','productBrands','suppliers','purchaseOrders','batches','stockAdjustments','inventoryHolds','returnInspections'] as const;
+const inventorySupplierKeys=['products','productCategories','productBrands','productBrandIds','suppliers','purchaseOrders','batches','stockAdjustments','inventoryHolds','returnInspections'] as const;
 const financeKeys=['expenses','cashEntries','accountOpenings','accountMatches','financeCloses','customerRefunds','returnSettlements','creditUses'] as const;
 const compatibilityKeys=['tasks','businessName','businessProfile','automationSettings'] as const;
 const modalCollection:Record<Modal['type'],string>={order:'orders',orderEdit:'orders',customer:'customers',task:'tasks',product:'products',category:'productCategories',brand:'productBrands',batch:'batches',batchSupplier:'batches',stockAdjust:'stockAdjustments',stockHold:'inventoryHolds',supplier:'suppliers',expense:'expenses',cashEntry:'cashEntries',settings:'businessName'};
