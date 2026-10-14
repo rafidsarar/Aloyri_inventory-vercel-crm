@@ -35,3 +35,27 @@ for(const role of ['owner','admin','inventory','sales','finance','viewer'] as Wo
   else assert.throws(()=>applyRoleChanges(s,next,role),/role cannot change/);
  });
 }
+
+
+test('brand IDs stay stable across a CRM rename and survive workspace serialization',()=>{
+  let state=normalizeProductBrands(initialState());
+  const original='Simple',initialId=state.productBrandIds['simple'];
+  assert.ok(initialId);
+  state=saveProductBrand(state,'Simple Skincare',original);
+  assert.equal(state.productBrandIds['simple'],undefined);
+  assert.equal(state.productBrandIds['simple skincare'],initialId);
+  const restored=fixedBusinessName(stateSchema.parse(JSON.parse(JSON.stringify(state))));
+  assert.equal(restored.productBrandIds['simple skincare'],initialId);
+  state=saveProductBrand(restored,'Independent Label');
+  assert.ok(state.productBrandIds['independent label']);
+  state=deleteProductBrand(state,'Independent Label');
+  assert.equal(state.productBrandIds['independent label'],undefined);
+});
+test('legacy workspaces produce deterministic public-safe brand IDs',()=>{
+  const state=initialState();
+  delete (state as any).productBrandIds;
+  const first=normalizeProductBrands(stateSchema.parse(state));
+  const second=normalizeProductBrands(stateSchema.parse(state));
+  assert.deepEqual(first.productBrandIds,second.productBrandIds);
+  assert.equal(Object.keys(first.productBrandIds).length,first.productBrands.length);
+});
