@@ -59,7 +59,7 @@ test('Add Product can select and quickly create a persisted brand',async({browse
  const dialog=page.getByRole('dialog'),name='Brand product '+Date.now(),brand='Quick brand '+Date.now();
  await dialog.getByLabel('name',{exact:true}).fill(name);
  await dialog.getByLabel('New brand name',{exact:true}).fill(brand);await dialog.getByRole('button',{name:'Use new brand',exact:true}).click();
- await expect(dialog.getByRole('combobox',{name:'Product brand',exact:true})).toContainText(brand);
+ await expect(dialog.getByRole('combobox',{name:'Product brand',exact:true})).toHaveValue(brand);
  await dialog.getByRole('button',{name:'Save changes',exact:true}).click();await expect(dialog).toBeHidden();
  await page.reload();const current=await (await request.get('/api/inventory-suppliers')).json();
  expect(current.data.productBrands).toContain(brand);expect(current.data.products.find(p=>p.name===name).brand).toBe(brand);
