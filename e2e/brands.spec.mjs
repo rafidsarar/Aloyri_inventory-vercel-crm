@@ -45,8 +45,8 @@ for(const role of ['owner','admin','inventory','sales','finance','viewer'])test(
  await context.close();
 });
 test('Brands UI creates, searches, renames and removes an unused brand',async({browser})=>{
- const {context}=await login(browser,'owner');const page=await context.newPage();await page.goto('/');
- await page.getByRole('button',{name:'Inventory',exact:true}).first().click();await page.getByRole('tab',{name:'Brands',exact:true}).click();
+ const {context}=await login(browser,'owner');const page=await context.newPage();await page.goto('/');await expect(page.getByRole('heading',{name:'Run the business from what needs attention now.'})).toBeVisible({timeout:30000});
+ await page.locator('.app-sidebar').getByRole('button',{name:'Inventory',exact:true}).click();await page.getByRole('tab',{name:'Brands',exact:true}).click();
  const name='UI brand '+Date.now();await page.getByRole('button',{name:'Add brand',exact:true}).click();await page.getByLabel('Brand name',{exact:true}).fill(name);
  await page.getByRole('dialog').getByRole('button',{name:/Save/}).click();await expect(page.getByRole('dialog')).toBeHidden();
  await page.getByLabel('Search inventory brands').fill(name);const row=page.getByRole('row').filter({hasText:name});await expect(row).toBeVisible();
@@ -54,8 +54,8 @@ test('Brands UI creates, searches, renames and removes an unused brand',async({b
  const renamed=page.getByRole('row').filter({hasText:name+' renamed'});await expect(renamed).toBeVisible();await renamed.getByRole('button',{name:'Delete',exact:true}).click();await page.getByRole('alertdialog').getByRole('button',{name:/Confirm|Delete/}).click();await expect(renamed).toBeHidden();await context.close();
 });
 test('Add Product can select and quickly create a persisted brand',async({browser})=>{
- const {context,request,headers}=await login(browser,'owner');const page=await context.newPage();await page.goto('/');
- await page.getByRole('button',{name:'Inventory',exact:true}).first().click();await page.getByRole('button',{name:'Add product',exact:true}).first().click();
+ const {context,request,headers}=await login(browser,'owner');const page=await context.newPage();await page.goto('/');await expect(page.getByRole('heading',{name:'Run the business from what needs attention now.'})).toBeVisible({timeout:30000});
+ await page.locator('.app-sidebar').getByRole('button',{name:'Inventory',exact:true}).click();await page.getByRole('button',{name:'Add product',exact:true}).first().click();
  const dialog=page.getByRole('dialog'),name='Brand product '+Date.now(),brand='Quick brand '+Date.now();
  await dialog.getByLabel('name',{exact:true}).fill(name);
  await dialog.getByLabel('New brand name',{exact:true}).fill(brand);await dialog.getByRole('button',{name:'Use new brand',exact:true}).click();
