@@ -36,7 +36,7 @@ test('relational date normalization remains part of the production read path',()
 
 test('existing edit boundaries remain unchanged while staff gain Overview access',()=>{
   assert.match(roles,/sales:\{\s*sections:\['Overview','Alerts','Orders','Customers','Follow-ups'\],\s*edit:\['orders','customers','tasks'\]/);
-  assert.match(roles,/inventory:\{\s*sections:\['Overview','Alerts','Inventory','Suppliers'\],\s*edit:\['products','productCategories','productBrands','batches','suppliers','purchaseOrders','stockAdjustments','inventoryHolds'\]/);
+  assert.match(roles,/inventory:\{\s*sections:\['Overview','Alerts','Inventory','Suppliers'\],\s*edit:\['products','productCategories','productBrands','productBrandIds','batches','suppliers','purchaseOrders','stockAdjustments','inventoryHolds'\]/);
   assert.match(roles,/viewer:\{\s*sections:\['Overview','Alerts','Orders','Inventory','Customers','Suppliers','Finances','Follow-ups'\],\s*edit:\[\]/);
   assert.match(roles,/owner:\{[\s\S]*audit:true/);
   assert.match(roles,/admin:\{[\s\S]*audit:true/);
