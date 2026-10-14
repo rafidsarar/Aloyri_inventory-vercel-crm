@@ -1,4 +1,5 @@
 import { validateRelations, type State } from './crm.ts';
+import { validateBrandRemoval } from './product-brands.ts';
 import type { WorkspaceRole } from './roles.ts';
 import { roleCanEdit } from './roles.ts';
 
@@ -72,6 +73,7 @@ export function samePostedRecords(stored:readonly {id:string}[],submitted:readon
 
 /** Allow untouched legacy duplicate order numbers, but reject any new/changed number collision. */
 export function validateWorkspaceChange(current:State,next:State,options:{allowNewRefunds?:boolean;allowSettlements?:boolean;allowCreditUses?:boolean;allowInspections?:boolean}={}){
+  validateBrandRemoval(current,next);
   if(!options.allowNewRefunds&&next.customerRefunds.some(r=>!current.customerRefunds.some(p=>p.id===r.id)))throw new Error('Use Record refund to post customer refunds.');
   for(const [key,allowed] of [['returnSettlements',options.allowSettlements],['creditUses',options.allowCreditUses],['returnInspections',options.allowInspections]] as const){
     for(const record of current[key])if(JSON.stringify(next[key].find(x=>x.id===record.id))!==JSON.stringify(record))throw new Error('Posted return and credit history cannot be changed or deleted.');
@@ -136,6 +138,7 @@ function restoreInventoryPaymentFields(next:State,current:State){
 }
 
 export function applyRoleChanges(current:State,proposed:State,role:WorkspaceRole):State {
+  validateBrandRemoval(current,proposed);
   const visible=visibleState(current,role);
   const postedKeys=['customerRefunds','returnSettlements','creditUses','returnInspections'] as const;
   // A caller may receive the relational ledger in a different order from the

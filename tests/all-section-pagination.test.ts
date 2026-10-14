@@ -8,7 +8,7 @@ function workspace(){
  const s=initialState(),product=s.products[0];s.productCategories=[];s.products=[];
  for(let i=0;i<63;i++){
   const suffix=String(i).padStart(3,'0'),p='product-'+suffix,b='batch-'+suffix,c='customer-'+suffix,returned='return-'+suffix,newOrder='new-'+suffix;
-  s.products.push({...product,id:p,name:'Product '+suffix,category:'Category '+suffix,active:true,reorderAt:1000});s.productCategories.push('Category '+suffix);
+  s.products.push({...product,id:p,name:'Product '+suffix,category:'Category '+suffix,active:true,reorderAt:1000});s.productCategories.push('Category '+suffix);s.productBrands.push('Brand '+suffix);
   s.customers.push({id:c,name:'Customer '+suffix,phone:'',address:'',city:'Dhaka',preference:'',notes:'',consent:false,created:'2026-01-01'});
   s.suppliers.push({id:'supplier-'+suffix,name:'Supplier '+suffix,contact:'',phone:'',email:'',address:'',leadDays:14,paymentTermsDays:30,notes:'',verified:false});
   s.batches.push({id:b,productId:p,qty:500,unitCost:10,received:'2026-01-01',expiry:'2099-12-31',supplierId:'supplier-'+suffix,invoice:'Invoice '+suffix,payments:[],paid:false});
