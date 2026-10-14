@@ -1,3 +1,4 @@
+import { publicCatalogBrands } from '../db/ecommerce-catalog.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { initialState,stateSchema,fixedBusinessName,validateRelations } from '../lib/crm.ts';
@@ -35,3 +36,35 @@ for(const role of ['owner','admin','inventory','sales','finance','viewer'] as Wo
   else assert.throws(()=>applyRoleChanges(s,next,role),/role cannot change/);
  });
 }
+
+
+test('brand IDs stay stable across a CRM rename and survive workspace serialization',()=>{
+  let state=normalizeProductBrands(initialState());
+  const original='Simple',initialId=state.productBrandIds['simple'];
+  assert.ok(initialId);
+  state=saveProductBrand(state,'Simple Skincare',original);
+  assert.equal(state.productBrandIds['simple'],undefined);
+  assert.equal(state.productBrandIds['simple skincare'],initialId);
+  const restored=fixedBusinessName(stateSchema.parse(JSON.parse(JSON.stringify(state))));
+  assert.equal(restored.productBrandIds['simple skincare'],initialId);
+  state=saveProductBrand(restored,'Independent Label');
+  assert.ok(state.productBrandIds['independent label']);
+  state=deleteProductBrand(state,'Independent Label');
+  assert.equal(state.productBrandIds['independent label'],undefined);
+});
+test('legacy workspaces produce deterministic public-safe brand IDs',()=>{
+  const legacy:Record<string,unknown>={...initialState()};
+  delete legacy.productBrandIds;
+  const first=normalizeProductBrands(stateSchema.parse(legacy));
+  const second=normalizeProductBrands(stateSchema.parse(legacy));
+  assert.deepEqual(first.productBrandIds,second.productBrandIds);
+  assert.equal(Object.keys(first.productBrandIds).length,first.productBrands.length);
+});
+
+test('signed storefront catalog includes empty brands but never internal brand metadata',()=>{
+  const state=saveProductBrand(normalizeProductBrands(initialState()),'Unassigned');
+  const directory=publicCatalogBrands(state);
+  assert.ok(directory.some(brand=>brand.name==='Unassigned'));
+  assert.ok(directory.every(brand=>Object.keys(brand).sort().join(',')==='id,name'));
+  assert.equal(new Set(directory.map(brand=>brand.id)).size,directory.length);
+});

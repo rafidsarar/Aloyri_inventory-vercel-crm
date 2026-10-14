@@ -7,7 +7,7 @@ import { today,uid,fixedBusinessName, stateSchema, validateRelations, type State
 import type { WorkspaceRole } from '../lib/roles.ts';
 import { ensureInventorySupplierApiReady, INVENTORY_SUPPLIER_DOMAIN, inventorySupplierShadowStatements } from './inventory-supplier-shadow.ts';
 
-export const inventorySupplierKeys=['products','productCategories','productBrands','suppliers','purchaseOrders','batches','stockAdjustments','inventoryHolds','returnInspections'] as const;
+export const inventorySupplierKeys=['products','productCategories','productBrands','productBrandIds','suppliers','purchaseOrders','batches','stockAdjustments','inventoryHolds','returnInspections'] as const;
 export type InventorySupplierKey=typeof inventorySupplierKeys[number];
 export type InventorySupplierData=Pick<State,InventorySupplierKey>;
 type Actor={userId:string;name:string;role:WorkspaceRole};
@@ -48,6 +48,7 @@ export async function getInventorySupplierDomain(ownerId:string){
 
     // Registry metadata shares the atomic workspace transaction and domain version.
     productBrands:state.productBrands,
+    productBrandIds:state.productBrandIds,
     productCategories:categories.results.map((x:any)=>x.name),
     products:products.results.map((x:any)=>({id:x.id,name:x.name,brand:x.brand,size:x.size,category:x.category,price:Number(x.price),cost:Number(x.cost),targetQty:Number(x.target_qty),reorderAt:Number(x.reorder_at),active:Boolean(x.active)})),
     suppliers:suppliers.results.map((x:any)=>({id:x.id,name:x.name,contact:x.contact,phone:x.phone,email:x.email,address:x.address,leadDays:Number(x.lead_days),paymentTermsDays:Number(x.payment_terms_days),notes:x.notes,verified:Boolean(x.verified)})),
@@ -56,14 +57,14 @@ export async function getInventorySupplierDomain(ownerId:string){
     stockAdjustments:adjustments.results.map((x:any)=>({id:x.id,batchId:x.batch_id,delta:Number(x.delta),date:relationalDate(x.date),reason:x.reason})),
     inventoryHolds:holds.results.map((x:any)=>({id:x.id,batchId:x.batch_id,qty:Number(x.qty),date:relationalDate(x.date),type:x.type,reason:x.reason,source:x.source,sourceOrderId:x.source_order_id||undefined,releasedAt:optionalRelationalDate(x.released_at)}))
   };
-  const parsed=stateSchema.pick({products:true,productCategories:true,productBrands:true,suppliers:true,purchaseOrders:true,batches:true,stockAdjustments:true,inventoryHolds:true,returnInspections:true}).parse(data);
+  const parsed=stateSchema.pick({products:true,productCategories:true,productBrands:true,productBrandIds:true,suppliers:true,purchaseOrders:true,batches:true,stockAdjustments:true,inventoryHolds:true,returnInspections:true}).parse(data);
   return {data:parsed,version:row.version,domainVersion};
 }
 
 export async function saveInventorySupplierDomain(ownerId:string,input:unknown,expectedDomainVersion:number,actor:Actor){
   if(!Number.isInteger(expectedDomainVersion)||expectedDomainVersion<0)throw new Error('DOMAIN_VERSION_REQUIRED');
   const parsed=stateSchema.pick({
-    products:true,productCategories:true,productBrands:true,suppliers:true,purchaseOrders:true,batches:true,stockAdjustments:true,inventoryHolds:true,returnInspections:true
+    products:true,productCategories:true,productBrands:true,productBrandIds:true,suppliers:true,purchaseOrders:true,batches:true,stockAdjustments:true,inventoryHolds:true,returnInspections:true
   }).safeParse(input);
   if(!parsed.success)throw new Error('INVALID_INVENTORY_SUPPLIER_DATA');
   const {row,state}=await ensureInventorySupplierApiReady(ownerId);

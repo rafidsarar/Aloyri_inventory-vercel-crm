@@ -1,4 +1,5 @@
 import { database } from './raw.ts';
+import { normalizeProductBrands, brandKey } from '../lib/product-brands.ts';
 import { catalogPromotionMap } from './ecommerce-promotions.ts';
 import {
   fixedBusinessName,
@@ -56,6 +57,12 @@ export function publicCatalogCategories(categoryNames:readonly string[], product
   return result;
 }
 
+export function publicCatalogBrands(state:StateLike){
+  const source=normalizeProductBrands(state);
+  return source.productBrands.map(name=>({id:source.productBrandIds[brandKey(name)],name}));
+}
+type StateLike=ReturnType<typeof stateSchema.parse>;
+
 export async function readEcommerceCatalog(ownerId:string){
   const row=await database().prepare(
     'SELECT data,updated_at FROM crm_workspaces WHERE owner_id=?'
@@ -80,6 +87,7 @@ export async function readEcommerceCatalog(ownerId:string){
     // Public category labels only; include newly created empty categories.
     // Never expose internal product costs, stock batches, or workspace state.
     categories:publicCatalogCategories(state.productCategories,state.products),
+    brands:publicCatalogBrands(state),
     products
   };
 }
