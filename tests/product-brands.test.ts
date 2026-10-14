@@ -53,10 +53,10 @@ test('brand IDs stay stable across a CRM rename and survive workspace serializat
   assert.equal(state.productBrandIds['independent label'],undefined);
 });
 test('legacy workspaces produce deterministic public-safe brand IDs',()=>{
-  const state=initialState();
-  delete (state as any).productBrandIds;
-  const first=normalizeProductBrands(stateSchema.parse(state));
-  const second=normalizeProductBrands(stateSchema.parse(state));
+  const legacy:Record<string,unknown>={...initialState()};
+  delete legacy.productBrandIds;
+  const first=normalizeProductBrands(stateSchema.parse(legacy));
+  const second=normalizeProductBrands(stateSchema.parse(legacy));
   assert.deepEqual(first.productBrandIds,second.productBrandIds);
   assert.equal(Object.keys(first.productBrandIds).length,first.productBrands.length);
 });
