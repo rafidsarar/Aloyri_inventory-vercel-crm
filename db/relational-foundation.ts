@@ -122,6 +122,14 @@ export const relationalFoundationSql = [
   )`,
   `CREATE INDEX IF NOT EXISTS crm_rel_order_collections_owner_date_idx
     ON crm_rel_order_collections(owner_id, date DESC)`,
+  `CREATE TABLE IF NOT EXISTS crm_rel_product_brands (
+    owner_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    record_version INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (owner_id, name)
+  )`,
   `CREATE TABLE IF NOT EXISTS crm_rel_product_categories (
     owner_id TEXT NOT NULL,
     name TEXT NOT NULL,
