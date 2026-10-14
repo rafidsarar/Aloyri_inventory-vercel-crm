@@ -1348,3 +1348,13 @@ html,body{max-width:100%;overflow-x:hidden}
 .session-device{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:var(--muted)}
 @media(max-width:700px){.session-row{grid-template-columns:auto 1fr}.session-row>.text-button{grid-column:2;justify-self:start}.account-security-actions>.btn{flex:1 1 180px}}
 
+
+/* Product brand selection and quick creation share consistent control spacing. */
+.product-brand-field{min-width:0}
+.product-brand-controls{display:grid;gap:10px;margin-top:7px}
+.product-brand-controls>input,.product-brand-create>input{width:100%;min-width:0;height:42px}
+.product-brand-controls select.choice{display:block;width:100%;min-width:0;height:42px!important;border:1px solid var(--border);padding:8px 11px;border-radius:7px}
+.product-brand-create{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px}
+.product-brand-create .btn{height:42px;min-height:42px;margin:0;padding:8px 12px;white-space:nowrap;justify-content:center}
+.product-brand-field>small{margin-top:8px}
+@media(max-width:480px){.product-brand-create{grid-template-columns:minmax(0,1fr)}.product-brand-create .btn{width:100%}}
